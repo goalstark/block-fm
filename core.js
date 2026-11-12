@@ -783,17 +783,26 @@ function marketInfo() {
   const fa = G.fa.map(id => G.players[id]).filter(p => p && !p.retired).sort((a,b)=>b.ovr-a.ovr).slice(0, 10);
   return { open, next, days: next - G.day, fa };
 }
-const PLANS = {
-  shoot:{ n:'슈팅 집중', k:['FIN','COM'] }, sprint:{ n:'스피드·민첩', k:['PAC','AGI'] }, tech:{ n:'드리블·테크닉', k:['DRI','TEC'] },
-  pass:{ n:'패스·시야', k:['PAS','VIS'] }, body:{ n:'체력·피지컬', k:['STA','STR'] }, mind:{ n:'판단·위치선정', k:['DEC','POS','OTB'] }, custom:{ n:'개인 특훈', k:[] }, rest:{ n:'휴식', k:[] }
+const PP = {
+  ST:{ fin:{n:'골 결정력',k:['FIN','COM']}, head:{n:'헤딩·점프',k:['HEA','JUM']}, move:{n:'침투·오프더볼',k:['OTB','PAC']}, hold:{n:'몸싸움·키핑',k:['STR','TEC']}, link:{n:'연계 패스',k:['PAS','VIS']}, body:{n:'체력',k:['STA','WOR']} },
+  W:{ drib:{n:'드리블·돌파',k:['DRI','AGI']}, spd:{n:'스피드',k:['PAC','AGI']}, cross:{n:'크로스·컷백',k:['CRS','PAS']}, fin:{n:'컷인 마무리',k:['FIN','TEC']}, link:{n:'2대1·연계',k:['PAS','OTB']}, body:{n:'체력·수비 가담',k:['STA','WOR']} },
+  AM:{ pass:{n:'창의 패스',k:['PAS','VIS']}, tech:{n:'드리블·턴',k:['DRI','TEC']}, shot:{n:'중거리·프리킥',k:['FIN','TEC']}, move:{n:'침투 타이밍',k:['OTB','DEC']}, calm:{n:'침착성·판단',k:['COM','DEC']}, body:{n:'체력·압박',k:['STA','WOR','AGG']} },
+  CM:{ pass:{n:'패스 레인지',k:['PAS','VIS']}, ctrl:{n:'볼 소유·턴',k:['TEC','DEC']}, def:{n:'수비 커버',k:['TAK','POS']}, run:{n:'활동량',k:['STA','WOR']}, shot:{n:'중거리 슛',k:['FIN','TEC']}, mind:{n:'판단·위치선정',k:['DEC','POS','OTB']} },
+  DM:{ tkl:{n:'태클·인터셉트',k:['TAK','DEC']}, pos:{n:'위치선정·마킹',k:['POS','MAR']}, phy:{n:'피지컬',k:['STR','AGG']}, pass:{n:'전진 패스',k:['PAS','VIS']}, run:{n:'활동량',k:['STA','WOR']}, air:{n:'공중볼',k:['HEA','JUM']} },
+  FB:{ run:{n:'오버래핑 스피드',k:['PAC','STA']}, cross:{n:'크로스',k:['CRS','PAS']}, def:{n:'1대1 수비',k:['MAR','TAK']}, drib:{n:'드리블',k:['DRI','AGI']}, pos:{n:'위치·커버',k:['POS','DEC']}, air:{n:'공중볼',k:['HEA','JUM']} },
+  CB:{ mark:{n:'마킹·태클',k:['MAR','TAK']}, air:{n:'헤딩 수비',k:['HEA','JUM']}, phy:{n:'피지컬',k:['STR','AGG']}, pos:{n:'위치선정·판단',k:['POS','DEC']}, build:{n:'빌드업 패스',k:['PAS','VIS']}, spd:{n:'스피드 회복',k:['PAC','AGI']} },
+  GK:{ ref:{n:'반사신경',k:['REF','HAN']}, air:{n:'공중볼·펀칭',k:['AER','HAN']}, kick:{n:'킥·배급',k:['KIC','DEC']}, mind:{n:'위치·판단',k:['DEC','REF']}, one:{n:'1대1 대응',k:['REF','AER']}, hand:{n:'핸들링',k:['HAN','AER']} }
 };
+const plansOf = (m) => Object.assign({}, PP[(m || me()).sub] || PP.ST, { custom:{ n:'개인 특훈', k:[] }, rest:{ n:'휴식', k:[] } });
+function normPlan(m) { const P = plansOf(m); if (!P[m.plan]) m.plan = Object.keys(P)[0]; return P; }
+const PLANS = plansOf({ sub:'ST' });
 function trainingDay() {
   const m = me(); const t = dateOf(G.day);
   const hasMatch = G.pendingMine || (G.lastRes[m.club] && G.lastRes[m.club].day===G.day);
   const tr = traitOf(m); m.fatSum = (m.fatSum||0) + m.fat; m.fatN = (m.fatN||0) + 1; m.push = (m.push||0) * 0.992;
   if (m.plan==='rest' || t.dow===0) { m.fat = Math.max(0, m.fat-(m.plan==='rest'?8:5)); return; }
-  const pl = PLANS[m.plan] || PLANS.shoot; const age = m.age;
-  const keys = m.plan==='custom' ? (m.cust && m.cust.length ? m.cust : ['FIN']) : pl.k;
+  const PL = normPlan(m); const pl = PL[m.plan]; const age = m.age;
+  const keys = m.plan==='custom' ? (m.cust && m.cust.length ? m.cust : [m.sub==='GK'?'REF':'FIN']) : pl.k;
   let gain = (age<=17?0.03: age<=21?0.026: age<=24?0.016: 0.008) * (m.fat>75?0.5:1) * (1+(m.trust-50)/300) * tr.gain;
   if (m.trait==='genius') gain *= 0.6 + rnd()*0.9;
   if (m.plan==='custom') gain *= keys.length===1 ? 1.5 : 1.1;
@@ -927,32 +936,36 @@ const OPT = {
   distS:{ n:'짧게 빌드업', tag:'build', k:[['KIC',.4],['DEC',.6]], b:.65, s:.009, t:'pass', a:.05, lo:.25, hi:.92, ok:['짧은 패스로 후방 빌드업을 시작합니다.'], ko:['빌드업 패스가 압박에 걸립니다.'] },
   throwQ:{ n:'빠른 던지기 역습', tag:'dist', k:[['KIC',.4],['DEC',.6]], b:.45, s:.011, t:'pass', a:.3, lo:.15, hi:.88, ta:['빠른 던지기 역습! 골로 이어집니다 — 어시스트!'], ok:['빠른 스로로 역습을 열어줍니다.'], ko:['던진 공이 상대에게 연결됩니다.'] },
 };
+// 선호 플레이 10개씩 (id가 OPT id면 해당 선택지에 ★)
+const PREF10 = { ST:['fin','oneT','head','chip','volley','long','holdup','onetwo','drib','cutback'], W:['drib','cutin','crossO','onetwo','cutback','thruP','turn','fin','long','setD'], AM:['thruP','onetwo','long','drib','cutin','setD','prog','chip','cutback','press'], CM:['prog','longP','thruP','long','onetwo','tkl','intercept','press','dribOut','setShort'], DM:['tkl','intercept','cover','press','jockey','safe','longP','prog','aerial','foul'], FB:['crossO','drib','tkl','jockey','intercept','onetwo','cutback','prog','aerial','press'], CB:['clear','aerial','tkl','block','intercept','cover','longP','build','head','foul'], GK:['dive','stand','narrow','punch','catchB','sweep','distL','distS','throwQ','wait'] };
+for (const pos in PREF10) { PREF_POS[pos] = PREF10[pos]; for (const id of PREF10[pos]) { if (!PREFS[id] && OPT[id]) { PREFS[id] = { n: OPT[id].n }; PREF_AT[id] = OPT[id].k.slice(0,2).map(x => x[0]); } } }
+
 // 장면: txt(상황 문구), o(선택지)
 const MOM = {
   box:{ txt:'박스 안에서 볼이 내 앞에 떨어집니다!', o:['shoot','oneT','chip','cutback','drib'] },
-  through:{ txt:'동료의 스루패스가 수비 뒷공간으로 들어옵니다!', o:['shoot','chip','drib','cutback','oneT'] },
+  through:{ txt:'동료의 스루패스가 수비 뒷공간으로 들어옵니다!', o:['shoot','chip','drib','cutback','oneT','long'] },
   crossIn:{ txt:'측면에서 크로스가 박스로 올라옵니다!', o:['head','volley','oneT','cutback'] },
   link:{ txt:'등을 지고 공을 받았습니다. 동료들이 올라오고 있습니다.', o:['holdup','onetwo','turn','shoot','thruP'] },
-  counter:{ txt:'역습 상황, 앞에 수비수 한 명뿐입니다!', o:['shoot','drib','chip','thruP'] },
+  counter:{ txt:'역습 상황, 앞에 수비수 한 명뿐입니다!', o:['shoot','drib','chip','thruP','long'] },
   wing:{ txt:'측면에서 수비수와 1대1 상황입니다!', o:['drib','onetwo','crossO','cutin','safe'] },
   cutinM:{ txt:'안쪽으로 파고들 공간이 보입니다!', o:['cutin','shoot','cutback','thruP','onetwo'] },
-  counterW:{ txt:'역습 기회, 측면이 활짝 열렸습니다!', o:['drib','thruP','shoot','crossO','onetwo'] },
+  counterW:{ txt:'역습 기회, 측면이 활짝 열렸습니다!', o:['drib','thruP','shoot','crossO','onetwo','turn','long'] },
   far:{ txt:'반대편에서 크로스가 넘어옵니다!', o:['volley','head','oneT','cutback'] },
-  zone14:{ txt:'수비 라인 사이에서 공을 받았습니다!', o:['thruP','long','onetwo','drib','shoot'] },
+  zone14:{ txt:'수비 라인 사이에서 공을 받았습니다!', o:['thruP','long','onetwo','drib','shoot','cutin','chip'] },
   setp:{ txt:'박스 앞 프리킥 기회입니다!', o:['setD','setCross','setShort'] },
   second:{ txt:'세컨볼이 박스 근처로 흘러옵니다!', o:['oneT','long','cutback','shoot','thruP'] },
-  pressA:{ txt:'상대 압박이 거세게 들어옵니다!', o:['turn','safe','onetwo','dribOut','prog'] },
+  pressA:{ txt:'상대 압박이 거세게 들어옵니다!', o:['turn','safe','onetwo','dribOut','prog','press'] },
   longC:{ txt:'중거리 슛을 때릴 공간이 열렸습니다!', o:['long','thruP','safe','drib','onetwo'] },
   thruM:{ txt:'앞선 동료가 침투하고 있습니다. 킬패스 타이밍!', o:['thruP','onetwo','longP','safe','long'] },
   tackleM:{ txt:'상대 역습이 시작됩니다! 중원에서 끊어야 합니다.', o:['tackle','intercept','press','foul','jockey'] },
   interceptD:{ txt:'상대가 침투 패스를 노립니다!', o:['intercept','tackle','cover','foul','jockey'] },
   buildD:{ txt:'공을 잡았습니다. 빌드업을 이끌어야 합니다.', o:['prog','longP','safe','dribOut','thruP'] },
-  secondD:{ txt:'세컨볼 경합 상황입니다!', o:['tackle','press','block','safe'] },
+  secondD:{ txt:'세컨볼 경합 상황입니다!', o:['tackle','press','block','safe','aerial'] },
   overlap:{ txt:'오버래핑 공간이 활짝 열렸습니다!', o:['crossO','onetwo','drib','cutback','safe'] },
-  duelD:{ txt:'상대 윙어와 1대1 상황입니다!', o:['tackle','jockey','block','foul','cover'] },
+  duelD:{ txt:'상대 윙어와 1대1 상황입니다!', o:['tackle','jockey','block','foul','cover','intercept','aerial','press'] },
   buildFB:{ txt:'측면에서 공을 잡았습니다. 전개를 선택하세요.', o:['prog','longP','safe','drib','crossO'] },
   aerialM:{ txt:'상대 크로스가 위험지역으로 들어옵니다!', o:['clear','aerial','cover','block'] },
-  duelCB:{ txt:'상대 공격수가 돌파해 들어옵니다!', o:['tackle','jockey','block','foul','cover'] },
+  duelCB:{ txt:'상대 공격수가 돌파해 들어옵니다!', o:['tackle','jockey','block','foul','cover','intercept'] },
   buildCB:{ txt:'수비 라인에서 공을 잡았습니다. 빌드업을 선택하세요.', o:['longP','prog','safe','dribOut'] },
   cornerH:{ txt:'코너킥! 공격에 가담합니다.', o:['head','safe','volley'] },
   shotG:{ txt:'강한 슈팅이 날아옵니다!', o:['dive','stand','narrow','punch','catchB'] },
@@ -961,7 +974,7 @@ const MOM = {
   distG:{ txt:'공을 잡았습니다. 배급 기회!', o:['distL','distS','throwQ'] },
   penG:{ txt:'페널티킥! 키커와 마주합니다.', o:['dive','wait','stand','narrow'] },
 };
-const POSK = { ST:['box','through','crossIn','link','counter'], W:['wing','cutinM','counterW','far'], AM:['zone14','setp','second','pressA'], CM:['pressA','longC','thruM','tackleM'], DM:['interceptD','buildD','secondD','tackleM'], FB:['overlap','duelD','buildFB'], CB:['aerialM','duelCB','buildCB','cornerH'], GK:['shotG','oneone','crossG','distG','penG'] };
+const POSK = { ST:['box','through','crossIn','link','counter'], W:['wing','cutinM','counterW','far','setp'], AM:['zone14','setp','second','pressA'], CM:['pressA','longC','thruM','tackleM','setp'], DM:['interceptD','buildD','secondD','tackleM'], FB:['overlap','duelD','buildFB'], CB:['aerialM','duelCB','buildCB','cornerH'], GK:['shotG','oneone','crossG','distG','penG'] };
 function momentText(kind) { return (MOM[kind] || MOM.box).txt; }
 function momentOptions(mo) {
   const m = me(), a = m.a, os = (G.mm.oppStr-60)*0.004, tb = traitOf(m).b, pf = m.prefs || [];
@@ -969,7 +982,7 @@ function momentOptions(mo) {
   const ids = (MOM[mo.kind] || MOM.box).o;
   return ids.map(id => { const d = OPT[id]; let v = 0; for (const [k,w] of d.k) v += w * (a[k] || 45);
     let p = d.b + (v-50)*d.s - os*(d.osf||1) + (d.t ? (tb[d.t === 'pass' ? 'pass' : d.t] || 0) : 0) + (d.pos && d.g===1 ? pb : 0);
-    const fav = pf.some(x => x === d.tag); if (fav) p += 0.06;
+    const fav = pf.some(x => x === d.tag || x === id); if (fav) p += 0.06;
     p = clamp(p, d.lo || 0.05, d.hi || 0.9);
     return { id, n: d.n, p, shown: p, fav, def: !!d.def };
   });
@@ -1158,5 +1171,5 @@ function dailyNews(t) {
 // ----- 저장 -----
 function serialize() { return JSON.stringify(G, (k,v) => { if (k==='ab'||k==='mm') return undefined; if ((k==='st'||k==='cst'||k==='nst') && v && v.a===0 && v.g===0 && v.as===0 && v.m===0 && v.y===0) return undefined; if (k==='form' || k==='rs') return Math.round(v*100)/100; return v; }); }
 function load(str) { const g = JSON.parse(str); if (g.v !== 2) throw new Error('old save'); G = g; for (const id in G.players) { const p = G.players[id]; if (!p.st) p.st = blankSt(); if (!p.cst) p.cst = blankSt(); if (!p.nst) p.nst = blankSt(); Eng.finalize(p); } G.mm = null; return G; }
-const API2 = { mvpOf, get G() { return G; }, newWorld, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
+const API2 = { plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
 if (typeof module !== 'undefined') module.exports = API2;
