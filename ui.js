@@ -329,8 +329,10 @@ function contractView() {
   else body = scoutView(m);
   return `<div class="top"><div class="ttl">이적</div></div>${subChips(S.ct, CT_TABS, 'ct')}<div class="body">${body}</div>`;
 }
+async function gzEnc(str) { const cs = new Blob([str]).stream().pipeThrough(new CompressionStream('gzip')); const u = new Uint8Array(await new Response(cs).arrayBuffer()); let b = ''; for (let i = 0; i < u.length; i += 0x8000) b += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return 'BFM1:' + btoa(b); }
+async function gzDec(code) { if (!code.startsWith('BFM1:')) throw new Error('bad'); const bin = atob(code.slice(5)), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).text(); }
 function settingsModal() {
-  return `<div class="ttl">설정</div><div class="sec">저장·불러오기</div><div class="dim">자동 저장은 매 진행마다 이뤄집니다. 칸에 따로 저장해 두면 되돌릴 수 있어요.</div>${slotRows(true)}<div class="sec">게임</div><button class="btn sec wide" data-act="reset">${S.resetArm?'정말 지우고 새 게임 시작 (다시 누르면 삭제)':'새 게임 시작'}</button>`;
+  return `<div class="ttl">설정</div><div class="sec">저장·불러오기</div><div class="dim">자동 저장은 매 진행마다 이뤄집니다. 칸에 따로 저장해 두면 되돌릴 수 있어요.</div>${slotRows(true)}<div class="sec">백업 코드</div><div class="dim">앱을 지우고 다시 설치할 때를 대비해 코드를 복사해 두세요(메모 앱 등에 붙여넣기). 새로 설치한 뒤 아래 칸에 붙여넣고 복원하면 이어서 할 수 있습니다.</div><textarea id="bkbox" rows="3" style="width:100%;background:#101814;color:#EAF1EC;border:1px solid #2A3A30;border-radius:10px;padding:8px;font-size:11px" placeholder="백업 코드"></textarea><div class="row g8"><button class="btn sec" data-act="bkcopy" style="flex:1">백업 코드 복사</button><button class="btn sec" data-act="bkrestore" style="flex:1">코드로 복원</button></div><div class="sec">게임</div><button class="btn sec wide" data-act="reset">${S.resetArm?'정말 지우고 새 게임 시작 (다시 누르면 삭제)':'새 게임 시작'}</button>`;
 }
 function teamView(lg) {
   const G = G0(), me = Core.me();
@@ -385,18 +387,35 @@ let MV = null;
 const FORM = [[5,50],[22,12],[20,37],[20,63],[22,88],[44,12],[42,37],[42,63],[44,88],[66,36],[66,64]];
 const c01 = (v, a, b) => Math.max(a, Math.min(b, v));
 const sortSt = (l) => (l||[]).slice().sort((a,b) => POS_ORDER.indexOf(a.sub) - POS_ORDER.indexOf(b.sub));
+// ---- 경기장 잔디/바닥: 홈 구장에 따라 색과 무늬가 다름 ----
+const PITCHES = [
+  { n: '천연잔디', base: '#2E8B4A', a: '#319550', b: '#2A8445', pat: 'v' },
+  { n: '짙은 잔디', base: '#26763F', a: '#2A7F44', b: '#226B39', pat: 'v' },
+  { n: '연두 잔디', base: '#4FA85A', a: '#55B060', b: '#469A50', pat: 'h' },
+  { n: '건조한 잔디', base: '#7E9A44', a: '#869F4A', b: '#748E3C', pat: 'v' },
+  { n: '인조잔디', base: '#2F9C7A', a: '#33A481', b: '#2B9172', pat: 'c' },
+  { n: '흙 운동장', base: '#B08658', a: '#B58B5C', b: '#A77D50', pat: 'n' },
+  { n: '야간 구장', base: '#1F6B3C', a: '#226F40', b: '#1B6036', pat: 'v' },
+  { n: '푸른 인조잔디', base: '#2C7F8F', a: '#308896', b: '#287686', pat: 'h' }];
+function pickPitch(M) { const h = M.h; let x = ((h.id | 0) * 2654435761) >>> 0, hs = (x >> 7) % 8; if (h.lg === 'KHS' || h.kind === 'youth') hs = [0, 3, 5, 4, 1, 3][(x >> 5) % 6]; return PITCHES[hs]; }
+function pitchBg(pt) { const st = pt.pat, rect = (x, y, w, h, c) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`; let o = '';
+  if (st === 'v') for (let i = 0; i < 8; i++) o += rect(i * 12.5, 0, 12.5, 64, i % 2 ? pt.b : pt.a);
+  else if (st === 'h') for (let i = 0; i < 8; i++) o += rect(0, i * 8, 100, 8, i % 2 ? pt.b : pt.a);
+  else if (st === 'c') for (let i = 0; i < 8; i++) for (let j = 0; j < 4; j++) o += rect(i * 12.5, j * 16, 12.5, 16, (i + j) % 2 ? pt.b : pt.a);
+  else o = rect(0, 0, 100, 64, pt.a) + `<g fill="${pt.b}" fill-opacity=".5">${[[12, 10], [40, 50], [70, 20], [85, 48], [25, 36], [58, 8]].map(q => `<ellipse cx="${q[0]}" cy="${q[1]}" rx="7" ry="3"/>`).join('')}</g>`;
+  return `<rect width="100" height="64" fill="${pt.base}"/>` + o; }
 // ---- 유니폼: 홈/원정 색이 비슷하면 원정팀이 대체 유니폼을 입고, 골키퍼는 별도 색 ----
 const rgbOf = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 function cdist(a, b) { const [r1, g1, b1] = rgbOf(a), [r2, g2, b2] = rgbOf(b), rm = (r1 + r2) / 2; return Math.sqrt((2 + rm / 256) * (r1 - r2) ** 2 + 4 * (g1 - g2) ** 2 + (2 + (255 - rm) / 256) * (b1 - b2) ** 2); }
-function pickKits(M) {
+function pickKits(M, pt) {
   const h = M.h, a = M.a, hk = [h.col, h.col2], T = 160; let ak = [a.col, a.col2], away = false;
-  const okC = (c) => cdist(hk[0], c[0]) >= T && cdist(c[0], '#2E8B4A') > 90;
+  const okC = (c) => cdist(hk[0], c[0]) >= T && cdist(c[0], pt.base) > 90;
   if (cdist(hk[0], ak[0]) < T) { away = true;
     const cands = [[a.col2, a.col], ['#F2F2F2', a.col], ['#1A1A1A', a.col], ['#F2C230', '#1A1A1A'], ['#5BB2E6', '#1A1A1A'], ['#E8741A', '#1A1A1A'], ['#C8202F', '#F2F2F2']];
     ak = cands.find(okC) || cands.slice().sort((x, y) => cdist(hk[0], y[0]) - cdist(hk[0], x[0]))[0]; }
   const GKC = ['#F2C230', '#2BD9C5', '#C77DFF', '#FF8A3D', '#E94F9E', '#1A1A1A'];
   const gkPick = (avoid) => GKC.slice().sort((x, y) => Math.min(...avoid.map(c => cdist(y, c))) - Math.min(...avoid.map(c => cdist(x, c))))[0];
-  const hg = gkPick([hk[0], ak[0], '#2E8B4A']), ag = gkPick([hk[0], ak[0], hg, '#2E8B4A']);
+  const hg = gkPick([hk[0], ak[0], pt.base]), ag = gkPick([hk[0], ak[0], hg, pt.base]);
   const mh = M.mineHome; return { m: mh ? hk : ak, o: mh ? ak : hk, gk: { m: mh ? hg : ag, o: mh ? ag : hg }, away: away ? (mh ? 'o' : 'm') : null };
 }
 const kitClub = (club, kit) => ({ id: 'k' + club.id + kit[0], name: club.name, col: kit[0], col2: kit[1] });
@@ -404,7 +423,7 @@ function pitchHTML(M) {
   const dots = (st, col0, pre) => st.map((p,i) => { const col = p.sub === 'GK' ? MV.kit.gk[pre] : col0; const lk = lookOf(p), sk = '#' + SKIN_C[lk.skin], hr = '#' + HAIR_C[lk.hair], ol = pre==='o' ? '#fff' : '#000';
     const fig = `<rect x="-1.4" y="-1.4" width="2.8" height="2.9" fill="${col}" stroke="${ol}" stroke-width="0.28"/><rect x="-1.1" y="-4" width="2.2" height="2.3" fill="${sk}" stroke="${ol}" stroke-width="0.22"/><rect x="-1.1" y="-4" width="2.2" height="0.8" fill="${hr}"/><rect x="-1.2" y="1.5" width="1" height="1.5" fill="#232A26"/><rect x="0.2" y="1.5" width="1" height="1.5" fill="#232A26"/>`;
     return p.me ? `<g class="dot me" id="${pre}${i}" transform="translate(50 32)"><circle class="mering" cy="0" r="4.2" fill="none" stroke="#FFE45C" stroke-width="0.6"/><g transform="scale(1.45)">${fig}</g><path d="M0 -8.4 L-1.8 -10.8 L1.8 -10.8 Z" fill="#FFE45C"/><text y="-11.6" text-anchor="middle" font-size="3.4" font-weight="800" fill="#FFE45C" stroke="#000" stroke-width="0.5" paint-order="stroke">나</text></g>` : `<g class="dot" id="${pre}${i}" transform="translate(50 32)">${fig}</g>`; }).join('');
-  return `<div class="pwrap"><svg id="pitch" viewBox="0 0 100 64" preserveAspectRatio="xMidYMid meet"><rect width="100" height="64" fill="#2E8B4A"/>${[0,1,2,3,4,5,6,7].map(i=>`<rect x="${i*12.5}" width="12.5" height="64" fill="${i%2?'#2A8445':'#319550'}"/>`).join('')}<g fill="none" stroke="#fff" stroke-opacity=".75" stroke-width=".4"><rect x="1" y="1" width="98" height="62"/><path d="M50 1V63"/><circle cx="50" cy="32" r="8"/><rect x="1" y="17" width="14" height="30"/><rect x="85" y="17" width="14" height="30"/><rect x="1" y="25" width="5" height="14"/><rect x="94" y="25" width="5" height="14"/></g>${dots(MV.ost, MV.kit.o[0], 'o')}${dots(MV.mst, MV.kit.m[0], 'm')}<g id="ball" transform="translate(50 32)"><circle r="1.25" fill="#fff" stroke="#000" stroke-width=".35"/></g></svg><div id="fx"></div></div>`;
+  return `<div class="pwrap"><svg id="pitch" viewBox="0 0 100 64" preserveAspectRatio="xMidYMid meet">${pitchBg(MV.pitch)}<g fill="none" stroke="#fff" stroke-opacity=".75" stroke-width=".4"><rect x="1" y="1" width="98" height="62"/><path d="M50 1V63"/><circle cx="50" cy="32" r="8"/><rect x="1" y="17" width="14" height="30"/><rect x="85" y="17" width="14" height="30"/><rect x="1" y="25" width="5" height="14"/><rect x="94" y="25" width="5" height="14"/></g>${dots(MV.ost, MV.kit.o[0], 'o')}${dots(MV.mst, MV.kit.m[0], 'm')}<g id="ball" transform="translate(50 32)"><circle r="1.25" fill="#fff" stroke="#000" stroke-width=".35"/></g></svg><div id="fx"></div></div>`;
 }
 const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // ---- 연속 이동 엔진: 포메이션 기준점 + 공 영향 + 역할 + 스티어링(속도/가속), 매 프레임 갱신 ----
@@ -632,7 +651,8 @@ function lockOrient(mode) { try { const P = window.Capacitor && window.Capacitor
   else if (screen.orientation && screen.orientation.lock) screen.orientation.lock(mode).catch(() => {}); } catch (e) {} }
 function startMatch() {
   const M = Core.prepareMine();
-  MV = { min: 0, timer: null, paused: false, log: [], over: false, momentOpen: null, speed: spdMs(), ball: { x: 50, y: 32 }, poss: 'm', holder: null, pos: { m: [], o: [] }, ballFree: false, red: {}, kit: pickKits(M), t: 0, rt: 0, kick: 0, act: null, dec: 1, els: null, raf: 0, last: 0, run: {}, tgt: { m: [], o: [] }, mst: sortSt(M.stMine), ost: sortSt(M.stOpp), fxT: null };
+  const PT = pickPitch(M);
+  MV = { min: 0, timer: null, paused: false, log: [], over: false, momentOpen: null, speed: spdMs(), ball: { x: 50, y: 32 }, poss: 'm', holder: null, pos: { m: [], o: [] }, ballFree: false, red: {}, pitch: PT, kit: pickKits(M, PT), t: 0, rt: 0, kick: 0, act: null, dec: 1, els: null, raf: 0, last: 0, run: {}, tgt: { m: [], o: [] }, mst: sortSt(M.stMine), ost: sortSt(M.stOpp), fxT: null };
   MV.kc = { m: kitClub(M.mine, MV.kit.m), o: kitClub(M.opp, MV.kit.o) }; S.matchOpen = true; if (M.role==='bench' || M.role==='inj') { MV.speed = 60; MV.fast = true; }
   $('#match').innerHTML = `<div class="mh" id="mh"></div><div id="pitchbox">${pitchHTML(M)}</div><div class="mb" id="mb"></div><div class="mf" id="mf"></div>`;
   lockOrient('landscape'); $('#match').classList.add('on'); initPos(M); renderMatch(); movePitch(); MV.timer = setInterval(tick, MV.speed);
@@ -756,6 +776,8 @@ document.addEventListener('click', (e) => {
   else if (a==='mt') { S.mt = id; }
   else if (a==='ct') { S.ct = id; }
   else if (a==='gogrow') { S.tab = 'me'; S.mt = 'grow'; }
+  else if (a==='bkcopy') { gzEnc(Core.serialize()).then(c => { const ta = $('#bkbox'); if (ta) ta.value = c; return navigator.clipboard.writeText(c).then(() => toast('백업 코드를 복사했습니다'), () => toast('아래 코드를 직접 복사해 주세요')); }).catch(() => toast('백업에 실패했습니다')); return; }
+  else if (a==='bkrestore') { const v = (($('#bkbox') || {}).value || '').trim(); gzDec(v).then(str => { Core.load(str); S.step = 'game'; S.tab = 'home'; S.lc = null; S.ld = null; S.modal = null; save(); render(); toast('복원했습니다'); }).catch(() => toast('백업 코드가 올바르지 않습니다')); return; }
   else if (a==='settings') { S.modalKind = 'settings'; S.modal = settingsModal(); refreshSlots0().then(() => { if (S.modal) { S.modal = settingsModal(); render(); } }); }
   else if (a==='meet') { S.modal = meetModal(); }
   else if (a==='ma') { const r = Core.answerMeeting(+id); if (r) { S.modal = `<div class="ttl">면담 결과</div><div class="card gl"><div>“${esc(r.resp)}”</div><div class="dim">${r.fx}</div></div><button class="btn wide" data-act="close">확인</button>`; save(); } }
