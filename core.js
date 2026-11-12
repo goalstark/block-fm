@@ -152,11 +152,11 @@ function newWorld(seed, sel) {
   const used = new Set();
   for (const code of sel) buildCountry(code, used);
   // 대륙대회 보충용 외부 클럽
-  for (const cont of ['EU','AS']) {
+  for (const cont of ['EU','AS','SA','NA']) {
     const cs = sel.filter(c => DD.COUNTRIES[c].cont===cont && DD.COUNTRIES[c].slots>0); if (!cs.length) continue;
     const slots = cs.reduce((s,c)=>s+DD.COUNTRIES[c].slots,0), need = Math.max(0, 16-slots);
-    const nm = genNames(cont==='EU'?'EXT_EU':'EXT_AS', need, used);
-    nm.forEach(n => { const col = pick(DD.COLS); addClub({ name:n, lg:'EXT', col:col[0], col2:col[1], strength: cont==='EU' ? 60+ri(0,8) : 54+ri(0,7), nat:pick(cont==='EU'?['FRA','POR','NED','BEL','CRO','SRB','DEN','SUI']:['CHN','AUS','IRN','JPN','KOR','SAU']), cc:cont, kind:'ext', tier:0 }); });
+    const nm = genNames('EXT_'+cont, need, used);
+    nm.forEach(n => { const col = pick(DD.COLS); addClub({ name:n, lg:'EXT', col:col[0], col2:col[1], strength: ({EU:60+ri(0,8), AS:54+ri(0,7), SA:56+ri(0,8), NA:50+ri(0,7)})[cont], nat:pick({EU:['FRA','POR','NED','BEL','CRO','SRB','DEN','SUI'], AS:['CHN','AUS','IRN','JPN','KOR','SAU'], SA:['ARG','URU','COL','BRA'], NA:['MEX','MEX','USA']}[cont]), cc:cont, kind:'ext', tier:0 }); });
   }
   for (const c of G.clubs) buildClubSquad(c);
   for (const lg of G.leagues) { const y = lg.cal==='S' ? 2027 : 2026; buildSchedule(lg, seasonStart(lg, y)); lg.season = y; }
@@ -333,6 +333,7 @@ function finishComp(comp, champ) {
 function buildComps(cal, year) {
   for (const code of G.sel) { const C = DD.COUNTRIES[code]; if (C.cal===cal) buildCup(code); }
   if (cal==='E') for (const cont of ['EU','AS']) buildCont(cont, year);
+  if (cal==='S') for (const cont of ['SA','NA']) buildCont(cont, year);
 }
 function buildCup(cc) {
   const C = DD.COUNTRIES[cc], l1 = leagueOf(C.l1.id), l2 = C.l2 ? leagueOf(C.l2.id) : null;
@@ -358,22 +359,23 @@ function contTeams(cont) {
   while (t.length < 16 && ext.length) t.push(ext.pop());
   return t.length>=8 ? t : null;
 }
-const CONT_NAME = { EU:'유럽 챔피언스컵', AS:'아시아 챔피언스' };
+const CONT_NAME = { EU:'유럽 챔피언스컵', AS:'아시아 챔피언스', SA:'남미 리베르타도레스컵', NA:'북중미 챔피언스컵' };
 function buildCont(cont, year) {
   const teams = contTeams(cont); if (!teams) return;
   const sorted = teams.slice().sort((a,b)=>G.clubs[b].strength-G.clubs[a].strength);
   const ng = Math.floor(sorted.length/4);
-  const comp = mkComp('CONT_'+cont, CONT_NAME[cont], 'cont', cont, `${year}/${String((year+1)%100).padStart(2,'0')}`);
+  const comp = mkComp('CONT_'+cont, CONT_NAME[cont], 'cont', cont, (cont==='SA'||cont==='NA') ? `${year}` : `${year}/${String((year+1)%100).padStart(2,'0')}`);
   comp.stage = 'G'; comp.groups = [];
   for (let g=0; g<ng; g++) comp.groups.push({ teams:[], table:{} });
   for (let pot=0; pot<4; pot++) { const p = shuffle(sorted.slice(pot*ng, pot*ng+ng)); p.forEach((id,g) => { comp.groups[g].teams.push(id); comp.groups[g].table[id] = { p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0 }; }); }
-  const gd = [[9,15],[9,29],[10,20],[11,3],[11,24],[12,8]].map(([m,d]) => nextDow(dayOf(year,m,d), 2));
+  const SC = cont==='SA' || cont==='NA';
+  const gd = (SC ? [[4,14],[4,28],[5,19],[6,2],[6,23],[7,7]] : [[9,15],[9,29],[10,20],[11,3],[11,24],[12,8]]).map(([m,d]) => nextDow(dayOf(year,m,d), 2));
   comp.left = 0;
   for (const [gi,g] of comp.groups.entries()) {
     const base = circle(g.teams), md = base.concat(base.map(r => r.map(([h,a]) => [a,h])));
     md.forEach((ms, i) => ms.forEach(([h,a]) => { addFx(gd[i], h, a, { t:'cont', id:comp.id, g:gi }); comp.left++; }));
   }
-  comp.rdays = [[nextDow(dayOf(year+1,2,16),2), nextDow(dayOf(year+1,3,9),2)], [nextDow(dayOf(year+1,4,6),2), nextDow(dayOf(year+1,4,20),2)], [nextDow(dayOf(year+1,5,30),6)]];
+  comp.rdays = SC ? [[nextDow(dayOf(year,8,11),2), nextDow(dayOf(year,8,25),2)], [nextDow(dayOf(year,9,15),2), nextDow(dayOf(year,9,29),2)], [nextDow(dayOf(year,11,2),6)]] : [[nextDow(dayOf(year+1,2,16),2), nextDow(dayOf(year+1,3,9),2)], [nextDow(dayOf(year+1,4,6),2), nextDow(dayOf(year+1,4,20),2)], [nextDow(dayOf(year+1,5,30),6)]];
   comp.rl = '조별리그';
 }
 function startContKO(comp) {
@@ -532,7 +534,7 @@ function yearEnd() {
     const sh = p.sub==='GK' ? 4 : 0, ag = p.age - sh;   // 골키퍼는 늦게까지
     const tech = ag<=21?3.0 : ag<=24?1.6 : ag<=27?0.6 : ag<=30?0.1 : ag<=33?-0.3 : -0.9;
     const phys = ag<=21?2.8 : ag<=24?1.2 : ag<=27?0.1 : ag<=29?-0.5 : ag<=31?-1.2 : ag<=34?-2.0 : -2.8;
-    const before = Object.assign({}, p.a);
+    const before = Object.assign({}, p.a), ovr0 = p.ovr;
     for (const k in p.a) {
       let d = PHYS.includes(k) ? phys : tech;
       if (d < 0) d *= (1 - 0.55*care); else if (p.me) d *= 0.55;
@@ -542,10 +544,22 @@ function yearEnd() {
       p.a[k] = clamp(p.a[k] + v, 20, 97);
     }
     Eng.finalize(p);
+    // 잠재력 재평가: 성장 속도, 활약(평점·인지도), 나이에 따라 조정. 젊을수록 변동 크고, 29세 이후엔 현재 능력에 수렴
+    { const pot0 = p.pot, exp = ag<=21?3.0 : ag<=24?1.5 : ag<=27?0.5 : 0, gain = p.ovr - ovr0;
+      let adj = (gain - exp) * 0.8;
+      if (p.me) adj += clamp((p.form||6.3) - 6.5, -1.5, 2) * 1.6 + clamp(((p.fame||0) - 30)/40, -0.5, 1) + (p.trait==='genius' ? 0.4 : 0);
+      else adj += gauss() * 1.1;
+      if (ag >= 25) adj -= (ag - 24) * 0.35;
+      const lim = ag<=21 ? 4 : ag<=24 ? 3 : 2;
+      let np = pot0 + Math.round(clamp(adj, -lim, lim));
+      if (ag >= 29) np = Math.min(np, p.ovr + Math.max(0, 33 - ag));
+      np = clamp(np, p.ovr, 97);
+      if (np !== pot0) { p.pot = np; if (p.me) { p.potLog = (p.potLog||[]).concat([[y, pot0, np]]).slice(-8); } }
+      if (p.me) p.potCh = np - pot0; }
     if (p.me) { const ch = Object.keys(p.a).filter(k => p.a[k] !== before[k]).map(k => `${k} ${p.a[k]>before[k]?'+':''}${p.a[k]-before[k]}`); yrRep.push([p, ch]); }
     if (!p.me && p.age >= 34) { const ba = {34:0.04,35:0.08,36:0.15,37:0.25,38:0.35,39:0.5,40:0.65}[Math.min(p.age,40)] || 0.85; const pr = ba * (1.4 - care) * (1 - clamp((p.ovr-70)/60, 0, 0.5)) * (p.sub==='GK'?0.7:1) * (p.club===null?1.6:1); if (rnd() < pr) retire(p); }
   }
-  for (const [p, ch] of yrRep) { p.yrRep = { y, age: p.age, ch, care: Math.round(p.care*100) }; p.log.unshift([G.day, `${p.age}세 연간 변화: ${ch.length?ch.slice(0,6).join(', '):'변화 없음'}`]); if (p.log.length>40) p.log.length = 40; addNews('me', `📈 ${p.age}세 시즌 결산 — 종합 ${p.ovr} (몸 관리 ${Math.round(p.care*100)}점)`, false, { me:true }); }
+  for (const [p, ch] of yrRep) { p.yrRep = { y, age: p.age, ch, care: Math.round(p.care*100) }; p.log.unshift([G.day, `${p.age}세 연간 변화: ${ch.length?ch.slice(0,6).join(', '):'변화 없음'}`]); if (p.log.length>40) p.log.length = 40; const pc = p.potCh||0; p.log.unshift([G.day, `잠재력 재평가: ${p.pot-pc} → ${p.pot}${pc>0?' ▲':pc<0?' ▼':' (유지)'}`]); addNews('me', `📈 ${p.age}세 시즌 결산 — 종합 ${p.ovr}, 잠재 ${p.pot}${pc>0?' ▲'+pc:pc<0?' ▼'+(-pc):''} (몸 관리 ${Math.round(p.care*100)}점)`, false, { me:true }); }
   for (const c of G.clubs) c.pl = c.pl.filter(id => G.players[id] && !G.players[id].retired);
   // 유스·대학 졸업
   for (const c of G.clubs) {

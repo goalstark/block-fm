@@ -161,6 +161,10 @@ function finCard(m) {
   const led = f.log.slice(0,6).map(l=>`<tr><td>${l.y%100}.${String(l.m).padStart(2,'0')}</td><td>${l.wage}</td><td>${l.sp+l.bonus}</td><td>${l.tax+l.live+l.inv}</td><td><b style="color:${l.net>=0?'#C6F36B':'#FFB27A'}">${l.net}</b></td></tr>`).join('');
   return `<div class="sec">재정</div><div class="tiles">${tile('주급', pro?won(m.ct.wage):'—', pro?'연봉 약 '+won(m.ct.wage*52):'프로 계약 전')}${tile('잔고', won(f.bal), '누적 순이익')}${tile('누적 수입', won(f.earn+f.sp+f.bonus), '급여 '+won(f.earn))}${tile('누적 지출', won(out), '세금 '+won(f.tax))}</div><div class="card"><div class="dim">수입 내역 — 급여 ${won(f.earn)} · 스폰서 ${won(f.sp)} · 보너스(골·도움·MVP·계약) ${won(f.bonus)}</div><div class="dim">지출 내역 — 세금 ${won(f.tax)} · 생활·에이전트 ${won(f.cost)} · 자기 투자 ${won(f.inv)}</div></div><div class="sec">스폰서</div>${spOf}<div class="card">${spOn}</div><div class="sec">자기 투자 <span class="dim">매달 비용</span></div><div class="opts">${inv}</div>${led?`<div class="sec">월별 수지 <span class="dim">(만 원)</span></div><div class="card"><table class="tb"><tr><th>월</th><th>급여</th><th>스폰·보너스</th><th>지출</th><th>순이익</th></tr>${led}</table></div>`:''}`;
 }
+function potCard(m) {
+  const l = (m.potLog||[]).slice().reverse().map(x=>`<div class="li"><span class="dim">${x[0]}</span> 잠재 ${x[1]} → <b style="color:${x[2]>x[1]?'#C6F36B':x[2]<x[1]?'#FFB27A':'#9DB0A4'}">${x[2]}</b></div>`).join('');
+  return `<div class="sec">잠재력 <span class="dim">매년 재평가</span></div><div class="card"><div class="row"><b>현재 ${m.ovr} / 잠재 ${m.pot}</b></div><div class="dim">성장 속도·경기 평점·인지도·나이에 따라 매년 1월 조정됩니다. 29세 이후에는 현재 능력에 가까워져요.</div>${l}</div>`;
+}
 function achCard(m) {
   const got = Object.keys(m.ach||{}); const all = Object.keys(Core.ACH);
   return `<div class="sec">업적 <span class="dim">${got.length}/${all.length}</span></div><div class="card">${all.map(id=>`<div class="li" style="opacity:${m.ach&&m.ach[id]?1:0.4}">${m.ach&&m.ach[id]?'🏅':'🔒'} <b>${Core.ACH[id][0]}</b> <span class="dim">${Core.ACH[id][1]}</span></div>`).join('')}</div>`;
@@ -265,7 +269,7 @@ function profileHTML(p) {
   const nt = p.nst && p.nst.a>0 ? `<span class="tag">대표 ${p.nst.a}경기 ${p.nst.g}골</span>` : '';
   return `<div class="prof">${head}<div><div class="ttl">${esc(p.name)}</div><div class="dim">${Core.POS_KO[p.sub]} · ${p.age}세 · ${Core.NATK(p.nat)} · ${c?esc(c.name):'무소속'}</div><div class="row g8" style="flex-wrap:wrap"><span class="tag">종합 ${p.ovr}</span>${p.me?`<span class="tag">잠재 ${p.pot}</span>`:''}<span class="tag">계약 ${p.ct.until}</span>${nt}</div>${p.inj>0?`<div class="dim" style="color:#FFB27A">부상 ${p.inj}일</div>`:''}</div></div><div class="sec">시즌별 기록</div>${histTable(p)}${xferList(p)}<div class="sec">능력치</div>${attrBars(p)}`;
 }
-function meView() { const m = Core.me(), tr = Core.TRAITS[m.trait] || Core.TRAITS.grinder; return `<div class="top"><div class="ttl">내 선수</div></div><div class="body">${profileHTML(m)}<div class="card"><div class="row"><b>플레이 성향</b><span class="tag">${tr.n}</span></div><div class="dim">${tr.d}</div></div>${finCard(m)}${mentorCard(m)}${achCard(m)}</div>`; }
+function meView() { const m = Core.me(), tr = Core.TRAITS[m.trait] || Core.TRAITS.grinder; return `<div class="top"><div class="ttl">내 선수</div></div><div class="body">${profileHTML(m)}<div class="card"><div class="row"><b>플레이 성향</b><span class="tag">${tr.n}</span></div><div class="dim">${tr.d}</div></div>${potCard(m)}${finCard(m)}${mentorCard(m)}${achCard(m)}</div>`; }
 function contractView() {
   const m = Core.me(), c = Core.clubOf(m.club), G = G0();
   const mt = G.news.filter(n=>n.type==='transfer').slice(0,12).map(n=>`<div class="news">${esc(n.text)}</div>`).join('');
@@ -292,9 +296,9 @@ function clubModal(id) {
   return `<div class="ttl">${crest(c,28)} ${esc(c.name)}${c.id===me.club?' <span class="tag">마이팀</span>':''}</div><div class="dim">${lg?lg.name:'대표팀'} · ${Core.stageOf(c)} · 전력 ${Math.round(c.strength)} · 선수 ${pl.length}명</div>${tm}${lead}<table class="tb"><tr><th>포지션</th><th>선수</th><th>나이</th><th>종합</th><th>출전</th><th>${IC.ball}</th><th>${IC.boot}</th><th>${IC.star}</th></tr>${pl.map(p=>`<tr class="${p.me?'hl':''}"><td>${p.sub}</td><td>${pLink(p)}</td><td>${p.age}</td><td>${p.ovr}</td><td>${p.st.a}</td><td>${p.st.g}</td><td>${p.st.as}</td><td>${p.st.a?f1(p.st.rs/p.st.a):'-'}</td></tr>`).join('')}</table>`;
 }
 function setupView() {
-  const n = S.sel.length, est = S.sel.reduce((s,c)=>s+(c==='KOR'?1560:c==='USA'?1250:1380),0) + (S.sel.some(c=>CO[c].cont==='AS')||S.sel.some(c=>CO[c].cont==='EU')?300:0);
+  const n = S.sel.length, est = S.sel.reduce((s,c)=>s+(c==='KOR'?1560:c==='USA'?1250:1380),0) + (S.sel.some(c=>CO[c].slots>0)?300:0);
   const cards = Core.CODES.map(c => { const C = CO[c], on = S.sel.includes(c); return `<button class="opt ${on?'on':''}" data-act="sel" data-id="${c}"><b>${on?'✓ ':''}${Core.FLAG[c]||''} ${C.name}</b><span class="dim">${C.l1.name}${C.l2?' · '+C.l2.name:''}</span></button>`; }).join('');
-  return `<div class="top"><div class="ttl">월드 설정</div><div class="dim">${n}/5개국</div></div><div class="body"><div class="dim">진행할 나라를 최대 5개까지 고르세요. 고른 나라의 1부·2부·유스 리그, 컵대회, 승강제가 전부 정밀 시뮬레이션되고, 선택하지 않은 나라는 만들어지지 않습니다.</div><div class="opts">${cards}</div><div class="card"><div class="dim">예상 선수 수 약 ${est.toLocaleString()}명 · 대륙대회(유럽·아시아)는 선택한 나라 팀과 외부 초청팀이 함께 참가합니다. 월드 생성에 몇 초가 걸립니다.</div></div><button class="btn wide" data-act="world" ${n<1?'disabled':''}>이 월드로 시작하기</button>${Object.keys(S.slots||{}).length?`<div class="sec">저장된 게임 불러오기</div>${slotRows(false)}`:''}</div>`;
+  return `<div class="top"><div class="ttl">월드 설정</div><div class="dim">${n}/5개국</div></div><div class="body"><div class="dim">진행할 나라를 최대 5개까지 고르세요. 고른 나라의 1부·2부·유스 리그, 컵대회, 승강제가 전부 정밀 시뮬레이션되고, 선택하지 않은 나라는 만들어지지 않습니다.</div><div class="opts">${cards}</div><div class="card"><div class="dim">예상 선수 수 약 ${est.toLocaleString()}명 · 대륙대회(유럽·아시아·남미·북중미)는 선택한 나라 팀과 외부 초청팀이 함께 참가합니다. 월드 생성에 몇 초가 걸립니다.</div></div><button class="btn wide" data-act="world" ${n<1?'disabled':''}>이 월드로 시작하기</button>${Object.keys(S.slots||{}).length?`<div class="sec">저장된 게임 불러오기</div>${slotRows(false)}`:''}</div>`;
 }
 function creatorClubs() {
   const G = G0(), c = S.cr; const C = CO[c.cc];
