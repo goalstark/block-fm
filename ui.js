@@ -395,10 +395,13 @@ const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // ---- 연속 이동 엔진: 포메이션 기준점 + 공 영향 + 역할 + 스티어링(속도/가속), 매 프레임 갱신 ----
 const ROLE_U = { GK: [2, 14], CB: [10, 60], FB: [10, 82], DM: [18, 70], CM: [20, 84], AM: [28, 90], W: [25, 96], ST: [38, 97] };
 const SUBX = { ST: 9, W: 5, AM: 4, CM: 0, DM: -5, FB: -2, CB: -6, GK: 0 };
+const FTS = { ST: [89, 7], W: [85, 0], AM: [77, 11], CM: [63, 0], FB: [70, 0], DM: [54, 0], CB: [44, 10] };   // 공격 3분의 1 지역에서의 팀 구조(자기 편 기준 좌표)
 const PA = (p, k) => (p && p.a && p.a[k]) || 50;
+const uOf = (x, d) => d > 0 ? x : 100 - x;
+const dM_ = (M) => M.mineHome ? 1 : -1;
 const tsOf = () => (MV && MV.fast) ? 3 : (S.spd || 1);
 function initPos(M) {
-  const dM = M.mineHome ? 1 : -1; MV.pos = { m: [], o: [] }; MV.tgt = { m: [], o: [] }; MV.run = {};
+  const dM = dM_(M); MV.pos = { m: [], o: [] }; MV.tgt = { m: [], o: [] }; MV.run = {};
   const f = (st, pre, d) => st.forEach((p, i) => { const b = FORM[Math.min(i, FORM.length - 1)]; MV.pos[pre][i] = { x: d > 0 ? b[0] : 100 - b[0], y: b[1] * 0.64, vx: 0, vy: 0 }; });
   f(MV.mst, 'm', dM); f(MV.ost, 'o', -dM);
   const k = Math.min(6, MV.mst.length - 1); MV.holder = null; MV.act = { k: 'pass', to: { s: 'm', i: k }, sp: 40 }; MV.poss = 'm'; MV.dec = 0.6;
@@ -406,73 +409,123 @@ function initPos(M) {
 function runOf(key, p, d, atk, sub) {
   let r = MV.run[key]; if (r && r.until > MV.t) return r;
   const amp = sub === 'CB' ? 3 : sub === 'FB' ? 5 : sub === 'DM' ? 5 : sub === 'CM' ? 7 : 9, fw = atk ? (PA(p, 'OTB') - 40) / 60 : -0.25;
-  return MV.run[key] = { dx: d * amp * (Math.random() * 1.2 - 0.4 + fw * 0.8), dy: (Math.random() * 2 - 1) * amp * (0.6 + PA(p, 'WOR') / 120), until: MV.t + 1.4 + Math.random() * 2.4 };
+  return MV.run[key] = { dx: d * amp * (Math.random() * 1.2 - 0.4 + fw * 0.8) * 0.7, dy: (Math.random() * 2 - 1) * amp * (0.5 + PA(p, 'WOR') / 140), until: MV.t + 1.6 + Math.random() * 2.6 };
 }
 function retarget(M) {
-  const b = MV.ball, dM = M.mineHome ? 1 : -1, hold = MV.holder, pos = MV.pos, act = MV.act, kick = MV.kick > 0;
-  const place = (st, pre, d, atk) => {
+  const b = MV.ball, pos = MV.pos, act = MV.act, kick = MV.kick > 0, hold = MV.holder, D = { m: dM_(M), o: -dM_(M) }, SS = { m: MV.mst, o: MV.ost };
+  const line = {};                                       // 오프사이드 라인: 상대 최종 수비수 위치
+  for (const pre of ['m', 'o']) { const op = pre === 'm' ? 'o' : 'm'; let mx = 55; SS[op].forEach((p, i) => { const q = pos[op][i]; if (i === 0 || !q || MV.red[op + i]) return; mx = Math.max(mx, uOf(q.x, D[pre])); }); line[pre] = Math.max(mx, uOf(b.x, D[pre])); }
+  const place = (pre) => {
+    const st = SS[pre], d = D[pre], atk = MV.poss === pre, op = pre === 'm' ? 'o' : 'm', ball = uOf(b.x, d), fin = atk && ball > 64 && !kick;
     const hp = hold && hold.s === pre && pos[pre][hold.i] ? pos[pre][hold.i] : null;
-    const near = st.map((p, i) => ({ i, d2: pos[pre][i] ? (pos[pre][i].x - b.x) ** 2 + (pos[pre][i].y - b.y) ** 2 : 1e9 })).filter(o => st[o.i].sub !== 'GK' && !MV.red[pre + o.i]).sort((u, v) => u.d2 - v.d2).map(o => o.i);
+    const near = st.map((p, i) => ({ i, d2: pos[pre][i] ? (pos[pre][i].x - b.x) ** 2 + (pos[pre][i].y - b.y) ** 2 : 1e9 })).filter(o => st[o.i].sub !== 'GK' && !MV.red[pre + o.i]).sort((a, c) => a.d2 - c.d2).map(o => o.i);
+    const taken = new Set(), foes = SS[op].map((p, j) => ({ j, q: pos[op][j] })).filter(o => o.j !== 0 && o.q && !MV.red[op + o.j]);
     st.forEach((p, i) => { const f = FORM[Math.min(i, FORM.length - 1)];
-      const A = (k) => PA(p, k), sub = p.sub || 'CM', gk = sub === 'GK', bx = d > 0 ? f[0] : 100 - f[0];
-      let x = bx + d * (SUBX[sub] || 0), y = f[1] * 0.64, sprint = false;
-      if (sub === 'W' || sub === 'FB') y = y < 32 ? 8 + (sub === 'FB' ? 3 : 0) : 56 - (sub === 'FB' ? 3 : 0);
+      const A = (k) => PA(p, k), sub = p.sub || 'CM', gk = sub === 'GK', isH = hold && hold.s === pre && hold.i === i, wideY = (f[1] * 0.64 < 32) ? 1 : -1;
+      let u = f[0] + (SUBX[sub] || 0), y = f[1] * 0.64, sprint = false, chase = null;
+      if (sub === 'W' || sub === 'FB') y = wideY > 0 ? 8 + (sub === 'FB' ? 3 : 0) : 56 - (sub === 'FB' ? 3 : 0);
       if (!kick) {
         const lineK = gk ? 0.1 : 0.2 + (70 - A('POS')) / 260 + (sub === 'CB' ? -0.06 : sub === 'ST' ? 0.05 : 0);
-        x += (b.x - 50) * (0.18 + lineK); y += (b.y - y) * (gk ? 0.28 : 0.18);
+        u += (ball - 50) * (0.18 + lineK); y += (b.y - y) * (gk ? 0.3 : 0.18);
         if (!gk) {
-          const r = runOf(pre + i, p, d, atk, sub); x += r.dx; y += r.dy;
+          const r = runOf(pre + i, p, d, atk, sub); u += r.dx * d; y += r.dy;
           if (atk) {
-            if (sub === 'ST' || sub === 'W') x += d * (4 + (A('OTB') - 50) / 6 + (A('PAC') - 50) / 12);
-            else if (sub === 'AM' || sub === 'CM') x += d * (2 + (A('OTB') - 50) / 14);
-            if (sub === 'FB' && (A('PAC') + A('STA')) / 2 > 58) x += d * (8 + (A('PAC') - 55) / 8);
-            if (hp && hold && p !== st[hold.i]) { const dx = hp.x - x, dy = hp.y - y, dist = Math.hypot(dx, dy);
-              if (dist > 9 && (sub === 'AM' || sub === 'CM' || sub === 'DM' || sub === 'W')) { const k = clampN((A('VIS') + A('PAS') - 80) / 260, 0.05, 0.4); x += dx * k; y += dy * k; } }
-            if (hold && st[hold.i] === p && !MV.paused) x += d * 7;     // 공 가진 선수는 드리블로 전진
+            if (sub === 'ST' || sub === 'W') u += 4 + (A('OTB') - 50) / 6 + (A('PAC') - 50) / 12; else if (sub === 'AM' || sub === 'CM') u += 2 + (A('OTB') - 50) / 14;
+            if (sub === 'FB' && (A('PAC') + A('STA')) / 2 > 58) u += 8 + (A('PAC') - 55) / 8;
+            if (fin && FTS[sub] && !isH) { const t = FTS[sub]; const ty = t[1] === 0 ? (sub === 'W' ? (wideY > 0 ? 9 : 55) : sub === 'FB' ? (wideY > 0 ? 10 : 54) : f[1] * 0.64) : 32 + (i % 2 ? 1 : -1) * t[1]; u = u * 0.3 + t[0] * 0.7; y = y * 0.3 + ty * 0.7; }
+            if (hp && !isH) { const hu = uOf(hp.x, d), dx = hu - u, dy = hp.y - y, dist = Math.hypot(dx, dy);
+              if (dist > 9 && (sub === 'AM' || sub === 'CM' || sub === 'DM' || sub === 'W')) { const k = clampN((A('VIS') + A('PAS') - 80) / 260, 0.05, 0.4); u += dx * k; y += dy * k; } }
+            if (isH && (!MV.paused || MV.pg)) { u += MV.pg ? 16 : 7; if (MV.pg) sprint = true; }                                                     // 공 가진 선수는 드리블로 전진
+            if (!isH) u = Math.min(u, line[pre] + 0.5);                                                  // 오프사이드 라인 지킴
           } else {
-            const ci = near.indexOf(i);
-            if (ci === 0) { x = b.x; y = b.y; sprint = true; }                                          // 공에 가장 가까운 선수는 직접 압박
-            else if (ci === 1) { const k = clampN(0.35 + (A('AGG') + A('WOR') - 80) / 220, 0.2, 0.8); x += (b.x - x) * k; y += (b.y - y) * k; }
-            else if (sub === 'DM' || sub === 'CM') { x += (b.x - x) * 0.14; y += (b.y - y) * 0.2; }
-            if (sub === 'CB' || sub === 'DM') x -= d * (A('POS') > 62 ? 3 : 0);
-            if (sub === 'ST' || sub === 'W') x -= d * (A('WOR') > 60 ? 8 : 2);
+            if (sub === 'ST' || sub === 'W') u -= (A('WOR') > 60 ? 8 : 2);
+            if (sub === 'CB' || sub === 'DM') u += (A('POS') > 62 ? 3 : 0);
+            else if (sub === 'CM') u += (ball - u) * 0.12;
+            y += (b.y - y) * 0.12;
           }
-          if (act && act.k === 'pass' && act.to.s === pre && act.to.i === i) { x += (b.x - x) * 0.55; y += (b.y - y) * 0.55; sprint = true; }   // 패스 받으러 마중
+          if (act && act.k === 'pass' && act.to.s === pre && act.to.i === i) { u += (ball - u) * 0.55; y += (b.y - y) * 0.55; sprint = true; }   // 패스 받으러 마중
         }
-        const tired = clampN((60 - A('STA')) / 120 * (MV.min / 90), 0, 0.35); x = bx + (x - bx) * (1 - tired);
+        const tired = clampN((60 - A('STA')) / 120 * (MV.min / 90), 0, 0.35); u = f[0] + (u - f[0]) * (1 - tired);
       } else sprint = true;
-      const rg = ROLE_U[sub] || [3, 97]; let u = d > 0 ? x : 100 - x; u = c01(u, rg[0], rg[1]); x = d > 0 ? u : 100 - u;
+      let x = d > 0 ? u : 100 - u;
+      if (!kick && !gk && !atk) {
+        const ci = near.indexOf(i);
+        if (ci === 0) { x = b.x; y = b.y; sprint = true; }                                                // 가장 가까운 선수는 공 압박
+        else if (ci === 1) { const k = clampN(0.35 + (A('AGG') + A('WOR') - 80) / 220, 0.2, 0.8); x += (b.x - x) * k; y += (b.y - y) * k; }
+        else { let best = null, bd = 24; foes.forEach(o => { if (taken.has(o.j)) return; const dd = Math.hypot(o.q.x - x, o.q.y - y); if (dd < bd) { bd = dd; best = o; } });          // 가까운 공격수 마크(골문 쪽에서)
+          if (best) { taken.add(best.j); const mk = clampN(0.45 + (A('MAR') - 50) / 150, 0.3, 0.8); x += (best.q.x - d * 2.8 - x) * mk; y += (best.q.y + (32 - best.q.y) * 0.1 - y) * mk; } }
+      }
+      if (gk && act && act.k === 'shot' && act.s !== pre) { y = act.out === 'goal' ? act.ty + (act.ty > 32 ? -3 : 3) : act.ty; sprint = true; }   // 슛 막으러 몸을 던짐
+      const rg = ROLE_U[sub] || [3, 97]; let uu = uOf(x, d); uu = c01(uu, rg[0], rg[1]); x = d > 0 ? uu : 100 - uu;
       MV.tgt[pre][i] = { x: c01(x, 2.5, 97.5), y: c01(y, 3, 61), sprint };
     });
   };
-  place(MV.mst, 'm', dM, MV.poss === 'm'); place(MV.ost, 'o', -dM, MV.poss === 'o');
+  place('m'); place('o');
 }
 function movePitch() { const M = G0().mm; if (!M || !MV || !MV.pos) return; retarget(M); if (!MV.raf) MV.raf = requestAnimationFrame(frame); }
+function sideOf(s) { return s === 'm' ? MV.mst : MV.ost; }
+function passTo(s, i, sp) { MV.act = { k: 'pass', to: { s, i }, sp }; MV.holder = null; }
+function shoot(M, out) {
+  const h = MV.holder, s = h.s, d = s === 'm' ? dM_(M) : -dM_(M), os = s === 'm' ? 'o' : 'm', cur = MV.pos[s][h.i], gx = d > 0 ? 99 : 1;
+  let t = { x: gx, y: 32 }, to = null;
+  if (out === 'goal') t = { x: gx, y: 32 + (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 3) };
+  else if (out === 'wide') t = { x: gx, y: 32 + (Math.random() < 0.5 ? -1 : 1) * (9 + Math.random() * 5) };
+  else if (out === 'post') t = { x: gx, y: 32 + (Math.random() < 0.5 ? -1 : 1) * 4.2 };
+  else if (out === 'save') t = { x: MV.pos[os][0].x, y: MV.pos[os][0].y };
+  else { let bi = -1, bd = 1e9; MV.pos[os].forEach((q, i) => { if (i === 0 || !q || MV.red[os + i]) return; const dd = Math.hypot(q.x - cur.x, q.y - cur.y); if (dd < bd) { bd = dd; bi = i; } }); if (bi < 0) { out = 'wide'; t = { x: gx, y: 32 + 10 }; } else to = { s: os, i: bi }; }
+  MV.act = { k: 'shot', tx: t.x, ty: t.y, sp: 78, out, s, to }; MV.holder = null;
+}
 function decide(M) {
-  if (!MV.holder) return;
-  const dM = M.mineHome ? 1 : -1, s = MV.holder.s, arr = MV.pos[s], cur = arr[MV.holder.i]; if (!cur) return;
-  const dir = s === 'm' ? dM : -dM, pm = c01(0.5 + (M.mine.strength - M.opp.strength) / 160, 0.3, 0.7);
-  const lose = s === 'm' ? 0.18 - (pm - 0.5) * 0.25 : 0.18 + (pm - 0.5) * 0.25, who = (s === 'm' ? MV.mst : MV.ost)[MV.holder.i];
-  if (Math.random() < lose) {                                   // 태클/인터셉트: 가장 가까운 상대에게 공이 넘어감
-    const os = s === 'm' ? 'o' : 'm', oa = MV.pos[os]; let best = -1, bd = 1e9;
-    oa.forEach((p, i) => { if (!p || MV.red[os + i]) return; const d2 = (p.x - cur.x) ** 2 + (p.y - cur.y) ** 2; if (d2 < bd) { bd = d2; best = i; } });
-    if (best >= 0) { MV.act = { k: 'pass', to: { s: os, i: best }, sp: 55 }; MV.holder = null; return; }
+  const h = MV.holder; if (!h) return;
+  const s = h.s, d = s === 'm' ? dM_(M) : -dM_(M), st = sideOf(s), arr = MV.pos[s], cur = arr[h.i], who = st[h.i], os = s === 'm' ? 'o' : 'm', oarr = MV.pos[os]; if (!cur) return;
+  const u = uOf(cur.x, d), gd = Math.hypot(100 - u, cur.y - 32), pg = MV.pg && MV.pg.s === s ? MV.pg : null;
+  let nd = 1e9, ni = -1; oarr.forEach((q, i) => { if (i === 0 || !q || MV.red[os + i]) return; const dd = Math.hypot(q.x - cur.x, q.y - cur.y); if (dd < nd) { nd = dd; ni = i; } });
+  const line = (() => { let mx = 55; oarr.forEach((q, i) => { if (i && q && !MV.red[os + i]) mx = Math.max(mx, uOf(q.x, d)); }); return mx; })();
+  const mates = []; arr.forEach((q, i) => { if (!q || i === h.i || MV.red[s + i]) return; const pu = uOf(q.x, d); let od = 1e9; oarr.forEach((o, j) => { if (j && o && !MV.red[os + j]) od = Math.min(od, Math.hypot(o.x - q.x, o.y - q.y)); });
+    mates.push({ i, q, pu, dist: Math.hypot(q.x - cur.x, q.y - cur.y), open: clampN(od / 10, 0.3, 1.6), sub: st[i].sub, who: st[i] }); });
+  const pickBy = (arr2, wf) => { const c = arr2.map(m => ({ m, w: wf(m) })).filter(o => o.w > 0); if (!c.length) return null; let r = Math.random() * c.reduce((a, o) => a + o.w, 0); for (const o of c) { r -= o.w; if (r <= 0) return o.m; } return c[0].m; };
+  // 득점 연출: 골이 예정된 팀은 득점자가 마무리하도록 공을 몰아 줌
+  if (pg) {
+    if (h.i === 0) { const t = pickBy(mates.filter(m => m.i), m => Math.exp(-m.dist / 25) * (m.pu > 40 ? 1.5 : 0.7)); if (t) passTo(s, t.i, 46); else MV.dec = 0.5; return; }
+    const si = pg.si;
+    if (si === h.i || (si < 0 && gd < 30) || MV.pg.t > 8) { if (gd < 32 || MV.pg.t > 8) { shoot(M, 'goal'); return; } MV.dec = 0.35; return; }
+    const sc = si >= 0 ? mates.find(m => m.i === si) : null; if (sc && (u > 45 || pg.t > 2.5)) { passTo(s, si, 52); return; }
+    const t = pickBy(mates.filter(m => m.i && m.pu > u - 6), m => Math.exp(-m.dist / 22) * (m.pu > u ? 2 : 0.6) * m.open); if (t) passTo(s, t.i, 44); else MV.dec = 0.4; return;
   }
-  if (Math.random() < 0.25) { MV.dec = 0.5 + Math.random() * 0.5; return; }   // 드리블 계속
-  const cand = []; arr.forEach((p, i) => { if (!p || i === MV.holder.i || MV.red[s + i]) return; const dx = (p.x - cur.x) * dir, dist = Math.hypot(p.x - cur.x, p.y - cur.y); if (i === 0 && Math.random() < 0.9) return;
-    cand.push({ i, w: Math.exp(-dist / 20) * (dx > 4 ? 1.4 : dx < -8 ? 0.5 : 1) * (dist < 5 ? 0.1 : 1) }); });
-  if (!cand.length) { MV.dec = 0.6; return; } let tw = cand.reduce((a, c) => a + c.w, 0), r = Math.random() * tw, pick = cand[0];
-  for (const c of cand) { r -= c.w; if (r <= 0) { pick = c; break; } }
-  MV.act = { k: 'pass', to: { s, i: pick.i }, sp: 34 + PA(who, 'PAS') / 4 }; MV.holder = null;
+  // 골키퍼: 잡은 뒤 배급 (짧게 풀어 나가거나 길게 전방으로)
+  if (h.i === 0) { const long = Math.random() < 0.35 + (PA(who, 'KIC') - 50) / 250;
+    const t = pickBy(mates.filter(m => m.i), m => long ? (m.sub === 'ST' || m.sub === 'W' || m.sub === 'AM' ? 1 + m.open : 0.2) : (m.sub === 'CB' || m.sub === 'FB' || m.sub === 'DM' ? Math.exp(-m.dist / 20) * m.open : 0.15));
+    if (t) passTo(s, t.i, long ? 55 : 38); else MV.dec = 0.5; return; }
+  const pm = c01(0.5 + (M.mine.strength - M.opp.strength) / 160, 0.3, 0.7), press = nd < 6 ? 1 : nd < 12 ? 0.5 : 0.15;
+  const lose = clampN(0.05 + press * 0.14 + (s === 'm' ? -(pm - 0.5) * 0.2 : (pm - 0.5) * 0.2) - (PA(who, 'DRI') - 50) / 700, 0.03, 0.38);
+  if (ni >= 0 && Math.random() < lose) { passTo(os, ni, 55); return; }                                          // 태클/인터셉트
+  if (MV.finS !== s) { MV.finS = s; MV.fin = 0; } if (u < 60) MV.fin = 0;
+  const wide = cur.y < 16 || cur.y > 48;
+  if (u > 70 && gd < 30) {                                                                                       // 슈팅 / 크로스 / 컷백
+    const shotP = clampN(0.26 + (PA(who, 'FIN') - 50) / 150 + (gd < 18 ? 0.25 : 0) - press * 0.08 + MV.fin * 0.22 - (wide ? 0.22 : 0), 0.08, 0.95);
+    if (Math.random() < shotP) { const r = Math.random(), fin = (PA(who, 'FIN') - 50) / 400, out = r < 0.38 - fin ? 'save' : r < 0.62 - fin ? 'wide' : r < 0.85 ? 'block' : 'post'; shoot(M, out); MV.fin = 0; return; }
+    MV.fin++;
+    if (wide && Math.random() < 0.55 + (PA(who, 'CRS') - 50) / 200) { const t = pickBy(mates.filter(m => m.pu > 78), m => 1 + (PA(m.who, 'HEA') - 50) / 80 + m.open); if (t) { passTo(s, t.i, 50); return; } }
+  }
+  if (u < 30 && press > 0.5 && Math.random() < 0.35) { const t = pickBy(mates.filter(m => m.i), m => m.sub === 'ST' || m.sub === 'W' || m.sub === 'AM' ? 1 + m.open : 0.15); if (t) { passTo(s, t.i, 54); return; } }   // 위험 지역 걷어내기
+  if (nd > 8 && u < 72 && Math.random() < 0.2 + (PA(who, 'DRI') - 50) / 400) { MV.dec = 0.5 + Math.random() * 0.5; return; }   // 드리블 전진
+  const t = pickBy(mates, m => { if (m.i === 0 && (u > 25 || Math.random() < 0.85)) return 0; const fw = m.pu - u; return Math.exp(-m.dist / 22) * (fw > 4 ? 1.5 : fw < -8 ? 0.45 : 1) * (m.dist < 5 ? 0.1 : 1) * m.open * (m.pu > line + 1 ? 0.15 : 1) * (1 + (PA(who, 'VIS') - 50) / 150); });
+  if (t) passTo(s, t.i, 34 + PA(who, 'PAS') / 4); else MV.dec = 0.5;
 }
 function stepBall() { if (MV) MV.dec = Math.min(MV.dec == null ? 0.2 : MV.dec, 0.2); }
+function goalFx(M) {
+  const pg = MV.pg; if (!pg) return; MV.pg = null;
+  pg.logs.slice().reverse().forEach(o => MV.log.unshift(o)); MV.goalRes = pg.ms ? 'o' : 'm';
+  fxShow(pg.html, pg.ms ? 'goal' : 'goal opp', 1700, true); renderMatch();
+}
+function flushPg() { const pg = MV && MV.pg; if (!pg) return; MV.pg = null; pg.logs.slice().reverse().forEach(o => MV.log.unshift(o)); }
 function frame(ts) {
   if (!MV) return; MV.raf = requestAnimationFrame(frame);
   const M = G0().mm; if (!M || !MV.pos) return;
   let dt = MV.last ? Math.min(0.05, (ts - MV.last) / 1000) : 0.016; MV.last = ts; dt *= tsOf();
-  MV.t += dt; MV.rt -= dt; if (MV.kick > 0) MV.kick -= dt; if (MV.rt <= 0) { retarget(M); MV.rt = 0.22; }
+  MV.t += dt; MV.rt -= dt; if (MV.kick > 0) MV.kick -= dt; if (MV.pg) MV.pg.t += dt; if (MV.rt <= 0) { retarget(M); MV.rt = 0.22; }
   const all = [];
-  for (const pre of ['m', 'o']) (pre === 'm' ? MV.mst : MV.ost).forEach((p, i) => {
+  for (const pre of ['m', 'o']) sideOf(pre).forEach((p, i) => {
     const c = MV.pos[pre][i], g = MV.tgt[pre][i]; if (!c || !g) return;
     if (MV.red[pre + i]) { c.vx = c.vy = 0; return; }
     const dx = g.x - c.x, dy = g.y - c.y, dist = Math.hypot(dx, dy) || 1e-6, tired = clampN((60 - PA(p, 'STA')) / 200 * (MV.min / 90), 0, 0.2);
@@ -480,28 +533,40 @@ function frame(ts) {
     c.vx += clampN(dx / dist * want - c.vx, -acc, acc); c.vy += clampN(dy / dist * want - c.vy, -acc, acc);
     c.x += c.vx * dt; c.y += c.vy * dt; all.push(c);
   });
-  for (let a = 0; a < all.length; a++) for (let b2 = a + 1; b2 < all.length; b2++) {          // 서로 겹치지 않게 살짝 밀어냄
+  for (let a = 0; a < all.length; a++) for (let b2 = a + 1; b2 < all.length; b2++) {
     const p = all[a], q = all[b2], dx = q.x - p.x, dy = q.y - p.y, d2 = dx * dx + dy * dy; if (d2 < 5.5 && d2 > 1e-4) { const d = Math.sqrt(d2), push = (2.35 - d) * 0.5; p.x -= dx / d * push; p.y -= dy / d * push; q.x += dx / d * push; q.y += dy / d * push; } }
   const b = MV.ball, act = MV.act;
-  if (act) {
-    let tx, ty; if (act.k === 'pass') { const q = MV.pos[act.to.s][act.to.i]; if (!q) { MV.act = null; return; } tx = q.x; ty = q.y; } else { tx = act.tx; ty = act.ty; }
-    const dx = tx - b.x, dy = ty - b.y, d = Math.hypot(dx, dy), step = act.sp * dt;
-    if (d <= step + 0.9) { b.x = tx; b.y = ty; MV.act = null; if (act.k === 'pass') { MV.holder = act.to; MV.poss = act.to.s; MV.dec = 0.45 + Math.random() * 0.7; retarget(M); } }
-    else { b.x += dx / d * step; b.y += dy / d * step; }
+  if (MV.pg && !MV.act && MV.holder && MV.holder.s !== MV.pg.s) {                                // 득점 연출 중에는 득점 팀이 공을 가져옴
+    const s = MV.pg.s, arr = MV.pos[s]; let bi = -1, bd = 1e9; arr.forEach((q, i) => { if (!q || i === 0 || MV.red[s + i]) return; const dd = Math.hypot(q.x - b.x, q.y - b.y); if (dd < bd) { bd = dd; bi = i; } }); if (bi >= 0) passTo(s, bi, 70); }
+  if (MV.act) {
+    const A2 = MV.act; let tx, ty;
+    if (A2.k === 'pass') { const q = MV.pos[A2.to.s][A2.to.i]; if (!q) { MV.act = null; return; } tx = q.x; ty = q.y; }
+    else if (A2.k === 'shot' && (A2.out === 'save' || A2.out === 'block')) { const tt = A2.out === 'save' ? { s: A2.s === 'm' ? 'o' : 'm', i: 0 } : A2.to, q = tt && MV.pos[tt.s][tt.i]; tx = q ? q.x : A2.tx; ty = q ? q.y : A2.ty; }
+    else { tx = A2.tx; ty = A2.ty; }
+    const dx = tx - b.x, dy = ty - b.y, d = Math.hypot(dx, dy), step = A2.sp * dt;
+    if (d <= step + 0.9) { b.x = tx; b.y = ty; MV.act = null;
+      if (A2.k === 'pass') { if (MV.holder === null && MV.poss !== A2.to.s) MV.fin = 0; MV.holder = A2.to; MV.poss = A2.to.s; MV.dec = A2.to.i === 0 ? 1.1 + Math.random() * 0.5 : 0.45 + Math.random() * 0.7; retarget(M); }
+      else if (A2.k === 'shot') { const os = A2.s === 'm' ? 'o' : 'm';
+        if (A2.out === 'goal') goalFx(M);
+        else if (A2.out === 'save') { MV.holder = { s: os, i: 0 }; MV.poss = os; MV.dec = 1.2 + Math.random() * 0.5; retarget(M); }
+        else if (A2.out === 'block') { MV.holder = A2.to; MV.poss = os; MV.dec = 0.4; retarget(M); }
+        else if (A2.out === 'post') { let bi = -1, bd = 1e9; MV.pos[os].forEach((q, i) => { if (i === 0 || !q || MV.red[os + i]) return; const dd = Math.hypot(q.x - b.x, q.y - b.y); if (dd < bd) { bd = dd; bi = i; } }); if (bi >= 0) passTo(os, bi, 40); }
+        else { MV.rs = { t: 0.9, s: os, i: 0 }; MV.holder = null; MV.poss = os; } }            // 골킥 준비
+    } else { b.x += dx / d * step; b.y += dy / d * step; }
+  } else if (MV.rs) {
+    MV.rs.t -= dt; if (MV.rs.t <= 0) { const q = MV.pos[MV.rs.s][MV.rs.i]; b.x = q.x; b.y = q.y; MV.holder = { s: MV.rs.s, i: MV.rs.i }; MV.poss = MV.rs.s; MV.dec = 1.0; MV.rs = null; retarget(M); }
   } else if (MV.holder && MV.pos[MV.holder.s][MV.holder.i]) {
     const hp = MV.pos[MV.holder.s][MV.holder.i], dd = MV.holder.s === 'm' ? dM_(M) : -dM_(M), k = Math.min(1, dt * 16);
     b.x += (c01(hp.x + dd * 1.7, 1.5, 98.5) - b.x) * k; b.y += (hp.y - b.y) * k;
-    if (!MV.paused && !MV.over) { MV.dec -= dt; if (MV.dec <= 0) decide(M); }
+    if ((!MV.paused || MV.pg) && !MV.over) { MV.dec -= dt; if (MV.dec <= 0) decide(M); }
   }
-  if (MV.goalRes && !MV.paused && !MV.act) {                                                      // 골 세리머니 끝: 킥오프
-    const s = MV.goalRes, st = s === 'm' ? MV.mst : MV.ost; MV.goalRes = null; b.x = 50; b.y = 32; MV.holder = { s, i: Math.min(6, st.length - 1) }; MV.poss = s; MV.dec = 1.2; MV.kick = 2.2; retarget(M); }
-  // 그리기
+  if (MV.goalRes && !MV.paused && !MV.act) {
+    const s = MV.goalRes, st = sideOf(s); MV.goalRes = null; b.x = 50; b.y = 32; MV.holder = { s, i: Math.min(6, st.length - 1) }; MV.poss = s; MV.dec = 1.2; MV.kick = 2.2; MV.fin = 0; retarget(M); }
   const els = MV.els || (MV.els = { m: MV.mst.map((_, i) => document.getElementById('m' + i)), o: MV.ost.map((_, i) => document.getElementById('o' + i)) });
   for (const pre of ['m', 'o']) els[pre].forEach((el, i) => { const c = MV.pos[pre][i]; if (!el || !c) return; const sp = Math.hypot(c.vx, c.vy), bob = Math.abs(Math.sin(MV.t * 11 + i * 1.3)) * Math.min(0.6, sp / 25);
     el.setAttribute('transform', `translate(${c.x.toFixed(2)} ${(c.y - bob).toFixed(2)})`); if (MV.red[pre + i]) el.style.opacity = 0.12; });
   const be = document.getElementById('ball'); if (be) be.setAttribute('transform', `translate(${b.x.toFixed(2)} ${b.y.toFixed(2)})`);
 }
-const dM_ = (M) => M.mineHome ? 1 : -1;
 function toMe(M) { const i = MV.mst.findIndex(p => p.me); if (i >= 0) { MV.holder = null; MV.act = { k: 'pass', to: { s: 'm', i }, sp: 70 }; MV.poss = 'm'; MV.dec = 1; } }
 function fxShow(html, cls, ms, pause) {
   const el = $('#fx'); if (!el) return; el.innerHTML = `<div class="fxb ${cls}">${html}</div>`;
@@ -512,9 +577,11 @@ function emitAt(M, min, anim) {
   const out = []; const dM = M.mineHome ? 1 : -1;
   for (const e of M.evMine.concat(M.evOpp)) if (e.min === min && !e.shown) {
     e.shown = true; const ms = M.evMine.includes(e), team = ms ? M.mine : M.opp;
-    out.push({ min, ic: IC.ball, cls: 'g ' + (ms ? 'mine' : 'opp'), t: `<b>골! ${esc(e.sc.name)}</b> <span class="dim">${esc(team.name)}</span>` });
-    if (e.as) out.push({ min, ic: IC.boot, cls: 'a ' + (ms ? 'mine' : 'opp'), t: `도움 ${esc(e.as.name)}` });
-    if (anim) { const gx = ms ? (dM > 0 ? 97 : 3) : (dM > 0 ? 3 : 97); MV.holder = null; MV.act = { k: 'free', tx: gx, ty: 32, sp: 80 }; MV.goalRes = ms ? 'o' : 'm'; fxShow(`<div class="gchar">${sprH(e.sc, team, 40)}</div><div class="gb">${IC.ball.replace('width="16" height="16"','width="44" height="44"')}</div><div class="gt">GOAL!</div><div class="gs">${esc(e.sc.name)}${e.as ? `<br><span class="gsa">${IC.boot} ${esc(e.as.name)}</span>` : ''}</div>`, ms ? 'goal' : 'goal opp', 1700, true); }
+    const lg = [{ min, ic: IC.ball, cls: 'g ' + (ms ? 'mine' : 'opp'), t: `<b>골! ${esc(e.sc.name)}</b> <span class="dim">${esc(team.name)}</span>` }];
+    if (e.as) lg.push({ min, ic: IC.boot, cls: 'a ' + (ms ? 'mine' : 'opp'), t: `도움 ${esc(e.as.name)}` });
+    if (anim && MV.pos && MV.pos.m.length) { const sd = ms ? 'm' : 'o', si = (ms ? MV.mst : MV.ost).indexOf(e.sc), html = `<div class="gchar">${sprH(e.sc, team, 40)}</div><div class="gb">${IC.ball.replace('width="16" height="16"','width="44" height="44"')}</div><div class="gt">GOAL!</div><div class="gs">${esc(e.sc.name)}${e.as ? `<br><span class="gsa">${IC.boot} ${esc(e.as.name)}</span>` : ''}</div>`;
+      MV.pg = { s: sd, ms, si, html, logs: lg, t: 0 }; MV.paused = true; MV.dec = Math.min(MV.dec, 0.3); }
+    else lg.forEach(o => out.push(o));
   }
   for (const x of M.evx || []) if (x.min === min && !x.shown) {
     x.shown = true; const team = x.ms ? M.mine : M.opp, nmx = esc(x.p.name);
@@ -552,11 +619,11 @@ function tick() {
   if (M.role==='sub' && MV.min===M.from && !MV.mst.some(p => p.me)) { let ix = MV.mst.findIndex(p => p.sub === m.sub && p.sub !== 'GK'); if (ix < 0) ix = MV.mst.findIndex(p => p.sub !== 'GK'); if (ix >= 0) { MV.mst[ix] = m; const pb = $('#pitchbox'); if (pb) { pb.innerHTML = pitchHTML(M); MV.els = null; } } }
   const mo = M.moments[M.mi];
   if (mo && !mo.done && mo.min === MV.min) { MV.paused = true; MV.momentOpen = mo; toMe(M); }
-  if (MV.min >= 90) { MV.min = 90; clearInterval(MV.timer); MV.over = true; finishLog(M); }
+  if (MV.min >= 90 && !MV.pg) { MV.min = 90; clearInterval(MV.timer); MV.over = true; finishLog(M); }
   movePitch(); renderMatch();
 }
 function skipMatch() {
-  clearInterval(MV.timer); const M = G0().mm; if (!M) return; MV.skipping = true;
+  clearInterval(MV.timer); const M = G0().mm; if (!M) return; MV.skipping = true; flushPg(); MV.paused = false;
   while (MV.min < 90) { MV.min++; emitAt(M, MV.min, false); const mo = M.moments[M.mi];
     if (M.role==='sub' && MV.min===M.from) MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 투입 — ${esc(Core.me().name)}` });
     if (mo && !mo.done && mo.min===MV.min) { MV.paused = true; MV.momentOpen = mo; MV.timer = setInterval(tick, 40); stepBall(M); toMe(M); movePitch(); renderMatch(); return; } }
@@ -565,7 +632,7 @@ function skipMatch() {
 
 const lvl3 = (p) => p >= 0.62 ? ['높음', 'hi'] : p >= 0.4 ? ['보통', 'mid'] : ['낮음', 'lo'];
 function renderMatch() {
-  const G = G0(), M = G.mm; if (!M || !MV || !$('#mh')) return; const [sh, sa] = scoreAt(MV.min);
+  const G = G0(), M = G.mm; if (!M || !MV || !$('#mh')) return; const [sh, sa] = scoreAt(MV.pg ? MV.min - 1 : MV.min);
   let dec = '';
   if (MV.momentOpen) { const mo = MV.momentOpen; const opts = Core.momentOptions(mo); dec = `<div class="card gl"><div class="row g8" style="align-items:flex-end"><span class="mebub">${sprH(Core.me(), M.mine, 28, 'idle')}</span><b>${Core.momentText(mo.kind)}</b></div><div class="dim">${MV.min}분 · 어떻게 할까?</div><div class="${opts.length===3?'opts3':'optsn'}">${opts.map(o => { const lv = lvl3(o.shown); return `<button class="opt ${o.fav?'fav':''}" data-act="mv" data-id="${o.id}"><b>${o.fav?'★ ':''}${o.n}</b><span class="lv ${lv[1]}">${lv[0]}</span><span class="pbar sm"><i class="${lv[1]}" style="width:${Math.round(o.shown*100)}%"></i></span><span class="dim s11">성공 ${Math.round(o.shown*100)}%</span></button>`; }).join('')}</div></div>`; }
   else if (MV.over) { const st = M.role==='start'?'선발':M.role==='sub'?'교체':M.role==='inj'?'부상 결장':'벤치(결장)'; const mv = M.mvp; dec = `<div class="card"><div class="row g8" style="align-items:flex-end"><span class="mebub">${sprH(Core.me(), M.mine, 32, mv&&mv.me?'jump':'idle')}${mv&&mv.me?'<i class="crown">'+IC.crown+'</i>':''}</span><div><b>경기 종료</b> <span class="dim">내 역할: ${st}</span></div></div><div class="row g8 wrapx">${M.myGoals?`<span class="tag">${IC.ball} ${M.myGoals}골</span>`:''}${M.myAssists?`<span class="tag">${IC.boot} ${M.myAssists}도움</span>`:''}${mv?`<span class="tag ${mv.me?'gold':''}">${IC.crown} MVP ${esc(mv.p.name)}</span>`:''}</div><button class="btn wide" data-act="mend">결과 확인</button></div>`; }
@@ -586,7 +653,7 @@ function render() {
   const app = $('#app');
   if (S.step==='setup') { app.innerHTML = `<div class="scr">${setupView()}</div>`; return; }
   if (S.step==='create') { app.innerHTML = `<div class="scr">${creatorView()}</div>`; return; }
-  const oldSc = document.querySelector('.scr'); const keyNow = S.step + '|' + S.tab + '|' + S.mt + '|' + S.ct + '|' + S.lc + '|' + S.ld + '|' + S.lt; const keepTop = (oldSc && S._sk === keyNow) ? oldSc.scrollTop : 0;
+  const oldSc = document.querySelector('.scr'); const keyNow = S.step + '|' + S.tab; const keepTop = (oldSc && S._sk === keyNow) ? oldSc.scrollTop : 0;
   let v = S.tab==='home' ? homeView() : S.tab==='news' ? newsView() : S.tab==='league' ? leagueView() : S.tab==='me' ? meView() : contractView();
   app.innerHTML = `<div class="scr">${v}</div>${actBar()}<nav>${NAV.map(([id,n])=>`<button class="nv ${S.tab===id?'on':''}" data-act="tab" data-id="${id}">${n}${navBadge(id)?'<i class="bdg"></i>':''}</button>`).join('')}</nav>`;
   { const ns = document.querySelector('.scr'); if (ns && keepTop) ns.scrollTop = keepTop; S._sk = keyNow; }
