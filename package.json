@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "sync": "cap sync android",
-    "capacitor:sync:after": "mkdir -p assets && cp icon-only.png icon-foreground.png icon-background.png assets/ && npx --yes @capacitor/assets generate --android"
+    "capacitor:sync:after": "node patch-android.js && mkdir -p assets && cp icon-only.png icon-foreground.png icon-background.png assets/ && npx --yes @capacitor/assets generate --android"
   },
   "dependencies": {
     "@capacitor/android": "^6.1.2",
