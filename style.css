@@ -55,3 +55,23 @@ select{width:100%;min-height:44px;border-radius:12px;border:2px solid #2A3A31;ba
 .lv{font-weight:900;font-size:12px}.lv.hi{color:#C6F36B}.lv.mid{color:#F7D117}.lv.lo{color:#FF8A80}.s11{font-size:11px}
 .trn .trow{display:grid;grid-template-columns:76px 28px 1fr 56px;gap:8px;align-items:center;margin-top:8px;font-size:13px}.trn .tv{font-weight:900;text-align:right}.trn .td{font-size:12px;text-align:left}.up{color:#C6F36B;font-weight:900;animation:rise 1.2s ease-out}.trn.live{box-shadow:0 0 0 2px #C6F36B55}.trow.lvup .pbar i{background:#F7D117}
 @keyframes rise{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* --- 개편: 메뉴·하위 탭·면담·스카우트·경기 --- */
+.gear{width:38px;height:38px;border-radius:12px;border:0;background:#19241E;color:#C9D6CD;font-size:19px;line-height:1}
+.nv{position:relative}.bdg{position:absolute;top:8px;right:calc(50% - 22px);width:8px;height:8px;border-radius:50%;background:#FF6B5B;display:block}
+.card.lnk{display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.tiles.t3{grid-template-columns:repeat(3,1fr)}
+.tag.warn{background:#3A2A20;color:#FFB27A}.tag.on{background:#C6F36B;color:#101814}
+.optsn{display:grid;grid-template-columns:1fr 1fr;gap:8px}.optsn>.opt:last-child:nth-child(odd){grid-column:1/-1}
+.opt.fav{border-color:#FFE45C}
+.mering{transform-box:fill-box;transform-origin:center;animation:mering 1.1s ease-in-out infinite}
+@keyframes mering{0%{transform:scale(.75);opacity:1}100%{transform:scale(1.35);opacity:.15}}
+#match{display:none}#match.on{display:flex}
+@media (orientation:landscape) and (max-height:560px){
+  #match.on{display:grid;grid-template-columns:56% 44%;grid-template-rows:auto 1fr auto}
+  #match .mh{grid-column:2;grid-row:1;padding:8px 12px 6px}
+  #match #pitchbox{grid-column:1;grid-row:1/4;align-self:center}
+  #match .mb{grid-column:2;grid-row:2;overflow-y:auto;min-height:0}
+  #match .mf{grid-column:2;grid-row:3}
+  .pwrap{margin:0 8px}
+}
