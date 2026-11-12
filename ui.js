@@ -546,13 +546,23 @@ function render() {
   if (S.step==='create') { app.innerHTML = `<div class="scr">${creatorView()}</div>`; return; }
   const oldSc = document.querySelector('.scr'); const keyNow = S.step + '|' + S.tab + '|' + S.mt + '|' + S.ct + '|' + S.lc + '|' + S.ld + '|' + S.lt; const keepTop = (oldSc && S._sk === keyNow) ? oldSc.scrollTop : 0;
   let v = S.tab==='home' ? homeView() : S.tab==='news' ? newsView() : S.tab==='league' ? leagueView() : S.tab==='me' ? meView() : contractView();
-  app.innerHTML = `<div class="scr">${v}</div><div class="act"><button class="btn big" data-act="day">다음 날 ▶</button><button class="btn sec" data-act="week">7일</button><button class="btn sec" data-act="match">경기까지</button></div><nav>${NAV.map(([id,n])=>`<button class="nv ${S.tab===id?'on':''}" data-act="tab" data-id="${id}">${n}${navBadge(id)?'<i class="bdg"></i>':''}</button>`).join('')}</nav>`;
+  app.innerHTML = `<div class="scr">${v}</div>${actBar()}<nav>${NAV.map(([id,n])=>`<button class="nv ${S.tab===id?'on':''}" data-act="tab" data-id="${id}">${n}${navBadge(id)?'<i class="bdg"></i>':''}</button>`).join('')}</nav>`;
   { const ns = document.querySelector('.scr'); if (ns && keepTop) ns.scrollTop = keepTop; S._sk = keyNow; }
   if (S.tab!=='home') S.trfx = null; else animBars();
   if (S.modalKind==='settings') S.modal = settingsModal();
   if (S.modal) { $('#modal').innerHTML = `<div class="sheet"><button class="x" data-act="close">닫기</button>${S.modal}</div>`; $('#modal').style.display = 'block'; } else $('#modal').style.display = 'none';
 }
 function toast(t) { const el = $('#toast'); el.textContent = t; el.style.opacity = 1; setTimeout(() => el.style.opacity = 0, 2200); }
+function actBar() {
+  let ev = null; try { ev = Core.nextEvent(); } catch (e) {} const mt = ev && ev.match, mv = ev && ev.move, m = Core.me();
+  const dd = (n) => n <= 0 ? '오늘' : n === 1 ? '내일' : n + '일 뒤';
+  const md = (day) => { const t = Core.dateOf(day); return `${t.m}/${t.d}`; };
+  const info = m.meet ? '감독 면담 요청이 있습니다' : m.offers.length ? `이적 제안 ${m.offers.length}건 — 확인하세요` : mt ? `다음 경기 · ${dd(mt.days)} (${md(mt.day)}) ${mt.home ? 'vs' : '@'} ${esc(mt.opp)}` : mv ? `${esc(mv.club)} 합류 ${dd(mv.days)}` : '예정된 경기가 없습니다';
+  const sub = mv && mt && mv.days < mt.days ? ` · ${esc(mv.club)} 합류 ${dd(mv.days)}` : '';
+  const go = mt && mt.days === 1 && !m.meet && !m.offers.length ? '경기 시작 ⚽' : '계속 ▶';
+  const open = S.skipOpen ? `<div class="skiprow"><button class="chip" data-act="skip" data-id="1">하루만</button><button class="chip" data-act="skip" data-id="7">일주일</button><button class="chip" data-act="skip" data-id="30">한 달</button></div>` : '';
+  return `<div class="act"><div class="actinfo">${info}${sub}</div>${open}<div class="actrow"><button class="btn big" data-act="go">${go}</button><button class="btn sec skp ${S.skipOpen?'on':''}" data-act="skipm" aria-label="건너뛰기 메뉴">⏩</button></div></div>`;
+}
 function advance(days) {
   let stopped = null;
   { const m = Core.me(); S.trfx = { acc0: Object.assign({}, m.acc||{}), a0: Object.assign({}, m.a), fat0: m.fat }; }
@@ -562,12 +572,16 @@ function advance(days) {
     if (pm) { stopped = 'match'; break; }
     const m1 = Core.me();
     if (m1.offers.length > before) { stopped = 'offer'; break; }
+    if (!m0.meet && m1.meet) { stopped = 'meet'; break; }
+    if (m0.club !== m1.club) { stopped = 'move'; break; }
     if (!cu0 && m1.callup && days>1) { stopped = 'call'; break; }
     if (m1.renewal && days>1) { stopped = 'ren'; break; }
   }
   save(); render();
   if (stopped==='match') { setTimeout(startMatch, 50); }
   else if (stopped==='offer') toast('제안이 도착했습니다');
+  else if (stopped==='meet') toast('감독이 면담을 요청했습니다');
+  else if (stopped==='move') toast('새 팀에 합류했습니다');
   else if (stopped==='call') toast('대표팀에 소집되었습니다');
 }
 function makeWorld() {
@@ -610,6 +624,9 @@ document.addEventListener('click', (e) => {
   else if (a==='dec') { S.modal = null; Core.declineOffer(+id); }
   else if (a==='ren') { Core.acceptRenewal(); save(); }
   else if (a==='reset') { if (!S.resetArm) { S.resetArm = true; } else { S.resetArm = false; idbDel('save'); S.step = 'setup'; S.tab = 'home'; refreshSlots0().then(render); } }
+  else if (a==='go') { S.skipOpen = false; advance(200); return; }
+  else if (a==='skipm') { S.skipOpen = !S.skipOpen; render(); return; }
+  else if (a==='skip') { S.skipOpen = false; advance(+id); return; }
   else if (a==='day') { advance(1); return; }
   else if (a==='week') { advance(7); return; }
   else if (a==='match') { advance(120); return; }

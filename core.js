@@ -1012,6 +1012,17 @@ function resolveMoment(choice) {
   M.evMine.sort((x,y)=>x.min-y.min);
   M.mi++; return mo.result;
 }
+// 홈 화면 "계속" 버튼 안내용: 다음 경기/이적 합류 일정
+function nextEvent() {
+  const m = me(); if (!m) return null; let best = null;
+  const cur = G.clubs[m.club], lg = cur && leagueOf(cur.lg);
+  if (lg) { let h = lg.half; for (let p = lg.ptr; p < lg.rd.length && !best; p++) { const r = lg.rd[p]; for (; h < 2; h++) { const d = r.day + h; if (d > G.day && r.ms.filter((x, i) => (i % 2) === h).some(([a, b]) => a === m.club || b === m.club)) { const f = r.ms.filter((x, i) => (i % 2) === h).find(([a, b]) => a === m.club || b === m.club); best = { day: d, h: f[0], a: f[1], ctx: { t: 'lg', id: lg.id } }; break; } } h = 0; } }
+  for (let d = G.day + 1; d <= G.day + 120 && (!best || d < best.day); d++) { const fl = G.fx[d]; if (!fl) continue; const f = fl.find(x => mineIn(x.h) || mineIn(x.a)); if (f) { best = { day: d, h: f.h, a: f.a, ctx: f.ctx }; break; } }
+  const out = { match: null, move: null };
+  if (best) { const oppId = mineIn(best.h) ? best.a : best.h, oc = clubOf(oppId); out.match = { day: best.day, days: best.day - G.day, opp: oc ? oc.name : '', title: matchTitle(best.ctx), home: mineIn(best.h) }; }
+  if (m.pending) out.move = { day: m.pending.eff, days: m.pending.eff - G.day, club: G.clubs[m.pending.club].name, kind: m.pending.kind };
+  return out;
+}
 function finishMine() {
   const M = G.mm, m = me(); m.benchStreak = (M.role==='start') ? 0 : (M.role==='sub' ? 1 : (m.benchStreak||0) + 1); const mineGoals = M.evMine.length, oppGoals = M.evOpp.length;
   const gh = M.mineHome ? mineGoals : oppGoals, ga = M.mineHome ? oppGoals : mineGoals;
@@ -1171,5 +1182,5 @@ function dailyNews(t) {
 // ----- 저장 -----
 function serialize() { return JSON.stringify(G, (k,v) => { if (k==='ab'||k==='mm') return undefined; if ((k==='st'||k==='cst'||k==='nst') && v && v.a===0 && v.g===0 && v.as===0 && v.m===0 && v.y===0) return undefined; if (k==='form' || k==='rs') return Math.round(v*100)/100; return v; }); }
 function load(str) { const g = JSON.parse(str); if (g.v !== 2) throw new Error('old save'); G = g; for (const id in G.players) { const p = G.players[id]; if (!p.st) p.st = blankSt(); if (!p.cst) p.cst = blankSt(); if (!p.nst) p.nst = blankSt(); Eng.finalize(p); } G.mm = null; return G; }
-const API2 = { plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
+const API2 = { nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
 if (typeof module !== 'undefined') module.exports = API2;
