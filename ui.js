@@ -397,7 +397,7 @@ const PITCHES = [
   { n: '흙 운동장', base: '#B08658', a: '#B58B5C', b: '#A77D50', pat: 'n' },
   { n: '야간 구장', base: '#1F6B3C', a: '#226F40', b: '#1B6036', pat: 'v' },
   { n: '푸른 인조잔디', base: '#2C7F8F', a: '#308896', b: '#287686', pat: 'h' }];
-function pickPitch(M) { const h = M.h; let x = ((h.id | 0) * 2654435761) >>> 0, hs = (x >> 7) % 8; if (h.lg === 'KHS' || h.kind === 'youth') hs = [0, 3, 5, 4, 1, 3][(x >> 5) % 6]; return PITCHES[hs]; }
+function pickPitch(M) { const h = M.h; let x = ((h.id | 0) * 2654435761) >>> 0, hs = (x >>> 7) % 8; if (h.lg === 'KHS' || h.kind === 'youth') hs = [0, 3, 5, 4, 1, 3][(x >>> 5) % 6]; return PITCHES[hs] || PITCHES[0]; }
 function pitchBg(pt) { const st = pt.pat, rect = (x, y, w, h, c) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`; let o = '';
   if (st === 'v') for (let i = 0; i < 8; i++) o += rect(i * 12.5, 0, 12.5, 64, i % 2 ? pt.b : pt.a);
   else if (st === 'h') for (let i = 0; i < 8; i++) o += rect(0, i * 8, 100, 8, i % 2 ? pt.b : pt.a);
@@ -423,7 +423,7 @@ function pitchHTML(M) {
   const dots = (st, col0, pre) => st.map((p,i) => { const col = p.sub === 'GK' ? MV.kit.gk[pre] : col0; const lk = lookOf(p), sk = '#' + SKIN_C[lk.skin], hr = '#' + HAIR_C[lk.hair], ol = pre==='o' ? '#fff' : '#000';
     const fig = `<rect x="-1.4" y="-1.4" width="2.8" height="2.9" fill="${col}" stroke="${ol}" stroke-width="0.28"/><rect x="-1.1" y="-4" width="2.2" height="2.3" fill="${sk}" stroke="${ol}" stroke-width="0.22"/><rect x="-1.1" y="-4" width="2.2" height="0.8" fill="${hr}"/><rect x="-1.2" y="1.5" width="1" height="1.5" fill="#232A26"/><rect x="0.2" y="1.5" width="1" height="1.5" fill="#232A26"/>`;
     return p.me ? `<g class="dot me" id="${pre}${i}" transform="translate(50 32)"><circle class="mering" cy="0" r="4.2" fill="none" stroke="#FFE45C" stroke-width="0.6"/><g transform="scale(1.45)">${fig}</g><path d="M0 -8.4 L-1.8 -10.8 L1.8 -10.8 Z" fill="#FFE45C"/><text y="-11.6" text-anchor="middle" font-size="3.4" font-weight="800" fill="#FFE45C" stroke="#000" stroke-width="0.5" paint-order="stroke">나</text></g>` : `<g class="dot" id="${pre}${i}" transform="translate(50 32)">${fig}</g>`; }).join('');
-  return `<div class="pwrap"><svg id="pitch" viewBox="0 0 100 64" preserveAspectRatio="xMidYMid meet">${pitchBg(MV.pitch)}<g fill="none" stroke="#fff" stroke-opacity=".75" stroke-width=".4"><rect x="1" y="1" width="98" height="62"/><path d="M50 1V63"/><circle cx="50" cy="32" r="8"/><rect x="1" y="17" width="14" height="30"/><rect x="85" y="17" width="14" height="30"/><rect x="1" y="25" width="5" height="14"/><rect x="94" y="25" width="5" height="14"/></g>${dots(MV.ost, MV.kit.o[0], 'o')}${dots(MV.mst, MV.kit.m[0], 'm')}<g id="ball" transform="translate(50 32)"><circle r="1.25" fill="#fff" stroke="#000" stroke-width=".35"/></g></svg><div id="fx"></div></div>`;
+  return `<div class="pwrap"><svg id="pitch" viewBox="0 0 100 64" preserveAspectRatio="xMidYMid meet">${pitchBg(MV.pitch)}<g fill="none" stroke="#fff" stroke-opacity=".75" stroke-width=".4"><rect x="1" y="1" width="98" height="62"/><path d="M50 1V63"/><circle cx="50" cy="32" r="8"/><rect x="1" y="17" width="14" height="30"/><rect x="85" y="17" width="14" height="30"/><rect x="1" y="25" width="5" height="14"/><rect x="94" y="25" width="5" height="14"/></g><line id="pline" x1="0" y1="0" x2="0" y2="0" stroke="#fff" stroke-opacity="0" stroke-width=".4" stroke-dasharray="1.2 1"/><ellipse id="bsh" rx="1.2" ry=".55" fill="#000" fill-opacity=".28" transform="translate(50 32)"/>${dots(MV.ost, MV.kit.o[0], 'o')}${dots(MV.mst, MV.kit.m[0], 'm')}<g id="ball" transform="translate(50 32)"><circle r="1.25" fill="#fff" stroke="#000" stroke-width=".35"/></g><text id="blbl" text-anchor="middle" font-size="3" font-weight="800" fill="#fff" stroke="#000" stroke-width=".55" paint-order="stroke" opacity="0" transform="translate(50 28)"></text></svg><div id="fx"></div></div>`;
 }
 const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // ---- 연속 이동 엔진: 포메이션 기준점 + 공 영향 + 역할 + 스티어링(속도/가속), 매 프레임 갱신 ----
@@ -504,6 +504,8 @@ function retarget(M) {
   place('m'); place('o');
 }
 function movePitch() { const M = G0().mm; if (!M || !MV || !MV.pos) return; retarget(M); if (!MV.raf) MV.raf = requestAnimationFrame(frame); }
+function lbl(t) { if (MV) MV.lbl = { t, l: 1 }; }
+function resetPos(M) { const dM = dM_(M); const f = (st, pre, d) => st.forEach((p, i) => { const b = FORM[Math.min(i, FORM.length - 1)], c = MV.pos[pre][i]; if (c) { c.x = d > 0 ? b[0] : 100 - b[0]; c.y = b[1] * 0.64; c.vx = c.vy = 0; } }); f(MV.mst, 'm', dM); f(MV.ost, 'o', -dM); MV.run = {}; }
 function sideOf(s) { return s === 'm' ? MV.mst : MV.ost; }
 function passTo(s, i, sp) { MV.act = { k: 'pass', to: { s, i }, sp }; MV.holder = null; }
 function shoot(M, out) {
@@ -514,7 +516,8 @@ function shoot(M, out) {
   else if (out === 'post') t = { x: gx, y: 32 + (Math.random() < 0.5 ? -1 : 1) * 4.2 };
   else if (out === 'save') t = { x: MV.pos[os][0].x, y: MV.pos[os][0].y };
   else { let bi = -1, bd = 1e9; MV.pos[os].forEach((q, i) => { if (i === 0 || !q || MV.red[os + i]) return; const dd = Math.hypot(q.x - cur.x, q.y - cur.y); if (dd < bd) { bd = dd; bi = i; } }); if (bi < 0) { out = 'wide'; t = { x: gx, y: 32 + 10 }; } else to = { s: os, i: bi }; }
-  MV.act = { k: 'shot', tx: t.x, ty: t.y, sp: 78, out, s, to }; MV.holder = null;
+  MV.act = { k: 'shot', tx: t.x, ty: t.y, sp: 78, out, s, to }; MV.holder = null; lbl('슛!');
+  if (out !== 'goal') { const nm = esc(sideOf(s)[h.i].name); MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${({ save: '골키퍼 선방', wide: '골대를 벗어남', block: '수비가 막아냄', post: '골대를 때림' })[out]}` }); }
 }
 function decide(M) {
   const h = MV.holder; if (!h) return;
@@ -536,13 +539,13 @@ function decide(M) {
   // 골키퍼: 잡은 뒤 배급 (짧게 풀어 나가거나 길게 전방으로)
   if (h.i === 0) { const long = Math.random() < 0.35 + (PA(who, 'KIC') - 50) / 250;
     const t = pickBy(mates.filter(m => m.i), m => long ? (m.sub === 'ST' || m.sub === 'W' || m.sub === 'AM' ? 1 + m.open : 0.2) : (m.sub === 'CB' || m.sub === 'FB' || m.sub === 'DM' ? Math.exp(-m.dist / 20) * m.open : 0.15));
-    if (t) passTo(s, t.i, long ? 55 : 38); else MV.dec = 0.5; return; }
+    if (t) { passTo(s, t.i, long ? 55 : 38); if (long) { MV.act.hi = true; lbl('롱킥'); } } else MV.dec = 0.5; return; }
   const R = who.sub, pm = c01(0.5 + (M.mine.strength - M.opp.strength) / 160, 0.3, 0.7), press = nd < 6 ? 1 : nd < 12 ? 0.5 : 0.15, foe = ni >= 0 ? sideOf(os)[ni] : null;
   const lose = clampN(0.05 + press * 0.14 + (s === 'm' ? -(pm - 0.5) * 0.2 : (pm - 0.5) * 0.2) - (PA(who, 'DRI') - 50) / 700 + (PA(foe, 'TAK') - 50) / 500 + (PA(foe, 'AGG') - 50) / 900, 0.03, 0.42);
-  const pass = (t, sp, lead) => { const err = clampN((55 - PA(who, 'PAS')) / 220 + press * 0.08 + (t.dist > 30 ? 0.05 : 0) + (lead ? 0.04 : 0), 0, 0.3);   // 패스 정확도: 능력치/압박/거리
+  const pass = (t, sp, lead, tag) => { const err = clampN((55 - PA(who, 'PAS')) / 220 + press * 0.08 + (t.dist > 30 ? 0.05 : 0) + (lead ? 0.04 : 0), 0, 0.3);   // 패스 정확도: 능력치/압박/거리
     if (Math.random() < err && ni >= 0) { let bi = -1, bd = 1e9; oarr.forEach((q, i) => { if (i && q && !MV.red[os + i]) { const dd = Math.hypot(q.x - t.q.x, q.y - t.q.y); if (dd < bd) { bd = dd; bi = i; } } }); if (bi >= 0) { passTo(os, bi, sp); return; } }
-    passTo(s, t.i, sp); if (lead) MV.act.lead = d * lead; };
-  if (ni >= 0 && Math.random() < lose) { passTo(os, ni, 55); return; }                                          // 태클/인터셉트
+    passTo(s, t.i, sp); if (lead) MV.act.lead = d * lead; if (tag) { MV.act.tag = tag; lbl(tag); } if (tag === '크로스' || tag === '롱패스' || tag === '걷어내기') MV.act.hi = true; };
+  if (ni >= 0 && Math.random() < lose) { passTo(os, ni, 55); lbl('태클!'); return; }                                          // 태클/인터셉트
   if (MV.finS !== s) { MV.finS = s; MV.fin = 0; } if (u < 60) MV.fin = 0;
   const wide = cur.y < 16 || cur.y > 48;
   const roleShot = R === 'ST' ? 0.15 : R === 'W' || R === 'AM' ? 0.05 : R === 'CB' || R === 'FB' || R === 'DM' ? -0.25 : 0, range = 24 + (PA(who, 'FIN') - 50) / 5 + (R === 'ST' ? 5 : 0) - (R === 'CB' || R === 'DM' ? 8 : 0);
@@ -550,15 +553,15 @@ function decide(M) {
     const shotP = clampN(0.26 + (PA(who, 'FIN') - 50) / 150 + roleShot + (gd < 18 ? 0.25 : 0) - press * 0.08 + MV.fin * 0.22 - (wide ? 0.22 : 0), 0.04, 0.95);
     if (Math.random() < shotP) { const r = Math.random(), fin = (PA(who, 'FIN') - 50) / 400, out = r < 0.38 - fin ? 'save' : r < 0.62 - fin ? 'wide' : r < 0.85 ? 'block' : 'post'; shoot(M, out); MV.fin = 0; return; }
     MV.fin++;
-    if (wide && Math.random() < 0.55 + (PA(who, 'CRS') - 50) / 200) { const t = pickBy(mates.filter(m => m.pu > 78), m => 1 + (PA(m.who, 'HEA') - 50) / 80 + m.open); if (t) { pass(t, 48 + (PA(who, 'CRS') - 50) / 8); return; } }
+    if (wide && Math.random() < 0.55 + (PA(who, 'CRS') - 50) / 200) { const t = pickBy(mates.filter(m => m.pu > 78), m => 1 + (PA(m.who, 'HEA') - 50) / 80 + m.open); if (t) { pass(t, 48 + (PA(who, 'CRS') - 50) / 8, 0, '크로스'); return; } }
   }
-  if (u < 30 && press > 0.5 && Math.random() < 0.35) { const t = pickBy(mates.filter(m => m.i), m => m.sub === 'ST' || m.sub === 'W' || m.sub === 'AM' ? 1 + m.open : 0.15); if (t) { pass(t, 54 + (R === 'CB' ? (PA(who, 'STR') - 50) / 10 : 0)); return; } }   // 위험 지역 걷어내기
+  if (u < 30 && press > 0.5 && Math.random() < 0.35) { const t = pickBy(mates.filter(m => m.i), m => m.sub === 'ST' || m.sub === 'W' || m.sub === 'AM' ? 1 + m.open : 0.15); if (t) { pass(t, 54 + (R === 'CB' ? (PA(who, 'STR') - 50) / 10 : 0), 0, '걷어내기'); return; } }   // 위험 지역 걷어내기
   if ((R === 'CM' || R === 'AM' || R === 'DM') && PA(who, 'VIS') > 55 && Math.random() < (PA(who, 'VIS') - 40) / 140) {   // 시야 좋은 미드필더: 수비 뒷공간 스루패스
-    const t = pickBy(mates.filter(m => m.i && m.pu > u + 8 && m.pu <= line + 4 && (m.sub === 'ST' || m.sub === 'W' || m.sub === 'AM')), m => m.open * (1 + (PA(m.who, 'OTB') - 50) / 60)); if (t) { pass(t, 46 + PA(who, 'PAS') / 10, 6); return; } }
+    const t = pickBy(mates.filter(m => m.i && m.pu > u + 8 && m.pu <= line + 4 && (m.sub === 'ST' || m.sub === 'W' || m.sub === 'AM')), m => m.open * (1 + (PA(m.who, 'OTB') - 50) / 60)); if (t) { pass(t, 46 + PA(who, 'PAS') / 10, 6, '스루패스'); return; } }
   if (R === 'ST' && (PA(who, 'STR') + PA(who, 'HEA')) / 2 > PA(who, 'PAC') + 4 && gd > 16 && Math.random() < 0.35) {          // 타깃맨: 등지고 받아 내려주기
     const t = pickBy(mates.filter(m => m.i && m.pu < u && (m.sub === 'AM' || m.sub === 'CM' || m.sub === 'W')), m => m.open); if (t) { pass(t, 38); return; } }
   if (PA(who, 'VIS') > 58 && (R === 'CM' || R === 'DM' || R === 'CB') && Math.random() < 0.18) {                                // 사이드 체인지
-    const t = pickBy(mates.filter(m => m.i && Math.abs(m.q.y - cur.y) > 26 && m.pu >= u - 4), m => m.open); if (t) { pass(t, 46); return; } }
+    const t = pickBy(mates.filter(m => m.i && Math.abs(m.q.y - cur.y) > 26 && m.pu >= u - 4), m => m.open); if (t) { pass(t, 46, 0, '사이드 체인지'); MV.act.hi = true; return; } }
   if (nd > 8 && u < 72 && Math.random() < 0.12 + (PA(who, 'DRI') - 50) / 300 + (R === 'W' ? 0.15 : R === 'AM' ? 0.08 : R === 'CB' || R === 'DM' ? -0.1 : 0)) { MV.dec = 0.5 + Math.random() * 0.5; return; }   // 드리블 전진
   const t = pickBy(mates, m => { if (m.i === 0 && (u > 25 || Math.random() < 0.85)) return 0; const fw = m.pu - u; return Math.exp(-m.dist / 22) * (fw > 4 ? 1.5 : fw < -8 ? 0.45 : 1) * (m.dist < 5 ? 0.1 : 1) * m.open * (m.pu > line + 1 ? 0.15 : 1) * (1 + (PA(who, 'VIS') - 50) / 150) * (fw > 4 && (m.sub === 'ST' || m.sub === 'W') ? 1 + (PA(m.who, 'OTB') - 50) / 100 : 1) * (R === 'CB' || R === 'FB' ? (m.sub === 'DM' || m.sub === 'CM' || m.sub === 'FB' || m.sub === 'CB' ? 1.3 : 0.8) : 1); });
   if (t) pass(t, 34 + PA(who, 'PAS') / 4); else MV.dec = 0.5;
@@ -566,14 +569,14 @@ function decide(M) {
 function stepBall() { if (MV) MV.dec = Math.min(MV.dec == null ? 0.2 : MV.dec, 0.2); }
 function goalFx(M) {
   const pg = MV.pg; if (!pg) return; MV.pg = null;
-  pg.logs.slice().reverse().forEach(o => MV.log.unshift(o)); MV.goalRes = pg.ms ? 'o' : 'm';
+  pg.logs.slice().reverse().forEach(o => MV.log.unshift(o)); MV.goalRes = pg.ms ? 'o' : 'm'; resetPos(M);
   fxShow(pg.html, pg.ms ? 'goal' : 'goal opp', 1700, true); renderMatch();
 }
 function flushPg() { const pg = MV && MV.pg; if (!pg) return; MV.pg = null; pg.logs.slice().reverse().forEach(o => MV.log.unshift(o)); }
 function frame(ts) {
   if (!MV) return; MV.raf = requestAnimationFrame(frame);
   const M = G0().mm; if (!M || !MV.pos) return;
-  let dt = MV.last ? Math.min(0.05, (ts - MV.last) / 1000) : 0.016; MV.last = ts; dt *= tsOf();
+  let dt = MV.last ? Math.min(0.05, (ts - MV.last) / 1000) : 0.016; MV.last = ts; const realDt = dt; dt *= tsOf();
   MV.t += dt; MV.rt -= dt; if (MV.kick > 0) MV.kick -= dt; if (MV.pg) MV.pg.t += dt; if (MV.rt <= 0) { retarget(M); MV.rt = 0.22; }
   const all = [];
   for (const pre of ['m', 'o']) sideOf(pre).forEach((p, i) => {
@@ -595,28 +598,35 @@ function frame(ts) {
     else if (A2.k === 'shot' && (A2.out === 'save' || A2.out === 'block')) { const tt = A2.out === 'save' ? { s: A2.s === 'm' ? 'o' : 'm', i: 0 } : A2.to, q = tt && MV.pos[tt.s][tt.i]; tx = q ? q.x : A2.tx; ty = q ? q.y : A2.ty; }
     else { tx = A2.tx; ty = A2.ty; }
     const dx = tx - b.x, dy = ty - b.y, d = Math.hypot(dx, dy), step = A2.sp * dt;
+    if (A2.d0 == null) { A2.d0 = Math.max(d, 1); A2.x0 = b.x; A2.y0 = b.y; A2.h = A2.k === 'shot' ? 1.4 : A2.hi ? 3.4 : A2.d0 > 34 ? 2.2 : 0.5; }
+    MV.bz = A2.h * Math.sin(Math.PI * clampN(1 - d / A2.d0, 0, 1)); MV.ln = { x0: A2.x0, y0: A2.y0, x1: tx, y1: ty };
     if (d <= step + 0.9) { b.x = tx; b.y = ty; MV.act = null;
       if (A2.k === 'pass') { if (MV.holder === null && MV.poss !== A2.to.s) MV.fin = 0; MV.holder = A2.to; MV.poss = A2.to.s; MV.dec = A2.to.i === 0 ? 1.1 + Math.random() * 0.5 : 0.45 + Math.random() * 0.7; retarget(M); }
       else if (A2.k === 'shot') { const os = A2.s === 'm' ? 'o' : 'm';
         if (A2.out === 'goal') goalFx(M);
-        else if (A2.out === 'save') { MV.holder = { s: os, i: 0 }; MV.poss = os; MV.dec = 1.2 + Math.random() * 0.5; retarget(M); }
-        else if (A2.out === 'block') { MV.holder = A2.to; MV.poss = os; MV.dec = 0.4; retarget(M); }
-        else if (A2.out === 'post') { let bi = -1, bd = 1e9; MV.pos[os].forEach((q, i) => { if (i === 0 || !q || MV.red[os + i]) return; const dd = Math.hypot(q.x - b.x, q.y - b.y); if (dd < bd) { bd = dd; bi = i; } }); if (bi >= 0) passTo(os, bi, 40); }
-        else { MV.rs = { t: 0.9, s: os, i: 0 }; MV.holder = null; MV.poss = os; } }            // 골킥 준비
+        else if (A2.out === 'save') { lbl('선방!'); MV.holder = { s: os, i: 0 }; MV.poss = os; MV.dec = 1.2 + Math.random() * 0.5; retarget(M); }
+        else if (A2.out === 'block') { lbl('막았다!'); MV.holder = A2.to; MV.poss = os; MV.dec = 0.4; retarget(M); }
+        else if (A2.out === 'post') { lbl('골대!'); let bi = -1, bd = 1e9; MV.pos[os].forEach((q, i) => { if (i === 0 || !q || MV.red[os + i]) return; const dd = Math.hypot(q.x - b.x, q.y - b.y); if (dd < bd) { bd = dd; bi = i; } }); if (bi >= 0) passTo(os, bi, 40); }
+        else { lbl('빗나감'); MV.rs = { t: 0.9, s: os, i: 0 }; MV.holder = null; MV.poss = os; } }            // 골킥 준비
     } else { b.x += dx / d * step; b.y += dy / d * step; }
   } else if (MV.rs) {
+    MV.bz = 0; MV.ln = null;
     MV.rs.t -= dt; if (MV.rs.t <= 0) { const q = MV.pos[MV.rs.s][MV.rs.i]; b.x = q.x; b.y = q.y; MV.holder = { s: MV.rs.s, i: MV.rs.i }; MV.poss = MV.rs.s; MV.dec = 1.0; MV.rs = null; retarget(M); }
   } else if (MV.holder && MV.pos[MV.holder.s][MV.holder.i]) {
+    MV.bz = 0; MV.ln = null;
     const hp = MV.pos[MV.holder.s][MV.holder.i], dd = MV.holder.s === 'm' ? dM_(M) : -dM_(M), k = Math.min(1, dt * 16);
     b.x += (c01(hp.x + dd * 1.7, 1.5, 98.5) - b.x) * k; b.y += (hp.y - b.y) * k;
     if ((!MV.paused || MV.pg) && !MV.over) { MV.dec -= dt; if (MV.dec <= 0) decide(M); }
   }
   if (MV.goalRes && !MV.paused && !MV.act) {
-    const s = MV.goalRes, st = sideOf(s); MV.goalRes = null; b.x = 50; b.y = 32; MV.holder = { s, i: Math.min(6, st.length - 1) }; MV.poss = s; MV.dec = 1.2; MV.kick = 2.2; MV.fin = 0; retarget(M); }
+    const s = MV.goalRes, st = sideOf(s); MV.goalRes = null; b.x = 50; b.y = 32; MV.holder = { s, i: Math.min(6, st.length - 1) }; MV.poss = s; MV.dec = 0.45; MV.kick = 0.7; MV.fin = 0; retarget(M); }
   const els = MV.els || (MV.els = { m: MV.mst.map((_, i) => document.getElementById('m' + i)), o: MV.ost.map((_, i) => document.getElementById('o' + i)) });
   for (const pre of ['m', 'o']) els[pre].forEach((el, i) => { const c = MV.pos[pre][i]; if (!el || !c) return; const sp = Math.hypot(c.vx, c.vy), bob = Math.abs(Math.sin(MV.t * 11 + i * 1.3)) * Math.min(0.6, sp / 25);
     el.setAttribute('transform', `translate(${c.x.toFixed(2)} ${(c.y - bob).toFixed(2)})`); if (MV.red[pre + i]) el.style.opacity = 0.12; });
-  const be = document.getElementById('ball'); if (be) be.setAttribute('transform', `translate(${b.x.toFixed(2)} ${b.y.toFixed(2)})`);
+  const bz = MV.act ? (MV.bz || 0) : 0, be = document.getElementById('ball'); if (be) be.setAttribute('transform', `translate(${b.x.toFixed(2)} ${(b.y - bz).toFixed(2)}) scale(${(1 + bz * 0.1).toFixed(2)})`);
+  const sh = document.getElementById('bsh'); if (sh) sh.setAttribute('transform', `translate(${b.x.toFixed(2)} ${(b.y + 0.9).toFixed(2)})`);
+  const ln = document.getElementById('pline'); if (ln) { if (MV.act && MV.ln && !MV.act.cross) { ln.setAttribute('x1', MV.ln.x0.toFixed(1)); ln.setAttribute('y1', MV.ln.y0.toFixed(1)); ln.setAttribute('x2', MV.ln.x1.toFixed(1)); ln.setAttribute('y2', MV.ln.y1.toFixed(1)); ln.setAttribute('stroke-opacity', '0.4'); } else ln.setAttribute('stroke-opacity', '0'); }
+  const lb = document.getElementById('blbl'); if (lb) { if (MV.lbl && MV.lbl.l > 0) { if (lb.textContent !== MV.lbl.t) lb.textContent = MV.lbl.t; lb.setAttribute('transform', `translate(${c01(b.x, 8, 92).toFixed(1)} ${c01(b.y - 4, 5, 60).toFixed(1)})`); lb.setAttribute('opacity', Math.min(1, MV.lbl.l * 2).toFixed(2)); MV.lbl.l -= realDt; } else lb.setAttribute('opacity', '0'); }
 }
 function toMe(M) { const i = MV.mst.findIndex(p => p.me); if (i >= 0) { MV.holder = null; MV.act = { k: 'pass', to: { s: 'm', i }, sp: 70 }; MV.poss = 'm'; MV.dec = 1; } }
 function fxShow(html, cls, ms, pause) {
