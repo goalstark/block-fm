@@ -391,14 +391,48 @@ function pitchHTML(M) {
     return p.me ? `<g class="dot me" id="${pre}${i}" style="transform:translate(50px,32px)"><circle class="mering" cy="0" r="4.2" fill="none" stroke="#FFE45C" stroke-width="0.6"/><g transform="scale(1.45)">${fig}</g><path d="M0 -8.4 L-1.8 -10.8 L1.8 -10.8 Z" fill="#FFE45C"/><text y="-11.6" text-anchor="middle" font-size="3.4" font-weight="800" fill="#FFE45C" stroke="#000" stroke-width="0.5" paint-order="stroke">나</text></g>` : `<g class="dot" id="${pre}${i}" style="transform:translate(50px,32px)">${fig}</g>`; }).join('');
   return `<div class="pwrap"><svg id="pitch" viewBox="0 0 100 64" preserveAspectRatio="xMidYMid meet"><rect width="100" height="64" fill="#2E8B4A"/>${[0,1,2,3,4,5,6,7].map(i=>`<rect x="${i*12.5}" width="12.5" height="64" fill="${i%2?'#2A8445':'#319550'}"/>`).join('')}<g fill="none" stroke="#fff" stroke-opacity=".75" stroke-width=".4"><rect x="1" y="1" width="98" height="62"/><path d="M50 1V63"/><circle cx="50" cy="32" r="8"/><rect x="1" y="17" width="14" height="30"/><rect x="85" y="17" width="14" height="30"/><rect x="1" y="25" width="5" height="14"/><rect x="94" y="25" width="5" height="14"/></g>${dots(MV.ost, M.opp.col, 'o')}${dots(MV.mst, M.mine.col, 'm')}<g id="ball" style="transform:translate(50px,32px)"><circle r="1.25" fill="#fff" stroke="#000" stroke-width=".35"/></g></svg><div id="fx"></div></div>`;
 }
+const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 function movePitch() {
   const M = G0().mm; if (!M || !MV) return; const b = MV.ball, dM = M.mineHome ? 1 : -1; MV.pos = MV.pos || { m: [], o: [] };
-  const place = (st, pre, d, atk) => st.forEach((p, i) => { const f = FORM[Math.min(i, FORM.length - 1)], el = document.getElementById(pre + i); if (!el) return;
-    let x = d > 0 ? f[0] : 100 - f[0]; x = c01(x + (b.x - 50) * (f[0] < 10 ? 0.12 : 0.38) + (atk && f[0] > 30 ? d * 8 : 0), 3, 97);
-    let y = f[1] * 0.64; y = c01(y + (b.y - y) * 0.16 + (Math.random() - 0.5) * 2.2, 3, 61);
-    if (MV.holder && MV.holder.s === pre && MV.holder.i === i) { x = c01(x + d * 2.5, 3, 97); }
-    MV.pos[pre][i] = { x, y };
-    el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px)`; el.style.opacity = MV.red[pre + i] ? 0.12 : 1; });
+  MV.tk = (MV.tk || 0) + 1; const tk = MV.tk, SUBX = { ST: 9, W: 5, AM: 4, CM: 0, DM: -5, FB: -2, CB: -6, GK: 0 };
+  const hold = MV.holder, bpos = MV.pos;
+  const place = (st, pre, d, atk) => {
+    const hp = hold && hold.s === pre && bpos[pre][hold.i] ? bpos[pre][hold.i] : null;   // 우리 편 공격 시 공 가진 선수
+    // 수비 시 공에 가장 가까운 선수들이 압박
+    const near = st.map((p, i) => ({ i, d2: bpos[pre][i] ? (bpos[pre][i].x - b.x) ** 2 + (bpos[pre][i].y - b.y) ** 2 : 1e9 })).filter(o => st[o.i].sub !== 'GK').sort((u, v) => u.d2 - v.d2).map(o => o.i);
+    st.forEach((p, i) => { const f = FORM[Math.min(i, FORM.length - 1)], el = document.getElementById(pre + i); if (!el) return;
+      const A = (k) => (p.a && p.a[k]) || 50, sub = p.sub || 'CM', gk = sub === 'GK', ph = (p.id || i) * 1.7;
+      let x = d > 0 ? f[0] : 100 - f[0], y = f[1] * 0.64;
+      x += d * (SUBX[sub] || 0);
+      if (sub === 'W' || sub === 'FB') y = y < 32 ? 8 + (sub === 'FB' ? 3 : 0) : 56 - (sub === 'FB' ? 3 : 0);
+      const lineK = gk ? 0.1 : 0.2 + (70 - A('POS')) / 260 + (sub === 'CB' ? -0.06 : sub === 'ST' ? 0.05 : 0);
+      x += (b.x - 50) * (0.18 + lineK); y += (b.y - y) * 0.18;
+      const wander = 1.4 + A('WOR') / 28; y += Math.sin(tk * 0.55 + ph) * wander; x += Math.cos(tk * 0.4 + ph * 1.3) * wander * 0.7;
+      if (!gk) {
+        if (atk) {
+          if (sub === 'ST' || sub === 'W') x += d * (4 + (A('OTB') - 50) / 6 + (A('PAC') - 50) / 12);       // 오프더볼: 수비 뒷공간 침투
+          else if (sub === 'AM' || sub === 'CM') x += d * (2 + (A('OTB') - 50) / 14);
+          if (sub === 'FB' && (A('PAC') + A('STA')) / 2 > 58) x += d * (8 + (A('PAC') - 55) / 8);          // 오버래핑
+          if (hp && p !== (hold && st[hold.i])) { const dx = hp.x - x, dy = hp.y - y, dist = Math.hypot(dx, dy);   // 패스 길 열어 주기
+            if (dist > 9 && (sub === 'AM' || sub === 'CM' || sub === 'DM' || sub === 'W')) { const k = clampN((A('VIS') + A('PAS') - 80) / 260, 0.05, 0.4); x += dx * k; y += dy * k; } }
+        } else {
+          const ci = near.indexOf(i);
+          if (ci >= 0 && ci < 2) { const k = clampN(0.2 + (A('AGG') + A('WOR') - 80) / 220 - ci * 0.12, 0.05, 0.6); x += (b.x - x) * k; y += (b.y - y) * k; }   // 압박
+          else if (sub === 'DM' || sub === 'CM') { x += (b.x - x) * 0.14; y += (b.y - y) * 0.2; }
+          if (sub === 'CB' || sub === 'DM') x -= d * (A('POS') > 62 ? 3 : 0);                               // 위치선정 좋으면 라인 유지
+          if (sub === 'ST' || sub === 'W') x -= d * (A('WOR') > 60 ? 8 : 2);                                  // 활동량 좋은 공격수는 수비 가담
+        }
+      }
+      if (MV.holder && MV.holder.s === pre && MV.holder.i === i) x += d * 2.5;
+      // 체력: 스태미나 낮으면 후반에 활동 범위 감소
+      const tired = clampN((60 - A('STA')) / 120 * (MV.min / 90), 0, 0.35); x = (d > 0 ? f[0] : 100 - f[0]) + (x - (d > 0 ? f[0] : 100 - f[0])) * (1 - tired);
+      x = c01(x, 3, 97); y = c01(y, 3, 61);
+      // 스피드/민첩에 따라 목표 위치로 이동하는 속도 차이
+      const cur = bpos[pre][i], k = clampN(0.32 + (A('PAC') + A('AGI') - 100) / 330, 0.2, 0.55);
+      const nx = cur ? cur.x + (x - cur.x) * k : x, ny = cur ? cur.y + (y - cur.y) * k : y;
+      bpos[pre][i] = { x: nx, y: ny };
+      el.style.transform = `translate(${nx.toFixed(1)}px,${ny.toFixed(1)}px)`; el.style.opacity = MV.red[pre + i] ? 0.12 : 1; });
+  };
   place(MV.mst, 'm', dM, MV.poss === 'm'); place(MV.ost, 'o', -dM, MV.poss === 'o');
   let bp = b; if (MV.holder && MV.pos[MV.holder.s][MV.holder.i] && !MV.ballFree) { const hp = MV.pos[MV.holder.s][MV.holder.i], dd = MV.holder.s === 'm' ? dM : -dM; bp = { x: c01(hp.x + dd * 1.6, 2, 98), y: hp.y }; }
   const be = document.getElementById('ball'); if (be) be.style.transform = `translate(${bp.x.toFixed(1)}px,${bp.y.toFixed(1)}px)`;
@@ -466,7 +500,8 @@ function tick() {
   MV.min++;
   const m = Core.me();
   stepBall(M); emitAt(M, MV.min, true);
-  if (M.role==='sub' && MV.min===M.from) MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 투입 — ${esc(m.name)}` });
+  if (M.role==='sub' && MV.min===M.from) MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 투입 — ${esc(m.name)}` })
+  if (M.role==='sub' && MV.min===M.from && !MV.mst.some(p => p.me)) { let ix = MV.mst.findIndex(p => p.sub === m.sub && p.sub !== 'GK'); if (ix < 0) ix = MV.mst.findIndex(p => p.sub !== 'GK'); if (ix >= 0) { MV.mst[ix] = m; const pb = $('#pitchbox'); if (pb) pb.innerHTML = pitchHTML(M); } }
   const mo = M.moments[M.mi];
   if (mo && !mo.done && mo.min === MV.min) { MV.paused = true; MV.momentOpen = mo; toMe(M); }
   if (MV.min >= 90) { clearInterval(MV.timer); MV.over = true; finishLog(M); }
@@ -474,7 +509,7 @@ function tick() {
   if (!MV.over && !MV.paused) { const t2 = MV.timer && setTimeout(() => { if (!MV || MV.paused || MV.over) return; hop(M); const hp2 = MV.holder && MV.pos && MV.pos[MV.holder.s][MV.holder.i]; if (hp2) MV.ball = { x: hp2.x, y: hp2.y }; movePitch(); }, Math.round(MV.speed * 0.5)); }
 }
 function skipMatch() {
-  clearInterval(MV.timer); const M = G0().mm;
+  clearInterval(MV.timer); const M = G0().mm; if (!M) return;
   while (MV.min < 90) { MV.min++; emitAt(M, MV.min, false); const mo = M.moments[M.mi];
     if (M.role==='sub' && MV.min===M.from) MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 투입 — ${esc(Core.me().name)}` });
     if (mo && !mo.done && mo.min===MV.min) { MV.paused = true; MV.momentOpen = mo; MV.timer = setInterval(tick, 40); stepBall(M); toMe(M); movePitch(); renderMatch(); return; } }
