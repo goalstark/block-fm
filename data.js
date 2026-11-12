@@ -57,6 +57,7 @@ const UN_SUF = ['대','체육대','공과대','국제대','교육대','과학대
 const COLS = [['#1E4FA3','#F2F2F2'],['#C8202F','#F2F2F2'],['#1F7A3A','#F2F2F2'],['#F2C230','#1A1A1A'],['#1A1A1A','#F2F2F2'],['#5B2A86','#F2F2F2'],['#E8741A','#1A1A1A'],['#5BB2E6','#1A1A1A'],['#8B1E2D','#F2C230'],['#C8202F','#1A1A1A'],['#1F7A3A','#F2C230'],['#F2F2F2','#1E4FA3']];
 // 국적
 const NAT_KO = { KOR:'한국',JPN:'일본',CHN:'중국',AUS:'호주',IRN:'이란',SAU:'사우디',ENG:'잉글랜드',ESP:'스페인',ITA:'이탈리아',GER:'독일',FRA:'프랑스',NED:'네덜란드',POR:'포르투갈',BEL:'벨기에',CRO:'크로아티아',SRB:'세르비아',DEN:'덴마크',SUI:'스위스',BRA:'브라질',ARG:'아르헨티나',URU:'우루과이',COL:'콜롬비아',USA:'미국',MEX:'멕시코',SEN:'세네갈',NGA:'나이지리아',MAR:'모로코',EGY:'이집트',GHA:'가나',CIV:'코트디부아르' };
+const FLAG = {KOR:'🇰🇷',JPN:'🇯🇵',CHN:'🇨🇳',AUS:'🇦🇺',IRN:'🇮🇷',SAU:'🇸🇦',ESP:'🇪🇸',ITA:'🇮🇹',GER:'🇩🇪',FRA:'🇫🇷',NED:'🇳🇱',POR:'🇵🇹',BEL:'🇧🇪',CRO:'🇭🇷',SRB:'🇷🇸',DEN:'🇩🇰',SUI:'🇨🇭',BRA:'🇧🇷',ARG:'🇦🇷',URU:'🇺🇾',COL:'🇨🇴',USA:'🇺🇸',MEX:'🇲🇽',SEN:'🇸🇳',NGA:'🇳🇬',MAR:'🇲🇦',EGY:'🇪🇬',GHA:'🇬🇭',CIV:'🇨🇮',ENG:'🏴󠁧󠁢󠁥󠁮󠁧󠁿'};
 const NAT_CODES = Object.keys(NAT_KO);
 const FOREIGN = ['BRA','BRA','ARG','FRA','ESP','ITA','GER','ENG','NED','POR','BEL','CRO','SRB','DEN','SUI','URU','COL','USA','SEN','NGA','MAR','EGY','GHA','CIV','JPN','KOR','AUS','MEX','CHN','IRN'];
 const NGRP = { ENG:'N',GER:'N',NED:'N',USA:'N',DEN:'N',SUI:'N',AUS:'N',SAU:'A',MAR:'A',EGY:'A',IRN:'A',SEN:'F',NGA:'F',GHA:'F',CIV:'F' };
@@ -75,4 +76,4 @@ const P = {
  J1:['다나카','사토','스즈키','다카하시','이토','와타나베','야마모토','나카무라','고바야시','가토','요시다','야마다','사사키','마쓰모토','이노우에','기무라','하야시','시미즈','야마구치','모리'],
  J2:['켄','유토','소타','하루토','류세이','다이키','쇼','리쿠','아오이','타쿠미','렌','코타','히로','마사','쓰바사','나오','신','가이','슌','유키']
 };
-if (typeof module !== 'undefined') module.exports = { DATA_CLUBS, EU, COUNTRIES, CODES, REG, SYM, HS_SUF, UN_SUF, COLS, NAT_KO, NAT_CODES, FOREIGN, NGRP, SUR, G1, G2, P };
+if (typeof module !== 'undefined') module.exports = { DATA_CLUBS, EU, COUNTRIES, CODES, REG, SYM, HS_SUF, UN_SUF, COLS, NAT_KO, NAT_CODES, FLAG, FOREIGN, NGRP, SUR, G1, G2, P };
