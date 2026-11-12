@@ -37,6 +37,38 @@ const S = { step:'boot', tab:'home', lc:null, ld:null, lt:'table', cv:null, moda
 const G0 = () => Core.G;
 const f1 = (x) => (Math.round(x*10)/10).toFixed(1);
 const CO = Core.COUNTRIES;
+
+const SV = (w, h, vb, body) => `<svg class="ic" width="${w}" height="${h}" viewBox="${vb}" aria-hidden="true">${body}</svg>`;
+const IC = {
+  ball: SV(16,16,'0 0 24 24','<circle cx="12" cy="12" r="10.5" fill="#fff" stroke="#16221B" stroke-width="1.6"/><path d="M12 7.2l3.6 2.6-1.4 4.2H9.8L8.4 9.8z" fill="#16221B"/><path d="M12 7.2V2.5M15.6 9.8l4.4-1.4M14.2 14l2.7 3.6M9.8 14l-2.7 3.6M8.4 9.8L4 8.4" stroke="#16221B" stroke-width="1.4" fill="none"/>'),
+  boot: SV(20,16,'0 0 28 24','<path d="M2 3h8l1.6 6.2 8.2 1.9c3.5.8 6 3 6.2 6V19H2z" fill="#F29B3C" stroke="#16221B" stroke-width="1.5" stroke-linejoin="round"/><path d="M2 19h24v2.4H2z" fill="#16221B"/><path d="M6 21.4v2.2M12 21.4v2.2M18 21.4v2.2M23 21.4v2.2" stroke="#16221B" stroke-width="2"/><path d="M10 11.5l2.2-1M12.8 13l2.2-1" stroke="#fff" stroke-width="1.2"/>'),
+  yc: SV(12,16,'0 0 12 16','<rect x=".8" y=".8" width="10.4" height="14.4" rx="1.6" fill="#F7D117" stroke="#16221B" stroke-width="1.2"/>'),
+  rc: SV(12,16,'0 0 12 16','<rect x=".8" y=".8" width="10.4" height="14.4" rx="1.6" fill="#E5322D" stroke="#16221B" stroke-width="1.2"/>'),
+  glove: '🧤', post: '🥅', crown: '👑', star: '⭐', target: '🎯', swap: '🔁'
+};
+const NEWS_IC = { match: IC.ball, nat: '🛡️', cup: '🏆', league: '📊', season: '📅', transfer: '🔁', rumor: '👀', injury: '🩹', youth: '🌱', retire: '👋', me: '⭐', table: '📊', world: '🌍' };
+const hs = (str) => { let h = 7; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0; return h; };
+const ART = {
+  match: ['이날 경기는 초반부터 양 팀이 팽팽하게 맞서며 긴장감 있게 전개됐다. 전반의 흐름을 가져간 쪽이 후반에도 압박의 강도를 유지하며 결과를 만들어 냈다.', '경기를 지켜본 현지 관계자들은 "세트피스 집중력과 마지막 10분의 체력 관리가 승부를 갈랐다"고 평가했다.', '패한 쪽 벤치는 경기 후 "찬스를 살리지 못한 것이 아쉽다. 다음 경기에서 바로 잡겠다"고 밝혔다.', '이 결과로 리그 순위 경쟁에도 작은 변화가 생겼다. 다음 라운드 결과에 따라 판도가 다시 흔들릴 수 있다.'],
+  cup: ['토너먼트 특유의 한 경기 승부 속에서 두 팀은 연장 가능성까지 염두에 둔 신중한 운영을 보였다.', '우승팀 관계자는 "선수단 전원이 한 경기 한 경기에 집중한 결과"라며 팬들에게 감사를 전했다.', '이번 대회 성적은 다음 시즌 대륙 대회 출전권과 구단 재정에도 영향을 줄 전망이다.'],
+  league: ['리그 사무국은 이번 결정이 시즌 운영 규정에 따라 확정됐다고 밝혔다.', '해당 구단들은 곧바로 다음 시즌 준비 체제에 들어간다. 코칭스태프 개편과 선수단 보강 소식이 이어질 것으로 보인다.', '팬 커뮤니티에서는 환영과 우려가 엇갈리는 반응이 나왔다.'],
+  season: ['한 시즌 동안 이어진 긴 레이스가 마무리됐다. 우승 구단은 꾸준한 경기력으로 시즌 내내 상위권을 지켰다.', '개인 타이틀 경쟁도 끝까지 치열했다. 득점왕과 MVP 모두 마지막 라운드에서야 윤곽이 드러났다.', '각 구단은 이제 재계약과 이적 시장을 통해 다음 시즌 전력을 구상한다.'],
+  transfer: ['이번 영입은 구단의 전력 보강 계획에 따른 것으로, 협상은 비교적 빠르게 마무리된 것으로 알려졌다.', '구단 관계자는 "포지션 경쟁을 자극하고 선수단 깊이를 더하는 영입"이라고 설명했다.', '선수는 곧 메디컬 테스트와 입단식을 거쳐 새 팀 훈련에 합류한다. 등번호와 데뷔 시점은 추후 공개될 예정이다.'],
+  rumor: ['현지 매체들은 협상이 초기 단계라고 전했지만, 구단 간 접촉이 이미 있었다는 보도도 나왔다.', '다만 양 구단 모두 공식 입장은 내놓지 않았다. 이적 시장이 열리는 시점에 맞춰 상황이 급진전될 수 있다.', '이적설의 당사자는 "지금은 소속팀 경기에 집중하고 있다"고 말을 아꼈다.'],
+  injury: ['구단 의료진은 정밀 검진 결과를 바탕으로 재활 일정을 확정했다고 밝혔다.', '감독은 "중요한 선수의 공백이지만 다른 선수들에게 기회가 될 것"이라며 대체 자원 가동을 예고했다.', '복귀 시점은 회복 속도에 따라 달라질 수 있으며, 무리한 조기 복귀는 없을 것이라고 구단은 덧붙였다.'],
+  youth: ['유소년 지도자들은 "기본기와 경기 이해도가 또래보다 뛰어나다"고 평가했다.', '여러 스카우트가 이미 경기장을 찾아 선수의 움직임을 기록한 것으로 전해졌다.', '성장 속도에 따라 1군 합류 시점이 앞당겨질 수도 있다는 전망이 나온다.'],
+  retire: ['선수는 기자회견에서 "축구와 함께한 시간은 가장 큰 행운이었다"며 동료와 팬들에게 감사를 전했다.', '구단은 은퇴 기념 행사를 준비 중이며, 지도자 과정 참여 가능성도 열려 있다고 밝혔다.'],
+  nat: ['대표팀 소집 명단에는 새 얼굴과 베테랑이 고르게 포함됐다. 감독은 "조직력을 끌어올릴 시간이 충분하지 않다"며 빠른 적응을 주문했다.', '이번 A매치 기간은 다음 대회 예선을 앞두고 전력을 점검할 중요한 무대로 평가된다.', '선수들은 소속팀 일정과 병행하며 컨디션 관리에 신경 쓰고 있다.'],
+  me: ['소식을 전해 들은 구단 관계자는 "성실하게 훈련에 임해 온 결과"라며 앞으로의 성장을 기대한다고 말했다.', '동료 선수들도 SNS를 통해 축하 메시지를 전했다. 팬들 사이에서는 다음 경기에서의 활약을 기대하는 목소리가 높다.', '코칭스태프는 현재의 흐름을 유지하되 체력 관리에도 신경 쓸 계획이다.'],
+  table: ['선두권 팀들 사이의 간격은 아직 크지 않다. 남은 일정에서 상대 전적과 부상자 관리가 변수가 될 전망이다.', '득점 경쟁에서도 상위권 선수들이 근소한 차이로 이어지고 있어 타이틀 향방을 가늠하기 어렵다.'],
+  world: ['새 시즌은 많은 이야기와 함께 시작된다. 신인과 베테랑, 새로운 도전자가 함께 그라운드에 선다.', '각 리그와 대회는 일정에 맞춰 차례로 개막하며, 이적 시장도 분주하게 움직이고 있다.']
+};
+function articleOf(n) {
+  const pool = ART[n.type] || ART.me, h = hs(n.text);
+  const picks = []; for (let i = 0; i < pool.length && picks.length < 3; i++) { const k = (h + i * 7) % pool.length; if (!picks.includes(pool[k])) picks.push(pool[k]); }
+  for (const x of pool) if (picks.length < 3 && !picks.includes(x)) picks.push(x);
+  return `<div class="art"><div class="dim">${Core.fmtDate(n.d)} · 블록 풋볼 뉴스</div><h3>${NEWS_IC[n.type] || ''} ${esc(n.text)}</h3><p class="lede">${esc(n.text)}${/[.!?)]$/.test(n.text) ? '' : '.'} 자세한 내용은 다음과 같다.</p>${picks.map(x => `<p>${esc(x)}</p>`).join('')}</div>`;
+}
 const crestCache = {};
 function crest(c, w) {
   w = w || 16;
@@ -77,13 +109,21 @@ function nextFixture(clubId) {
 // ---------- 공통 ----------
 function topbar() {
   const G = G0(), m = Core.me(), c = Core.clubOf(m.club);
-  return `<div class="top"><div><div class="dim">${Core.fmtDate(G.day)}</div><div class="ttl">${esc(m.name)} <span class="dim">${Core.POS_KO[m.sub]} · ${m.age}세 · ${Core.NATK(m.nat)}</span></div></div><div class="pill">${crest(c,18)}${esc(c.name)}</div></div>`;
+  return `<div class="top"><div><div class="dim">${Core.fmtDate(G.day)}</div><div class="ttl">${esc(m.name)} <span class="dim">${Core.POS_KO[m.sub]} · ${m.age}세 · ${Core.NATK(m.nat)}</span></div></div><div class="pill" data-act="club" data-id="${m.club}">${crest(c,18)}${esc(c.name)} ›</div></div>`;
 }
 function tile(k,v,s,c) { return `<div class="tile"><div class="dim">${k}</div><div class="big">${v}</div><div class="s" style="color:${c||'#9DB0A4'}">${s}</div></div>`; }
 function offerCard(o, i) {
   const c = Core.clubOf(o.club), lg = Core.leagueOf(c.lg), tag = o.grad ? '입단 제안 (3월 1일까지)' : o.early ? '조기 프로 콜업' : '영입 제안';
   return `<div class="card gl"><div class="dim">${tag}</div><b>${esc(c.name)}</b> <span class="dim">${lg?lg.name:''} · ${Core.stageOf(c)||''}</span><div class="dim">${c.kind==='pro'?`주급 ${o.wage}만 원 · ${o.years}년${o.fee?` · 이적료 약 ${o.fee}억 원`:''}`:`${o.years}년 과정 · 전력 ${Math.round(c.strength)}`}</div><div class="row g8"><button class="btn" data-act="acc" data-id="${i}">수락</button><button class="btn sec" data-act="dec" data-id="${i}">거절</button></div></div>`;
 }
+function trainCard(m) {
+  const pl = Core.PLANS[m.plan]; const fx = S.trfx; S.trfx = null;
+  if (!pl || !pl.k.length) { const d = fx && fx.fat0 !== undefined ? Math.round(fx.fat0 - m.fat) : 0; return `<div class="card trn"><b>😴 휴식 중</b><div class="dim">피로 회복${d>0?` <span class="up">-${d}</span>`:''}</div><div class="pbar"><i data-to="${100-m.fat}" style="width:${fx?100-fx.fat0:100-m.fat}%"></i></div></div>`; }
+  const bars = pl.k.map(k => { const cur = Math.min(1, (m.acc && m.acc[k]) || 0), prev = fx && fx.acc0 && fx.acc0[k] !== undefined ? fx.acc0[k] : cur, lv = fx && fx.a0 && m.a[k] > fx.a0[k]; const dlt = lv ? null : Math.round((cur - prev) * 100);
+    return `<div class="trow ${lv?'lvup':''}"><span class="tn">${AT_KO[k]||k}</span><span class="tv">${m.a[k]}</span><div class="pbar"><i data-to="${Math.round(cur*100)}" style="width:${lv?100:Math.round(prev*100)}%"></i></div><span class="td">${lv?'<b class="up">▲ 상승!</b>':(dlt>0?`<span class="up">+${dlt}%</span>`:'')}</span></div>`; }).join('');
+  return `<div class="card trn ${fx?'live':''}"><b>💪 ${pl.n} 진행</b> <span class="dim">${fx?'오늘 훈련 완료':'다음 날을 누르면 진행돼요'}</span>${bars}</div>`;
+}
+function animBars() { requestAnimationFrame(() => requestAnimationFrame(() => document.querySelectorAll('.pbar i[data-to]').forEach(e => { e.style.width = e.dataset.to + '%'; }))); }
 function homeView() {
   const G = G0(), m = Core.me(), c = Core.clubOf(m.club);
   const nf = nextFixture(m.club); let nx = '';
@@ -98,7 +138,7 @@ function homeView() {
   return topbar() + `<div class="body">${inj}${cu}${offers}${ren}${nx}
   <div class="tiles">${tile('종합',m.ovr,'잠재 '+m.pot)}${tile('피로',Math.round(m.fat),m.fat>70?'위험':'양호',m.fat>70?'#FFB27A':'#C6F36B')}${tile('사기',Math.round(m.mor),'')}${tile('신뢰',Math.round(m.trust),m.trust<45?'부족':'보통')}</div>
   <div class="dim">현재 단계: ${stage==='프로' ? '프로 · '+lgName(c.lg) : lgName(c.lg)}</div>
-  <div class="sec">오늘 훈련 <span class="dim">매일 적용</span></div><div class="opts">${plans}</div>
+  <div class="sec">오늘 훈련 <span class="dim">매일 적용</span></div><div class="opts">${plans}</div>${trainCard(m)}
   <div class="sec">최근 기록</div><div class="card">${logs}</div></div>`;
 }
 const NCHIPS = [['all','전체'],['me','내 소식'],['transfer','이적'],['rumor','이적설'],['match','경기'],['cup','대회'],['nat','대표팀'],['youth','유망주'],['season','시즌']];
@@ -106,7 +146,7 @@ function newsView() {
   const G = G0();
   const list = G.news.filter(n => S.nf==='all' || (S.nf==='me' ? n.me : n.type===S.nf));
   let html = '', last = -1;
-  for (const n of list.slice(0,70)) { if (n.d!==last) { html += `<div class="dh">${Core.fmtDate(n.d)}</div>`; last = n.d; } html += `<div class="news ${n.big?'big':''} ${n.me?'mine':''}">${esc(n.text)}</div>`; }
+  for (const n of list.slice(0,70)) { if (n.d!==last) { html += `<div class="dh">${Core.fmtDate(n.d)}</div>`; last = n.d; } html += `<div class="news ${n.big?'big':''} ${n.me?'mine':''}" data-act="news" data-id="${G.news.indexOf(n)}"><span class="nic">${NEWS_IC[n.type]||''}</span><span>${esc(n.text)}</span><span class="chev">›</span></div>`; }
   return `<div class="top"><div class="ttl">뉴스</div></div><div class="chips">${NCHIPS.map(([i,n])=>`<button class="chip ${S.nf===i?'on':''}" data-act="nf" data-id="${i}">${n}</button>`).join('')}</div><div class="body">${html||'<div class="dim">뉴스가 없습니다.</div>'}</div>`;
 }
 function tableView(lg) {
@@ -117,7 +157,7 @@ function tableView(lg) {
 function listView(lg, key) {
   const arr = key==='rt' ? Core.ratingList(lg,20,Math.max(3,Math.floor(lg.ptr/3))) : Core.topList(lg,key,20);
   const rows = arr.map((p,i) => `<tr><td>${i+1}</td><td>${pLink(p)}</td><td>${clubLink(p.club)}</td><td><b>${key==='rt'?f1(p.st.rs/p.st.a):p.st[key]}</b></td></tr>`).join('');
-  return `<table class="tb"><tr><th>#</th><th>선수</th><th>팀</th><th>${{g:'골',as:'도움',rt:'평점'}[key]}</th></tr>${rows || '<tr><td colspan=4 class="dim">기록 없음</td></tr>'}</table>`;
+  return `<table class="tb"><tr><th>#</th><th>선수</th><th>팀</th><th>${{g:IC.ball+' 골',as:IC.boot+' 도움',rt:IC.star+' 평점'}[key]}</th></tr>${rows || '<tr><td colspan=4 class="dim">기록 없음</td></tr>'}</table>`;
 }
 const DIVN = (l) => l.tier===1 ? '1부' : l.tier===2 ? '2부' : l.tier==='Y' ? (l.cc==='KOR'?'고교·유스':'유스') : '대학';
 function tieRow(t) {
@@ -162,9 +202,9 @@ function leagueView() {
     const lgs = G.leagues.filter(l=>l.cc===S.lc);
     if (!lgs.length) S.lc = G.sel[0];
     if (!S.ld || !lgs.some(l=>l.id===S.ld)) S.ld = (lgs.find(l=>l.tier===1)||lgs[0]).id;
-    const lg = Core.leagueOf(S.ld); const lts = [['table','순위'],['g','득점'],['as','도움'],['rt','평점'],['hist','역대']];
+    const lg = Core.leagueOf(S.ld); const lts = [['table','순위'],['team','팀 기록'],['g',IC.ball+' 득점'],['as',IC.boot+' 도움'],['rt',IC.star+' 평점'],['hist','역대']];
     sub = `<div class="chips">${lgs.map(l=>`<button class="chip s ${S.ld===l.id?'on':''}" data-act="ld" data-id="${l.id}">${DIVN(l)}</button>`).join('')}</div><div class="chips">${lts.map(([i,n])=>`<button class="chip s ${S.lt===i?'on':''}" data-act="lt" data-id="${i}">${n}</button>`).join('')}</div>`;
-    inner = S.lt==='table' ? tableView(lg) : S.lt==='hist' ? (lg.hist.length ? lg.hist.slice().reverse().map(h => `<div class="card"><b>${h.season}</b> 우승 ${clubLink(h.champ)}<div class="dim">${h.top?`득점왕 ${esc(h.top[0])} ${h.top[1]}골`:''}${h.mvp?` · MVP ${esc(h.mvp[0])}`:''}</div></div>`).join('') : '<div class="dim">아직 끝난 시즌이 없습니다.</div>') : listView(lg, S.lt);
+    inner = S.lt==='table' ? tableView(lg) : S.lt==='team' ? teamView(lg) : S.lt==='hist' ? (lg.hist.length ? lg.hist.slice().reverse().map(h => `<div class="card"><b>${h.season}</b> 우승 ${clubLink(h.champ)}<div class="dim">${h.top?`득점왕 ${esc(h.top[0])} ${h.top[1]}골`:''}${h.mvp?` · ${IC.crown} MVP ${esc(h.mvp[0])}`:''}</div></div>`).join('') : '<div class="dim">아직 끝난 시즌이 없습니다.</div>') : listView(lg, S.lt);
     head = `<div class="dim">${lg.name} · ${Math.min(lg.ptr,lg.rd.length)}/${lg.rd.length}라운드</div>`;
   }
   return `<div class="top"><div class="ttl">순위·대회</div>${head}</div><div class="chips">${ctop}</div>${sub}<div class="body">${inner}</div>`;
@@ -175,7 +215,7 @@ function histTable(p) {
   const cup = (a,g) => a ? `${a}-${g}` : '';
   const cur = (p.st.a>0||p.cst.a>0) ? `<tr class="hl"><td>진행중</td><td>${clubLink(p.club)}</td><td>${p.st.a}</td><td>${p.st.g}</td><td>${p.st.as}</td><td>${p.st.a?f1(p.st.rs/p.st.a):'-'}</td><td>${cup(p.cst.a,p.cst.g)}</td></tr>` : '';
   const tot = p.hist.reduce((a,h)=>[a[0]+h[3],a[1]+h[5],a[2]+h[6]],[p.st.a,p.st.g,p.st.as]);
-  return `<table class="tb"><tr><th>시즌</th><th>팀</th><th>출전</th><th>골</th><th>도움</th><th>평점</th><th>컵</th></tr>${cur}${rows.map(h=>`<tr><td>${h[0]}</td><td>${clubLink(h[1])}<div class="dim s9">${esc(lgName(h[2]))}</div></td><td>${h[3]}</td><td>${h[5]}</td><td>${h[6]}</td><td>${h[7]?f1(h[7]):'-'}</td><td>${cup(h[11]||0,h[12]||0)}</td></tr>`).join('')}<tr class="sum"><td colspan=2>통산${p.me?'':' (표시 구간)'}</td><td>${tot[0]}</td><td>${tot[1]}</td><td>${tot[2]}</td><td></td><td></td></tr></table>${(!p.me && p.hist.length>15)?'<div class="dim">최근 15시즌만 표시됩니다.</div>':''}<div class="dim">컵 = 컵·대륙대회 출전-골</div>`;
+  return `<table class="tb"><tr><th>시즌</th><th>팀</th><th>출전</th><th>${IC.ball}</th><th>${IC.boot}</th><th>${IC.star}</th><th>컵</th></tr>${cur}${rows.map(h=>`<tr><td>${h[0]}</td><td>${clubLink(h[1])}<div class="dim s9">${esc(lgName(h[2]))}</div></td><td>${h[3]}</td><td>${h[5]}</td><td>${h[6]}</td><td>${h[7]?f1(h[7]):'-'}</td><td>${cup(h[11]||0,h[12]||0)}</td></tr>`).join('')}<tr class="sum"><td colspan=2>통산${p.me?'':' (표시 구간)'}</td><td>${tot[0]}</td><td>${tot[1]}</td><td>${tot[2]}</td><td></td><td></td></tr></table>${(!p.me && p.hist.length>15)?'<div class="dim">최근 15시즌만 표시됩니다.</div>':''}<div class="dim">컵 = 컵·대륙대회 출전-골</div>`;
 }
 function xferList(p) { if (!p.xfers||!p.xfers.length) return ''; return `<div class="sec">이적 이력</div><div class="card">${p.xfers.slice().reverse().map(x=>`<div class="li"><span class="dim">${Core.fmtDate(x[0]).slice(0,10)}</span> ${x[1]!==null?esc(Core.clubOf(x[1]).name):'자유계약'} → ${esc(Core.clubOf(x[2]).name)} ${x[3]>0?`<span class="dim">(${x[3]}억)</span>`:''}</div>`).join('')}</div>`; }
 function profileHTML(p) {
@@ -193,12 +233,23 @@ function contractView() {
   const pro = c.kind==='pro';
   return `<div class="top"><div class="ttl">계약·이적</div></div><div class="body"><div class="card"><div class="row"><b>${crest(c,22)} ${esc(c.name)}</b><span class="dim">${lgName(c.lg)}</span></div><div class="dim">${pro?`계약 ${m.ct.until}년까지 · 주급 ${m.ct.wage}만 원`:`${Core.stageOf(c)} 과정 · 18세 졸업 시즌에 프로·대학 제안이 옵니다`}</div></div>${ofs}<div class="sec">받은 메시지</div><div class="card">${msgs}</div><div class="sec">이적 시장 소식</div>${mt||'<div class="dim">아직 소식이 없습니다.</div>'}<div class="sec">시장 정보</div><div class="dim">이적 가능 기간: 1~2월 중순, 7~9월 초. 오퍼는 활약과 인지도에 따라 들어옵니다.</div><div class="sec">게임</div><button class="btn sec wide" data-act="reset">${S.resetArm?'정말 지우고 새 게임 시작 (다시 누르면 삭제)':'새 게임 시작'}</button></div>`;
 }
-function clubModal(id) {
-  const c = Core.clubOf(id), G = G0(), lg = Core.leagueOf(c.lg);
-  const pl = c.pl.map(x=>G.players[x]).filter(Boolean).sort((a,b)=>POS_ORDER.indexOf(a.sub)-POS_ORDER.indexOf(b.sub)||b.ovr-a.ovr);
-  return `<div class="ttl">${crest(c,28)} ${esc(c.name)}</div><div class="dim">${lg?lg.name:'대표팀'} · ${Core.stageOf(c)} · 전력 ${Math.round(c.strength)} · 선수 ${pl.length}명</div><table class="tb"><tr><th>포지션</th><th>선수</th><th>국적</th><th>나이</th><th>종합</th><th>출전</th><th>골</th></tr>${pl.map(p=>`<tr><td>${p.sub}</td><td>${pLink(p)}</td><td>${Core.NATK(p.nat)}</td><td>${p.age}</td><td>${p.ovr}</td><td>${p.st.a}</td><td>${p.st.g}</td></tr>`).join('')}</table>`;
+function teamView(lg) {
+  const G = G0(), me = Core.me();
+  const rows = lg.clubs.map(id => { const c = Core.clubOf(id), t = lg.table[id], pl = c.pl.map(x => G.players[x]).filter(Boolean);
+    const tg = pl.slice().sort((a,b) => b.st.g - a.st.g)[0], ta = pl.slice().sort((a,b) => b.st.as - a.st.as)[0];
+    return { id, gf: t.gf, ga: t.ga, p: t.p, tg, ta }; }).sort((a,b) => b.gf - a.gf);
+  return `<table class="tb"><tr><th>팀</th><th>${IC.ball}득점</th><th>실점</th><th>${IC.ball}팀내 1위</th><th>${IC.boot}팀내 1위</th></tr>${rows.map(r => `<tr class="${r.id===me.club?'hl':''}"><td>${clubLink(r.id)}</td><td><b>${r.gf}</b></td><td>${r.ga}</td><td>${r.tg && r.tg.st.g ? pLink(r.tg)+' '+r.tg.st.g : '-'}</td><td>${r.ta && r.ta.st.as ? pLink(r.ta)+' '+r.ta.st.as : '-'}</td></tr>`).join('')}</table>`;
 }
-// ---------- 시작 화면 ----------
+function clubModal(id) {
+  const c = Core.clubOf(id), G = G0(), lg = Core.leagueOf(c.lg), me = Core.me();
+  const pl = c.pl.map(x=>G.players[x]).filter(Boolean).sort((a,b)=>POS_ORDER.indexOf(a.sub)-POS_ORDER.indexOf(b.sub)||b.ovr-a.ovr);
+  let tm = '';
+  if (lg && lg.table[id]) { const tb = Core.sortedTable(lg), t = lg.table[id]; tm = `<div class="tiles t5"><div class="tile"><div class="dim">순위</div><div class="big">${tb.indexOf(id)+1}</div></div><div class="tile"><div class="dim">승점</div><div class="big">${t.pts}</div></div><div class="tile"><div class="dim">승무패</div><div class="big s14">${t.w}-${t.d}-${t.l}</div></div><div class="tile"><div class="dim">${IC.ball} 득점</div><div class="big">${t.gf}</div></div><div class="tile"><div class="dim">실점</div><div class="big">${t.ga}</div></div></div>`; }
+  const best = (k) => pl.slice().sort((a,b) => b.st[k] - a.st[k])[0];
+  const bg = best('g'), ba = best('as'), br = pl.filter(p => p.st.a >= 3).sort((a,b) => b.st.rs/b.st.a - a.st.rs/a.st.a)[0];
+  const lead = `<div class="chips w">${bg && bg.st.g ? `<span class="tag">${IC.ball} ${pLink(bg)} ${bg.st.g}</span>` : ''}${ba && ba.st.as ? `<span class="tag">${IC.boot} ${pLink(ba)} ${ba.st.as}</span>` : ''}${br ? `<span class="tag">${IC.star} ${pLink(br)} ${f1(br.st.rs/br.st.a)}</span>` : ''}</div>`;
+  return `<div class="ttl">${crest(c,28)} ${esc(c.name)}${c.id===me.club?' <span class="tag">마이팀</span>':''}</div><div class="dim">${lg?lg.name:'대표팀'} · ${Core.stageOf(c)} · 전력 ${Math.round(c.strength)} · 선수 ${pl.length}명</div>${tm}${lead}<table class="tb"><tr><th>포지션</th><th>선수</th><th>나이</th><th>종합</th><th>출전</th><th>${IC.ball}</th><th>${IC.boot}</th><th>${IC.star}</th></tr>${pl.map(p=>`<tr class="${p.me?'hl':''}"><td>${p.sub}</td><td>${pLink(p)}</td><td>${p.age}</td><td>${p.ovr}</td><td>${p.st.a}</td><td>${p.st.g}</td><td>${p.st.as}</td><td>${p.st.a?f1(p.st.rs/p.st.a):'-'}</td></tr>`).join('')}</table>`;
+}
 function setupView() {
   const n = S.sel.length, est = S.sel.reduce((s,c)=>s+(c==='KOR'?1560:c==='USA'?1250:1380),0) + (S.sel.some(c=>CO[c].cont==='AS')||S.sel.some(c=>CO[c].cont==='EU')?300:0);
   const cards = Core.CODES.map(c => { const C = CO[c], on = S.sel.includes(c); return `<button class="opt ${on?'on':''}" data-act="sel" data-id="${c}"><b>${on?'✓ ':''}${Core.FLAG[c]||''} ${C.name}</b><span class="dim">${C.l1.name}${C.l2?' · '+C.l2.name:''}</span></button>`; }).join('');
@@ -226,36 +277,91 @@ function creatorView() {
 }
 // ---------- 경기 ----------
 let MV = null;
+const FORM = [[5,50],[22,12],[20,37],[20,63],[22,88],[44,12],[42,37],[42,63],[44,88],[66,36],[66,64]];
+const c01 = (v, a, b) => Math.max(a, Math.min(b, v));
+const sortSt = (l) => (l||[]).slice().sort((a,b) => POS_ORDER.indexOf(a.sub) - POS_ORDER.indexOf(b.sub));
+function pitchHTML(M) {
+  const dots = (st, col, pre) => st.map((p,i) => `<g class="dot" id="${pre}${i}" style="transform:translate(50px,32px)"><circle r="1.9" fill="${col}" stroke="${p.me?'#FFE45C':(pre==='o'?'#fff':'#000')}" stroke-width="${p.me?0.9:0.35}"/></g>`).join('');
+  return `<div class="pwrap"><svg id="pitch" viewBox="0 0 100 64" preserveAspectRatio="xMidYMid meet"><rect width="100" height="64" fill="#2E8B4A"/>${[0,1,2,3,4,5,6,7].map(i=>`<rect x="${i*12.5}" width="12.5" height="64" fill="${i%2?'#2A8445':'#319550'}"/>`).join('')}<g fill="none" stroke="#fff" stroke-opacity=".75" stroke-width=".4"><rect x="1" y="1" width="98" height="62"/><path d="M50 1V63"/><circle cx="50" cy="32" r="8"/><rect x="1" y="17" width="14" height="30"/><rect x="85" y="17" width="14" height="30"/><rect x="1" y="25" width="5" height="14"/><rect x="94" y="25" width="5" height="14"/></g>${dots(MV.ost, M.opp.col, 'o')}${dots(MV.mst, M.mine.col, 'm')}<g id="ball" style="transform:translate(50px,32px)"><circle r="1.25" fill="#fff" stroke="#000" stroke-width=".35"/></g></svg><div id="fx"></div></div>`;
+}
+function movePitch() {
+  const M = G0().mm; if (!M || !MV) return; const b = MV.ball, dM = M.mineHome ? 1 : -1;
+  const place = (st, pre, d, atk) => st.forEach((p, i) => { const f = FORM[Math.min(i, FORM.length - 1)], el = document.getElementById(pre + i); if (!el) return;
+    let x = d > 0 ? f[0] : 100 - f[0]; x = c01(x + (b.x - 50) * (f[0] < 10 ? 0.12 : 0.38) + (atk && f[0] > 30 ? d * 8 : 0), 3, 97);
+    let y = f[1] * 0.64; y = c01(y + (b.y - y) * 0.16 + (Math.random() - 0.5) * 3.5, 3, 61);
+    el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px)`; el.style.opacity = MV.red[pre + i] ? 0.12 : 1; });
+  place(MV.mst, 'm', dM, MV.poss === 'm'); place(MV.ost, 'o', -dM, MV.poss === 'o');
+  const be = document.getElementById('ball'); if (be) be.style.transform = `translate(${b.x.toFixed(1)}px,${b.y.toFixed(1)}px)`;
+}
+function stepBall(M) {
+  const dM = M.mineHome ? 1 : -1, pm = c01(0.5 + (M.mine.strength - M.opp.strength) / 160, 0.3, 0.7);
+  if (Math.random() < 0.35) MV.poss = Math.random() < pm ? 'm' : 'o';
+  const d = MV.poss === 'm' ? dM : -dM;
+  MV.ball = { x: c01(50 + d * Math.random() * 36 + (Math.random() - 0.5) * 10, 4, 96), y: 6 + Math.random() * 52 };
+}
+function fxShow(html, cls, ms, pause) {
+  const el = $('#fx'); if (!el) return; el.innerHTML = `<div class="fxb ${cls}">${html}</div>`;
+  if (pause) { MV.paused = true; }
+  clearTimeout(MV.fxT); MV.fxT = setTimeout(() => { const e = $('#fx'); if (e) e.innerHTML = ''; if (pause && MV && !MV.momentOpen) MV.paused = false; }, ms);
+}
+function emitAt(M, min, anim) {
+  const out = []; const dM = M.mineHome ? 1 : -1;
+  for (const e of M.evMine.concat(M.evOpp)) if (e.min === min && !e.shown) {
+    e.shown = true; const ms = M.evMine.includes(e), team = ms ? M.mine : M.opp;
+    out.push({ min, ic: IC.ball, cls: 'g ' + (ms ? 'mine' : 'opp'), t: `<b>골! ${esc(e.sc.name)}</b> <span class="dim">${esc(team.name)}</span>` });
+    if (e.as) out.push({ min, ic: IC.boot, cls: 'a ' + (ms ? 'mine' : 'opp'), t: `도움 ${esc(e.as.name)}` });
+    if (anim) { const gx = ms ? (dM > 0 ? 97 : 3) : (dM > 0 ? 3 : 97); MV.ball = { x: gx, y: 32 }; fxShow(`<div class="gb">${IC.ball.replace('width="16" height="16"','width="44" height="44"')}</div><div class="gt">GOAL!</div><div class="gs">${esc(e.sc.name)}${e.as ? `<br><span class="gsa">${IC.boot} ${esc(e.as.name)}</span>` : ''}</div>`, ms ? 'goal' : 'goal opp', 1700, true); }
+  }
+  for (const x of M.evx || []) if (x.min === min && !x.shown) {
+    x.shown = true; const team = x.ms ? M.mine : M.opp, nmx = esc(x.p.name);
+    if (x.t === 'yc') { out.push({ min, ic: IC.yc, cls: 'c', t: `경고 ${nmx} <span class="dim">${esc(team.name)}</span>` }); if (anim) fxShow(`${IC.yc.replace('width="12" height="16"','width="30" height="40"')}<div class="gs">${nmx}</div>`, 'card', 1000, false); }
+    else if (x.t === 'rc') { out.push({ min, ic: IC.rc, cls: 'c r', t: `<b>퇴장!</b> ${nmx} <span class="dim">${esc(team.name)}</span>` }); const idx = (x.ms ? MV.mst : MV.ost).indexOf(x.p); if (idx >= 0) MV.red[(x.ms ? 'm' : 'o') + idx] = true; if (anim) fxShow(`${IC.rc.replace('width="12" height="16"','width="30" height="40"')}<div class="gs">${nmx}</div>`, 'card red', 1300, false); }
+    else if (x.t === 'sv') { out.push({ min, ic: IC.glove, cls: 's', t: `<b>슈퍼세이브!</b> ${nmx} <span class="dim">${esc(team.name)}</span>` }); if (anim) fxShow(`<div class="gb">🧤</div><div class="gs">슈퍼세이브</div>`, 'save', 1000, false); }
+    else if (x.t === 'pt') { out.push({ min, ic: IC.post, cls: 'p', t: `${nmx}의 슛, 골대를 강타!` }); if (anim) fxShow(`<div class="gb">🥅</div><div class="gs">골대 강타!</div>`, 'save', 900, false); }
+  }
+  for (const o of out.reverse()) MV.log.unshift(o);
+}
 function startMatch() {
-  const M = Core.prepareMine(); MV = { min: 0, timer: null, paused: false, log: [], over: false, momentOpen: null, speed: 90 };
-  S.matchOpen = true; if (M.role==='bench' || M.role==='inj') MV.speed = 25; renderMatch(); MV.timer = setInterval(tick, MV.speed);
+  const M = Core.prepareMine();
+  MV = { min: 0, timer: null, paused: false, log: [], over: false, momentOpen: null, speed: 90, ball: { x: 50, y: 32 }, poss: 'm', red: {}, mst: sortSt(M.stMine), ost: sortSt(M.stOpp), fxT: null };
+  S.matchOpen = true; if (M.role==='bench' || M.role==='inj') MV.speed = 25;
+  $('#match').innerHTML = `<div class="mh" id="mh"></div><div id="pitchbox">${pitchHTML(M)}</div><div class="mb" id="mb"></div><div class="mf" id="mf"></div>`;
+  $('#match').style.display = 'flex'; renderMatch(); setTimeout(movePitch, 60); MV.timer = setInterval(tick, MV.speed);
 }
 function scoreAt(min) {
   const M = G0().mm; const mine = M.evMine.filter(e => e.min <= min).length, opp = M.evOpp.filter(e => e.min <= min).length;
   return M.mineHome ? [mine, opp] : [opp, mine];
 }
+function finishLog(M) { const mv = Core.mvpOf(M); MV.log.unshift({ min: 90, ic: IC.crown, cls: 'mvp', t: mv ? `<b>MVP ${esc(mv.p.name)}</b>${mv.me ? ' <span class="tag">나!</span>' : ''} <span class="dim">${esc((mv.mine ? M.mine : M.opp).name)}</span>` : '경기 종료' }); }
 function tick() {
-  const M = G0().mm; if (!M || MV.paused) return;
+  const M = G0().mm; if (!M || !MV || MV.paused) return;
   MV.min++;
   const m = Core.me();
-  for (const e of M.evMine.concat(M.evOpp)) if (e.min === MV.min && !e.shown) { e.shown = true; const mineSide = M.evMine.includes(e); MV.log.unshift(`${e.min}' ⚽ ${mineSide?M.mine.name:M.opp.name} 득점 — ${e.sc.name}${e.as?` (도움 ${e.as.name})`:''}`); }
-  if (M.role==='sub' && MV.min===M.from) MV.log.unshift(`${MV.min}' 교체 투입 — ${m.name}`);
+  stepBall(M); emitAt(M, MV.min, true);
+  if (M.role==='sub' && MV.min===M.from) MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 투입 — ${esc(m.name)}` });
   const mo = M.moments[M.mi];
   if (mo && !mo.done && mo.min === MV.min) { MV.paused = true; MV.momentOpen = mo; }
-  if (MV.min >= 90) { clearInterval(MV.timer); MV.over = true; }
-  renderMatch();
+  if (MV.min >= 90) { clearInterval(MV.timer); MV.over = true; finishLog(M); }
+  movePitch(); renderMatch();
+}
+function skipMatch() {
+  clearInterval(MV.timer); const M = G0().mm;
+  while (MV.min < 90) { MV.min++; emitAt(M, MV.min, false); const mo = M.moments[M.mi];
+    if (M.role==='sub' && MV.min===M.from) MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 투입 — ${esc(Core.me().name)}` });
+    if (mo && !mo.done && mo.min===MV.min) { MV.paused = true; MV.momentOpen = mo; MV.timer = setInterval(tick, 40); stepBall(M); movePitch(); renderMatch(); return; } }
+  MV.over = true; finishLog(M); movePitch(); renderMatch();
 }
 const MOM_TXT = { box:'박스 안에서 볼이 내 앞에 떨어집니다!', through:'동료의 스루패스가 수비 뒷공간으로 들어옵니다!', counter:'역습 상황, 앞에 수비수 한 명뿐입니다!', cross:'측면에서 크로스가 올라옵니다!' };
+const lvl3 = (p) => p >= 0.62 ? ['높음', 'hi'] : p >= 0.4 ? ['보통', 'mid'] : ['낮음', 'lo'];
 function renderMatch() {
-  const G = G0(), M = G.mm; if (!M) return; const m = Core.me(); const [sh, sa] = scoreAt(MV.min);
+  const G = G0(), M = G.mm; if (!M || !MV || !$('#mh')) return; const [sh, sa] = scoreAt(MV.min);
   let dec = '';
-  if (MV.momentOpen) { const mo = MV.momentOpen; const opts = Core.momentOptions(mo); dec = `<div class="card gl"><b>${MOM_TXT[mo.kind]}</b><div class="dim">${MV.min}분 · 어떻게 할까?</div><div class="opts3">${opts.map(o => `<button class="opt" data-act="mv" data-id="${o.id}"><b>${o.n}</b><span class="dim">성공 ${Math.round(o.shown*100)}%</span></button>`).join('')}</div></div>`; }
-  else if (MV.over) { const st = M.role==='start'?'선발':M.role==='sub'?'교체':M.role==='inj'?'부상 결장':'벤치(결장)'; dec = `<div class="card"><b>경기 종료</b> <span class="dim">내 역할: ${st}${M.myGoals?` · ${M.myGoals}골`:''}${M.myAssists?` · ${M.myAssists}도움`:''}</span><button class="btn wide" data-act="mend">결과 확인</button></div>`; }
+  if (MV.momentOpen) { const mo = MV.momentOpen; const opts = Core.momentOptions(mo); dec = `<div class="card gl"><b>${MOM_TXT[mo.kind]}</b><div class="dim">${MV.min}분 · 어떻게 할까?</div><div class="opts3">${opts.map(o => { const lv = lvl3(o.shown); return `<button class="opt" data-act="mv" data-id="${o.id}"><b>${o.n}</b><span class="lv ${lv[1]}">${lv[0]}</span><span class="pbar sm"><i class="${lv[1]}" style="width:${Math.round(o.shown*100)}%"></i></span><span class="dim s11">성공 ${Math.round(o.shown*100)}%</span></button>`; }).join('')}</div></div>`; }
+  else if (MV.over) { const st = M.role==='start'?'선발':M.role==='sub'?'교체':M.role==='inj'?'부상 결장':'벤치(결장)'; const mv = M.mvp; dec = `<div class="card"><b>경기 종료</b> <span class="dim">내 역할: ${st}</span><div class="row g8 wrapx">${M.myGoals?`<span class="tag">${IC.ball} ${M.myGoals}골</span>`:''}${M.myAssists?`<span class="tag">${IC.boot} ${M.myAssists}도움</span>`:''}${mv?`<span class="tag ${mv.me?'gold':''}">${IC.crown} MVP ${esc(mv.p.name)}</span>`:''}</div><button class="btn wide" data-act="mend">결과 확인</button></div>`; }
   const roleTxt = M.role==='start' ? '선발 출전' : M.role==='sub' ? `벤치 → ${M.from}분 투입 예정` : M.role==='inj' ? '부상으로 결장' : '벤치 (출전 명단 제외)';
-  $('#match').innerHTML = `<div class="mh"><div class="dim">${esc(M.title)} · ${Core.fmtDate(G.day)}</div><div class="sc"><div>${esc(M.h.name)}</div><b>${sh} : ${sa}</b><div>${esc(M.a.name)}</div></div><div class="dim">${MV.min}' · ${roleTxt}</div><div class="bar"><i style="width:${MV.min/90*100}%"></i></div></div>
-  <div class="mb">${dec}<div class="sec">경기 흐름</div>${MV.log.map(x=>`<div class="li">${esc(x)}</div>`).join('') || '<div class="dim">킥오프!</div>'}</div>
-  <div class="mf">${MV.over||MV.momentOpen ? '' : '<button class="btn sec" data-act="mskip">끝까지 자동 진행</button>'}</div>`;
-  $('#match').style.display = 'flex';
+  $('#mh').innerHTML = `<div class="dim">${esc(M.title)} · ${Core.fmtDate(G.day)}</div><div class="sc"><div>${crest(M.h,18)} ${esc(M.h.name)}</div><b>${sh} : ${sa}</b><div>${esc(M.a.name)} ${crest(M.a,18)}</div></div><div class="dim">${MV.min}' · ${roleTxt}</div><div class="bar"><i style="width:${MV.min/90*100}%"></i></div>`;
+  $('#mb').innerHTML = `${dec}<div class="sec">경기 흐름</div>${MV.log.map(x => `<div class="li ev ${x.cls||''}"><span class="mn">${x.min}'</span><span class="ico">${x.ic}</span><span class="et">${x.t}</span></div>`).join('') || '<div class="dim">킥오프!</div>'}`;
+  $('#mf').innerHTML = MV.over||MV.momentOpen ? '' : '<button class="btn sec" data-act="mskip">끝까지 자동 진행</button>';
 }
 function endMatchUI() {
   const r = Core.finishMine(); $('#match').style.display = 'none'; S.matchOpen = false; MV = null; save();
@@ -269,11 +375,13 @@ function render() {
   if (S.step==='create') { app.innerHTML = `<div class="scr">${creatorView()}</div>`; return; }
   let v = S.tab==='home' ? homeView() : S.tab==='news' ? newsView() : S.tab==='league' ? leagueView() : S.tab==='me' ? meView() : contractView();
   app.innerHTML = `<div class="scr">${v}</div><div class="act"><button class="btn big" data-act="day">다음 날 ▶</button><button class="btn sec" data-act="week">7일</button><button class="btn sec" data-act="match">경기까지</button></div><nav>${NAV.map(([id,n])=>`<button class="nv ${S.tab===id?'on':''}" data-act="tab" data-id="${id}">${n}</button>`).join('')}</nav>`;
+  if (S.tab!=='home') S.trfx = null; else animBars();
   if (S.modal) { $('#modal').innerHTML = `<div class="sheet"><button class="x" data-act="close">닫기</button>${S.modal}</div>`; $('#modal').style.display = 'block'; } else $('#modal').style.display = 'none';
 }
 function toast(t) { const el = $('#toast'); el.textContent = t; el.style.opacity = 1; setTimeout(() => el.style.opacity = 0, 2200); }
 function advance(days) {
   let stopped = null;
+  { const m = Core.me(); S.trfx = { acc0: Object.assign({}, m.acc||{}), a0: Object.assign({}, m.a), fat0: m.fat }; }
   for (let i=0;i<days;i++) {
     const m0 = Core.me(), before = m0.offers.length, cu0 = !!m0.callup;
     const pm = Core.step();
@@ -304,6 +412,7 @@ document.addEventListener('click', (e) => {
   else if (a==='pl') S.modal = profileHTML(G0().players[id]);
   else if (a==='club') S.modal = clubModal(+id);
   else if (a==='close') S.modal = null;
+  else if (a==='news') { const n = G0().news[+id]; if (n) S.modal = articleOf(n); }
   else if (a==='acc') { Core.acceptOffer(+id); save(); toast('계약이 완료되었습니다'); }
   else if (a==='dec') Core.declineOffer(+id);
   else if (a==='ren') { Core.acceptRenewal(); save(); }
@@ -311,8 +420,8 @@ document.addEventListener('click', (e) => {
   else if (a==='day') { advance(1); return; }
   else if (a==='week') { advance(7); return; }
   else if (a==='match') { advance(120); return; }
-  else if (a==='mv') { const r = Core.resolveMoment(id); MV.log.unshift(`${MV.min}' ${r.text}`); MV.momentOpen = null; MV.paused = false; renderMatch(); return; }
-  else if (a==='mskip') { clearInterval(MV.timer); const M = G0().mm; while (MV.min < 90) { MV.min++; const mo = M.moments[M.mi]; for (const ev of M.evMine.concat(M.evOpp)) if (ev.min===MV.min && !ev.shown) { ev.shown = true; MV.log.unshift(`${ev.min}' ⚽ ${M.evMine.includes(ev)?M.mine.name:M.opp.name} 득점 — ${ev.sc.name}`); } if (mo && !mo.done && mo.min===MV.min) { MV.paused = true; MV.momentOpen = mo; MV.timer = setInterval(tick, 40); renderMatch(); return; } } MV.over = true; renderMatch(); return; }
+  else if (a==='mv') { const M = G0().mm, mo = MV.momentOpen; const r = Core.resolveMoment(id); MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: esc(r.text) }); MV.momentOpen = null; MV.paused = false; stepBall(M); emitAt(M, mo ? mo.min : MV.min, true); movePitch(); renderMatch(); return; }
+  else if (a==='mskip') { skipMatch(); return; }
   else if (a==='mend') { endMatchUI(); return; }
   render();
 });
