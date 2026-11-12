@@ -75,3 +75,14 @@ select{width:100%;min-height:44px;border-radius:12px;border:2px solid #2A3A31;ba
   #match .mf{grid-column:2;grid-row:3}
   .pwrap{margin:0 8px}
 }
+
+/* --- 블록 캐릭터 노출 --- */
+.hero{display:flex;gap:14px;align-items:center;background:linear-gradient(135deg,#19241E,#1E3326)}
+.herochar{width:46px;display:flex;justify-content:center}
+@keyframes bobc{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes jumpc{0%{transform:translateY(0)}100%{transform:translateY(-12px)}}
+@keyframes zzz{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+.spr.idle{animation:bobc 1.8s ease-in-out infinite}.spr.train{animation:bobc .7s ease-in-out infinite}.spr.jump{animation:jumpc .45s ease-in-out infinite alternate}.spr.sleepy{animation:zzz 2.4s ease-in-out infinite;opacity:.85}
+.fxb .gchar{display:flex;justify-content:center;margin-bottom:2px}.fxb .gchar .spr{animation:jumpc .4s ease-in-out infinite alternate;width:44px}
+.mebub{position:relative;display:inline-flex}.mebub .crown{position:absolute;top:-12px;left:50%;transform:translateX(-50%);display:block}.mebub .crown svg{width:18px;height:18px}
+.artface{margin-bottom:6px}
