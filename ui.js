@@ -37,7 +37,25 @@ const S = { step:'boot', tab:'home', lc:null, ld:null, lt:'table', cv:null, moda
 const G0 = () => Core.G;
 const f1 = (x) => (Math.round(x*10)/10).toFixed(1);
 const CO = Core.COUNTRIES;
-const clubLink = (id) => { const c = Core.clubOf(id); return c ? `<a data-act="club" data-id="${id}">${esc(c.name)}</a>` : '-'; };
+const crestCache = {};
+function crest(c, w) {
+  w = w || 16;
+  const key = c.id + ':' + c.col + c.col2 + ':' + w;
+  if (crestCache[key]) return crestCache[key];
+  let h = 7; const s = c.name + c.id; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  const shapeI = h % 3, patI = (h >> 3) % 6, symI = (h >> 6) % 3;
+  const A = c.col, B = c.col2;
+  const shapes = ['M2 2H22V16C22 22 17 26 12 28C7 26 2 22 2 16Z', 'M12 1A11 11 0 1 1 12 23A11 11 0 1 1 12 1Z', 'M3 2H21Q22 2 22 3V19Q22 22 19 23L12 27L5 23Q2 22 2 19V3Q2 2 3 2Z'];
+  const sh = shapes[shapeI], vh = shapeI === 1 ? 24 : 28;
+  const pats = ['', '<rect x="8" y="0" width="8" height="30" fill="' + B + '"/>', '<rect x="0" y="9" width="30" height="7" fill="' + B + '"/>', '<path d="M0 0H30V30Z" fill="' + B + '"/>', '<path d="M0 6L12 16L24 6V13L12 23L0 13Z" fill="' + B + '"/>', '<rect x="0" y="0" width="12" height="30" fill="' + B + '"/>'];
+  const ink = patI === 0 ? B : '#FFFFFF';
+  const ch = [...c.name.replace(/\s/g, '')][0] || '?';
+  const sym = symI === 0 ? '<path d="M12 7L13.8 11.2L18.4 11.6L14.9 14.6L16 19L12 16.6L8 19L9.1 14.6L5.6 11.6L10.2 11.2Z" fill="' + ink + '" stroke="#000" stroke-opacity=".35" stroke-width=".6"/>' : symI === 1 ? '<circle cx="12" cy="13" r="4" fill="' + ink + '" stroke="#000" stroke-opacity=".35" stroke-width=".6"/>' : '<text x="12" y="17.5" text-anchor="middle" font-size="12" font-weight="700" font-family="sans-serif" fill="' + ink + '" stroke="#000" stroke-opacity=".4" stroke-width=".5">' + esc(ch) + '</text>';
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 ' + vh + '"><defs><clipPath id="k"><path d="' + sh + '"/></clipPath></defs><g clip-path="url(#k)"><rect width="30" height="30" fill="' + A + '"/>' + pats[patI] + '</g><path d="' + sh + '" fill="none" stroke="#111" stroke-opacity=".7" stroke-width="1.4"/>' + sym + '</svg>';
+  const url = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  return (crestCache[key] = `<img class="crest" src="${url}" width="${w}" height="${Math.round(w * vh / 24)}" alt="">`);
+}
+const clubLink = (id) => { const c = Core.clubOf(id); return c ? `${crest(c, 14)}<a data-act="club" data-id="${id}">${esc(c.name)}</a>` : '-'; };
 const pLink = (p) => `<a data-act="pl" data-id="${p.id}" class="${p.me?'me':''}">${esc(p.name)}</a>`;
 const lgName = (id) => { const l = Core.leagueOf(id); return l ? l.name : '-'; };
 // ---------- 저장 (IndexedDB, 실패하면 무시) ----------
@@ -59,7 +77,7 @@ function nextFixture(clubId) {
 // ---------- 공통 ----------
 function topbar() {
   const G = G0(), m = Core.me(), c = Core.clubOf(m.club);
-  return `<div class="top"><div><div class="dim">${Core.fmtDate(G.day)}</div><div class="ttl">${esc(m.name)} <span class="dim">${Core.POS_KO[m.sub]} · ${m.age}세 · ${Core.NATK(m.nat)}</span></div></div><div class="pill"><i style="background:${c.col}"></i>${esc(c.name)}</div></div>`;
+  return `<div class="top"><div><div class="dim">${Core.fmtDate(G.day)}</div><div class="ttl">${esc(m.name)} <span class="dim">${Core.POS_KO[m.sub]} · ${m.age}세 · ${Core.NATK(m.nat)}</span></div></div><div class="pill">${crest(c,18)}${esc(c.name)}</div></div>`;
 }
 function tile(k,v,s,c) { return `<div class="tile"><div class="dim">${k}</div><div class="big">${v}</div><div class="s" style="color:${c||'#9DB0A4'}">${s}</div></div>`; }
 function offerCard(o, i) {
@@ -173,12 +191,12 @@ function contractView() {
   const msgs = G.inbox.slice(0,6).map(x=>`<div class="li"><span class="dim">${Core.fmtDate(x.d).slice(5,10)}</span> ${esc(x.text)}</div>`).join('') || '<div class="dim">받은 메시지가 없습니다.</div>';
   const ofs = m.offers.map(offerCard).join('');
   const pro = c.kind==='pro';
-  return `<div class="top"><div class="ttl">계약·이적</div></div><div class="body"><div class="card"><div class="row"><b>${esc(c.name)}</b><span class="dim">${lgName(c.lg)}</span></div><div class="dim">${pro?`계약 ${m.ct.until}년까지 · 주급 ${m.ct.wage}만 원`:`${Core.stageOf(c)} 과정 · 18세 졸업 시즌에 프로·대학 제안이 옵니다`}</div></div>${ofs}<div class="sec">받은 메시지</div><div class="card">${msgs}</div><div class="sec">이적 시장 소식</div>${mt||'<div class="dim">아직 소식이 없습니다.</div>'}<div class="sec">시장 정보</div><div class="dim">이적 가능 기간: 1~2월 중순, 7~9월 초. 오퍼는 활약과 인지도에 따라 들어옵니다.</div><div class="sec">게임</div><button class="btn sec wide" data-act="reset">${S.resetArm?'정말 지우고 새 게임 시작 (다시 누르면 삭제)':'새 게임 시작'}</button></div>`;
+  return `<div class="top"><div class="ttl">계약·이적</div></div><div class="body"><div class="card"><div class="row"><b>${crest(c,22)} ${esc(c.name)}</b><span class="dim">${lgName(c.lg)}</span></div><div class="dim">${pro?`계약 ${m.ct.until}년까지 · 주급 ${m.ct.wage}만 원`:`${Core.stageOf(c)} 과정 · 18세 졸업 시즌에 프로·대학 제안이 옵니다`}</div></div>${ofs}<div class="sec">받은 메시지</div><div class="card">${msgs}</div><div class="sec">이적 시장 소식</div>${mt||'<div class="dim">아직 소식이 없습니다.</div>'}<div class="sec">시장 정보</div><div class="dim">이적 가능 기간: 1~2월 중순, 7~9월 초. 오퍼는 활약과 인지도에 따라 들어옵니다.</div><div class="sec">게임</div><button class="btn sec wide" data-act="reset">${S.resetArm?'정말 지우고 새 게임 시작 (다시 누르면 삭제)':'새 게임 시작'}</button></div>`;
 }
 function clubModal(id) {
   const c = Core.clubOf(id), G = G0(), lg = Core.leagueOf(c.lg);
   const pl = c.pl.map(x=>G.players[x]).filter(Boolean).sort((a,b)=>POS_ORDER.indexOf(a.sub)-POS_ORDER.indexOf(b.sub)||b.ovr-a.ovr);
-  return `<div class="ttl"><i class="dot" style="background:${c.col}"></i>${esc(c.name)}</div><div class="dim">${lg?lg.name:'대표팀'} · ${Core.stageOf(c)} · 전력 ${Math.round(c.strength)} · 선수 ${pl.length}명</div><table class="tb"><tr><th>포지션</th><th>선수</th><th>국적</th><th>나이</th><th>종합</th><th>출전</th><th>골</th></tr>${pl.map(p=>`<tr><td>${p.sub}</td><td>${pLink(p)}</td><td>${Core.NATK(p.nat)}</td><td>${p.age}</td><td>${p.ovr}</td><td>${p.st.a}</td><td>${p.st.g}</td></tr>`).join('')}</table>`;
+  return `<div class="ttl">${crest(c,28)} ${esc(c.name)}</div><div class="dim">${lg?lg.name:'대표팀'} · ${Core.stageOf(c)} · 전력 ${Math.round(c.strength)} · 선수 ${pl.length}명</div><table class="tb"><tr><th>포지션</th><th>선수</th><th>국적</th><th>나이</th><th>종합</th><th>출전</th><th>골</th></tr>${pl.map(p=>`<tr><td>${p.sub}</td><td>${pLink(p)}</td><td>${Core.NATK(p.nat)}</td><td>${p.age}</td><td>${p.ovr}</td><td>${p.st.a}</td><td>${p.st.g}</td></tr>`).join('')}</table>`;
 }
 // ---------- 시작 화면 ----------
 function setupView() {
