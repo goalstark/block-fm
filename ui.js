@@ -483,12 +483,18 @@ function emitAt(M, min, anim) {
   }
   for (const o of out.reverse()) MV.log.unshift(o);
 }
+const SPD = [1, 1.5, 2], BASE_MS = 450;
+function spdGet() { try { const v = +localStorage.getItem('bfm_spd'); if (SPD.includes(v)) return v; } catch (e) {} return 1; }
+function spdMs() { return Math.round(BASE_MS / (S.spd || (S.spd = spdGet()))); }
+function lockOrient(mode) { try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ScreenOrientation;
+  if (P && P.lock) P.lock({ orientation: mode }).catch(() => {});
+  else if (screen.orientation && screen.orientation.lock) screen.orientation.lock(mode).catch(() => {}); } catch (e) {} }
 function startMatch() {
   const M = Core.prepareMine();
-  MV = { min: 0, timer: null, paused: false, log: [], over: false, momentOpen: null, speed: 220, ball: { x: 50, y: 32 }, poss: 'm', holder: null, pos: { m: [], o: [] }, ballFree: false, red: {}, mst: sortSt(M.stMine), ost: sortSt(M.stOpp), fxT: null };
+  MV = { min: 0, timer: null, paused: false, log: [], over: false, momentOpen: null, speed: spdMs(), ball: { x: 50, y: 32 }, poss: 'm', holder: null, pos: { m: [], o: [] }, ballFree: false, red: {}, mst: sortSt(M.stMine), ost: sortSt(M.stOpp), fxT: null };
   S.matchOpen = true; if (M.role==='bench' || M.role==='inj') MV.speed = 60;
   $('#match').innerHTML = `<div class="mh" id="mh"></div><div id="pitchbox">${pitchHTML(M)}</div><div class="mb" id="mb"></div><div class="mf" id="mf"></div>`;
-  $('#match').classList.add('on'); renderMatch(); setTimeout(movePitch, 60); MV.timer = setInterval(tick, MV.speed);
+  lockOrient('landscape'); $('#match').classList.add('on'); renderMatch(); setTimeout(movePitch, 60); MV.timer = setInterval(tick, MV.speed);
 }
 function scoreAt(min) {
   const M = G0().mm; const mine = M.evMine.filter(e => e.min <= min).length, opp = M.evOpp.filter(e => e.min <= min).length;
@@ -509,7 +515,7 @@ function tick() {
   if (!MV.over && !MV.paused) { const t2 = MV.timer && setTimeout(() => { if (!MV || MV.paused || MV.over) return; hop(M); const hp2 = MV.holder && MV.pos && MV.pos[MV.holder.s][MV.holder.i]; if (hp2) MV.ball = { x: hp2.x, y: hp2.y }; movePitch(); }, Math.round(MV.speed * 0.5)); }
 }
 function skipMatch() {
-  clearInterval(MV.timer); const M = G0().mm; if (!M) return;
+  clearInterval(MV.timer); const M = G0().mm; if (!M) return; MV.skipping = true;
   while (MV.min < 90) { MV.min++; emitAt(M, MV.min, false); const mo = M.moments[M.mi];
     if (M.role==='sub' && MV.min===M.from) MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 투입 — ${esc(Core.me().name)}` });
     if (mo && !mo.done && mo.min===MV.min) { MV.paused = true; MV.momentOpen = mo; MV.timer = setInterval(tick, 40); stepBall(M); toMe(M); movePitch(); renderMatch(); return; } }
@@ -525,10 +531,10 @@ function renderMatch() {
   const roleTxt = M.role==='start' ? '선발 출전' : M.role==='sub' ? `벤치 → ${M.from}분 투입 예정` : M.role==='inj' ? '부상으로 결장' : '벤치 (출전 명단 제외)';
   $('#mh').innerHTML = `<div class="dim">${esc(M.title)} · ${Core.fmtDate(G.day)}</div><div class="sc"><div>${crest(M.h,18)} ${esc(M.h.name)}</div><b>${sh} : ${sa}</b><div>${esc(M.a.name)} ${crest(M.a,18)}</div></div><div class="dim">${MV.min}' · ${roleTxt}</div><div class="bar"><i style="width:${MV.min/90*100}%"></i></div>`;
   $('#mb').innerHTML = `${dec}<div class="sec">경기 흐름</div>${MV.log.map(x => `<div class="li ev ${x.cls||''}"><span class="mn">${x.min}'</span><span class="ico">${x.ic}</span><span class="et">${x.t}</span></div>`).join('') || '<div class="dim">킥오프!</div>'}`;
-  $('#mf').innerHTML = MV.over||MV.momentOpen ? '' : '<button class="btn sec" data-act="mskip">끝까지 자동 진행</button>';
+  $('#mf').innerHTML = MV.over ? '' : `<div class="spd">${SPD.map(v => `<button class="chip ${(S.spd||1)===v?'on':''}" data-act="mspd" data-id="${v}">${v}배속</button>`).join('')}${MV.momentOpen ? '' : '<button class="btn sec" data-act="mskip">끝까지 자동 진행</button>'}</div>`;
 }
 function endMatchUI() {
-  const r = Core.finishMine(); $('#match').classList.remove('on'); S.matchOpen = false; MV = null; save();
+  const r = Core.finishMine(); $('#match').classList.remove('on'); lockOrient('portrait'); S.matchOpen = false; MV = null; save();
   const rt = r.rating ? ` · 평점 ${f1(r.rating)}` : ''; toast(`종료 ${r.res.gh}-${r.res.ga}${rt}`); render();
 }
 // ---------- 렌더 ----------
@@ -608,6 +614,7 @@ document.addEventListener('click', (e) => {
   else if (a==='week') { advance(7); return; }
   else if (a==='match') { advance(120); return; }
   else if (a==='mv') { const M = G0().mm, mo = MV.momentOpen; const r = Core.resolveMoment(id); if (r.goal || r.assist) { MV.ballFree = false; } MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: esc(r.text) }); MV.momentOpen = null; MV.paused = false; stepBall(M); emitAt(M, mo ? mo.min : MV.min, true); movePitch(); renderMatch(); return; }
+  else if (a==='mspd') { S.spd = +id; try { localStorage.setItem('bfm_spd', String(S.spd)); } catch (e) {} if (MV) { MV.speed = spdMs(); if (MV.timer && !MV.skipping && !MV.over) { clearInterval(MV.timer); MV.timer = setInterval(tick, MV.speed); } renderMatch(); } return; }
   else if (a==='mskip') { skipMatch(); return; }
   else if (a==='mend') { endMatchUI(); return; }
   render();

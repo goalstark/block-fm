@@ -86,3 +86,5 @@ select{width:100%;min-height:44px;border-radius:12px;border:2px solid #2A3A31;ba
 .fxb .gchar{display:flex;justify-content:center;margin-bottom:2px}.fxb .gchar .spr{animation:jumpc .4s ease-in-out infinite alternate;width:44px}
 .mebub{position:relative;display:inline-flex}.mebub .crown{position:absolute;top:-12px;left:50%;transform:translateX(-50%);display:block}.mebub .crown svg{width:18px;height:18px}
 .artface{margin-bottom:6px}
+
+.spd{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.spd .btn{flex:1;min-width:120px}
