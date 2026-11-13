@@ -714,15 +714,20 @@ const NAV = [['home','홈'],['me','내 선수'],['ctr','이적'],['league','순�
 function navBadge(id) { try { const m = Core.me(); if (id==='home') return m.meet ? '●' : ''; if (id==='ctr') return (m.offers.length || m.pending || m.renewal) ? '●' : ''; } catch (e) {} return ''; }
 function render() {
   const app = $('#app');
-  if (S.step==='setup') { app.innerHTML = `<div class="scr">${setupView()}</div>`; return; }
-  if (S.step==='create') { app.innerHTML = `<div class="scr">${creatorView()}</div>`; return; }
+  if (S.step==='setup' || S.step==='create') {
+    const o0 = document.querySelector('.scr'); const k0 = S.step + '|' + (S.step==='setup' ? (S.sel ? 'x' : '') : '') ; const t0 = (o0 && S._sk === k0) ? o0.scrollTop : 0;
+    app.innerHTML = `<div class="scr">${S.step==='setup' ? setupView() : creatorView()}</div>`;
+    const n0 = document.querySelector('.scr'); if (n0 && t0) n0.scrollTop = t0; S._sk = k0; return;
+  }
   const oldSc = document.querySelector('.scr'); const keyNow = S.step + '|' + S.tab; const keepTop = (oldSc && S._sk === keyNow) ? oldSc.scrollTop : 0;
   let v = S.tab==='home' ? homeView() : S.tab==='news' ? newsView() : S.tab==='league' ? leagueView() : S.tab==='me' ? meView() : contractView();
   app.innerHTML = `<div class="scr">${v}</div>${actBar()}<nav>${NAV.map(([id,n])=>`<button class="nv ${S.tab===id?'on':''}" data-act="tab" data-id="${id}">${n}${navBadge(id)?'<i class="bdg"></i>':''}</button>`).join('')}</nav>`;
   { const ns = document.querySelector('.scr'); if (ns && keepTop) ns.scrollTop = keepTop; S._sk = keyNow; }
   if (S.tab!=='home') S.trfx = null; else animBars();
   if (S.modalKind==='settings') S.modal = settingsModal();
-  if (S.modal) { $('#modal').innerHTML = `<div class="sheet"><button class="x" data-act="close">닫기</button>${S.modal}</div>`; $('#modal').style.display = 'block'; } else $('#modal').style.display = 'none';
+  const oldSh = document.querySelector('#modal .sheet'); const shTop = (oldSh && $('#modal').style.display === 'block' && S._mk === (S.modalKind || 'm')) ? oldSh.scrollTop : 0;
+  S._mk = S.modalKind || 'm';
+  if (S.modal) { $('#modal').innerHTML = `<div class="sheet"><button class="x" data-act="close">닫기</button>${S.modal}</div>`; $('#modal').style.display = 'block'; const nsh = document.querySelector('#modal .sheet'); if (nsh && shTop) nsh.scrollTop = shTop; } else $('#modal').style.display = 'none';
 }
 function toast(t) { const el = $('#toast'); el.textContent = t; el.style.opacity = 1; setTimeout(() => el.style.opacity = 0, 2200); }
 function actBar() {
