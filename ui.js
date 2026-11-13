@@ -832,7 +832,8 @@ function placeMe(M) {
   if (pick) MV.mst[pick.i] = m; else MV.mst.push(m);
 }
 function startMatch() {
-  const M = Core.prepareMine();
+  if (S.matchOpen) return;
+  const M = Core.prepareMine(); if (!M) return;
   const PT = pickPitch(M);
   MV = { min: 0, timer: null, paused: false, log: [], over: false, momentOpen: null, speed: spdMs(), ball: { x: 50, y: 32 }, poss: 'm', holder: null, pos: { m: [], o: [] }, ballFree: false, red: {}, pitch: PT, kit: pickKits(M, PT), t: 0, rt: 0, kick: 0, act: null, dec: 1, els: null, raf: 0, last: 0, run: {}, tgt: { m: [], o: [] }, mst: sortSt(M.stMine), ost: sortSt(M.stOpp), fxT: null, st: { m: { pt: 0, sh: 0, sot: 0, xg: 0, pa: 0, pm: 0 }, o: { pt: 0, sh: 0, sot: 0, xg: 0, pa: 0, pm: 0 } }, heat: new Array(60).fill(0), my: { pa: 0, pm: 0 } };
   placeMe(M);
@@ -922,7 +923,8 @@ function render() {
     const n0 = document.querySelector('.scr'); if (n0 && t0) n0.scrollTop = t0; S._sk = k0; return;
   }
   const oldSc = document.querySelector('.scr'); const keyNow = S.step + '|' + S.tab; const keepTop = (oldSc && S._sk === keyNow) ? oldSc.scrollTop : 0;
-  let v = S.tab==='home' ? homeView() : S.tab==='news' ? newsView() : S.tab==='league' ? leagueView() : S.tab==='me' ? meView() : contractView();
+  let v; try { v = S.tab==='home' ? homeView() : S.tab==='news' ? newsView() : S.tab==='league' ? leagueView() : S.tab==='me' ? meView() : contractView(); }
+  catch (err) { v = `<div class="card"><b>화면 오류</b><div class="dim">${esc(String(err && err.message || err))}</div><div class="dim">이 글자를 화면 캡처해서 알려주세요.</div><button class="btn sec" data-act="tab" data-id="home">홈으로</button></div>`; try { console.error(err); } catch (e2) {} }
   app.innerHTML = `<div class="scr">${v}</div>${actBar()}<nav>${NAV.map(([id,n])=>`<button class="nv ${S.tab===id?'on':''}" data-act="tab" data-id="${id}">${n}${navBadge(id)?'<i class="bdg"></i>':''}</button>`).join('')}</nav>`;
   { const ns = document.querySelector('.scr'); if (ns && keepTop) ns.scrollTop = keepTop; S._sk = keyNow; }
   if (S.tab!=='home') S.trfx = null; else animBars();
@@ -1061,3 +1063,6 @@ async function boot() {
   else { S.step = 'setup'; render(); }
 }
 boot();
+
+window.addEventListener('error', (e) => { try { toast('오류: ' + (e.message || '알 수 없음') + (e.lineno ? ' (' + e.lineno + ')' : '')); } catch (e2) {} });
+window.addEventListener('unhandledrejection', (e) => { try { toast('오류: ' + String(e.reason && e.reason.message || e.reason)); } catch (e2) {} });
