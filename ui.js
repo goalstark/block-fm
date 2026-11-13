@@ -502,6 +502,7 @@ function retarget(M) {
     });
   };
   place('m'); place('o');
+  if (MV.force) for (const k in MV.force) { const F = MV.force[k], tg = MV.tgt[k[0]]; if (tg && tg[+k.slice(1)]) tg[+k.slice(1)] = { x: F.x, y: F.y, sprint: true }; }   // 장면 진입: 목표 위치로 전력 질주
 }
 function movePitch() { const M = G0().mm; if (!M || !MV || !MV.pos) return; retarget(M); if (!MV.raf) MV.raf = requestAnimationFrame(frame); }
 function lbl(t) { if (MV) MV.lbl = { t, l: 1 }; }
@@ -588,12 +589,13 @@ function frame(ts) {
     const c = MV.pos[pre][i], g = MV.tgt[pre][i]; if (!c || !g) return;
     if (MV.red[pre + i]) { c.vx = c.vy = 0; return; }
     const dx = g.x - c.x, dy = g.y - c.y, dist = Math.hypot(dx, dy) || 1e-6, tired = clampN((60 - PA(p, 'STA')) / 200 * (MV.min / 90), 0, 0.2);
-    const vmax = (8 + PA(p, 'PAC') / 9) * (g.sprint || dist > 12 ? 1 : 0.72) * (1 - tired) * (MV.kick > 0 ? 1.15 : 1), want = Math.min(vmax, dist * 3.2), acc = (30 + PA(p, 'AGI') / 2) * pdt;
+    const vmax = (8 + PA(p, 'PAC') / 9) * (g.sprint || dist > 12 ? 1 : 0.72) * (1 - tired) * (MV.kick > 0 ? 1.15 : 1) * (MV.lead ? 2.3 : 1), want = Math.min(vmax, dist * 3.2), acc = (30 + PA(p, 'AGI') / 2) * pdt;
     c.vx += clampN(dx / dist * want - c.vx, -acc, acc); c.vy += clampN(dy / dist * want - c.vy, -acc, acc);
     if (hold) { c.vx = c.vy = 0; } c.x += c.vx * pdt; c.y += c.vy * pdt; all.push(c);
   });
   for (let a = 0; a < all.length; a++) for (let b2 = a + 1; b2 < all.length; b2++) {
     const p = all[a], q = all[b2], dx = q.x - p.x, dy = q.y - p.y, d2 = dx * dx + dy * dy; if (d2 < 5.5 && d2 > 1e-4) { const d = Math.sqrt(d2), push = (2.35 - d) * 0.5; p.x -= dx / d * push; p.y -= dy / d * push; q.x += dx / d * push; q.y += dy / d * push; } }
+  if (MV.lead) { const L = MV.lead; L.t += realDt; let ok = true; for (const k in MV.force) { const c = MV.pos[k[0]][+k.slice(1)], F = MV.force[k]; if (c && Math.hypot(c.x - F.x, c.y - F.y) > 1.8) { ok = false; break; } } if ((ok && L.t > 1.1) || L.t > L.max) { endLead(M); return; } }
   const b = MV.ball, act = MV.act;
   if (MV.pg && !MV.act && MV.holder && MV.holder.s !== MV.pg.s) {                                // 득점 연출 중에는 득점 팀이 공을 가져옴
     const s = MV.pg.s, arr = MV.pos[s]; let bi = -1, bd = 1e9; arr.forEach((q, i) => { if (!q || i === 0 || MV.red[s + i]) return; const dd = Math.hypot(q.x - b.x, q.y - b.y); if (dd < bd) { bd = dd; bi = i; } }); if (bi >= 0) passTo(s, bi, 70); }
@@ -645,8 +647,10 @@ const SCN = {
   aerialM: { t: 'def', opp: [10, 30], cross: [24, 'w'], oppSt: 1 },
   shotG: { t: 'gk', me: [4, 32], opp: [17, 32] }, oneone: { t: 'gk', me: [6, 32], opp: [12, 32] }, crossG: { t: 'gk', me: [4, 32], opp: [9, 30], cross: [20, 'w'], oppSt: 1 }, penG: { t: 'gk', me: [4, 32], opp: [11, 32] },
   distG: { t: 'att', me: [4, 32] },
+  pressS: { t: 'att', me: [62, 32], few: 1 }, pressW: { t: 'att', me: [66, 'w'], few: 1 }, winBall: { t: 'att', me: [46, 32] },
+  cutbackD: { t: 'def', opp: [16, 'w'] }, blockCB: { t: 'def', opp: [30, 32] },
 };
-function stageMoment(M, mo) {
+function stageMoment(M, mo, soft) {
   const mi = MV.mst.findIndex(p => p.me); if (mi < 0) return; const me = MV.pos.m[mi]; if (!me) return;
   const sc = SCN[mo.kind] || SCN.box, d = dM_(M), ab = (u) => d > 0 ? u : 100 - u, side = Math.random() < 0.5 ? 12 : 52;
   const Y = (v) => v === 'w' ? side : v === 'c' ? (side < 32 ? 1.5 : 62.5) : v, C = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -679,7 +683,44 @@ function stageMoment(M, mo) {
     const m1 = takeNear(mates, me.x, me.y, um); if (m1) put(MV.pos.m[m1.i], (sc.t === 'gk' ? 8 : want[0] - 7), 64 - me.y);
     const o2 = takeNear(opps, me.x, me.y, uo); if (o2) put(MV.pos.o[o2.i], want[0] + 8, 64 - Y(want[1]));
   }
+  if (soft) return;
   MV.dec = 99; retarget(M); fxShow(`<div class="gs">⚡ 내 차례!</div>`, 'save', 900, false);
+}
+// ---- 장면 연결: 지금 흐름(공 소유)에 맞는 장면을 고르고, 선수들이 달려가며 자연스럽게 장면에 진입한다 ----
+const FLOWK = new Set(['counter', 'counterW', 'winBall', 'pressS', 'pressW', 'pressA', 'thruM']);
+function chooseKind(M) {
+  const kinds = Core.posKinds(Core.me().sub), prevK = (M.moments[M.mi - 1] || {}).kind, poss = MV.poss;
+  const w = kinds.map(k => { const t = (SCN[k] || {}).t || 'att'; let x;
+    if (poss === 'm') x = t === 'att' ? 2.6 : 0.6; else x = t === 'att' ? (FLOWK.has(k) ? 1.8 : 0.55) : 2.6;
+    if (k === 'setp' || k === 'cornerH') x *= 0.7; if (k === prevK) x *= 0.25; return x; });
+  let r = Math.random() * w.reduce((a, b) => a + b, 0); for (let i = 0; i < kinds.length; i++) { r -= w[i]; if (r <= 0) return kinds[i]; } return kinds[0];
+}
+function leadText(kind, prev) {
+  const t = (SCN[kind] || {}).t || 'att';
+  if (t === 'att') return prev === 'o' ? (FLOWK.has(kind) ? '압박·인터셉트로 공 탈취!' : '공을 되찾았습니다!') + ' 역습 기회' : kind === 'setp' ? '프리킥 기회를 얻었습니다' : kind === 'cornerH' ? '코너킥 — 공격에 가담합니다' : '공격을 전개합니다 · 기회가 열립니다';
+  if (t === 'gk') return prev === 'm' ? '공을 빼앗겼습니다! 위기입니다' : '상대 공격이 골문을 위협합니다';
+  return prev === 'm' ? '공을 빼앗겼습니다! 상대 역습' : '상대의 공격이 이어집니다';
+}
+function beginLead(M, mo) {
+  const mi = MV.mst.findIndex(p => p.me);
+  if (mi < 0 || !MV.pos.m[mi]) { MV.momentOpen = mo; stageMoment(M, mo); return; }
+  const prev = MV.poss; mo.kind = chooseKind(M);
+  const cp = (a) => a.map(c => c && { x: c.x, y: c.y }), old = { m: cp(MV.pos.m), o: cp(MV.pos.o), ball: { x: MV.ball.x, y: MV.ball.y } };
+  stageMoment(M, mo, true);                                                              // 도착 상태를 한 번 계산해 두고
+  const fin = { m: cp(MV.pos.m), o: cp(MV.pos.o), ball: { x: MV.ball.x, y: MV.ball.y }, holder: MV.holder, act: MV.act, poss: MV.poss, stage: MV.stage, stageOpp: MV.stageOpp, settle: MV.settle, rs: MV.rs, run: MV.run };
+  const force = {};                                                                      // 원래 자리로 되돌린 뒤, 바뀐 선수만 목표로 달려가게 한다
+  for (const pre of ['m', 'o']) MV.pos[pre].forEach((c, i) => { const o = old[pre][i], f = fin[pre][i]; if (!c || !o || !f) return; c.x = o.x; c.y = o.y; if (Math.hypot(f.x - o.x, f.y - o.y) > 0.8) force[pre + i] = { x: f.x, y: f.y }; });
+  MV.ball.x = old.ball.x; MV.ball.y = old.ball.y;
+  let h = fin.holder; if (!h) { const sd = fin.poss; let bi = -1, bd = 1e9; fin[sd].forEach((f, i) => { if (!f) return; const dd = Math.hypot(f.x - fin.ball.x, f.y - fin.ball.y); if (dd < bd) { bd = dd; bi = i; } }); h = bi >= 0 ? { s: sd, i: bi } : null; }
+  MV.act = null; MV.rs = null; MV.holder = h; MV.poss = fin.poss; MV.stage = fin.stage; MV.force = force; MV.lead = { mo, fin, force, t: 0, max: 2.8 }; MV.dec = 99;
+  const txt = leadText(mo.kind, prev); lbl(prev !== fin.poss ? (fin.poss === 'm' ? '공 탈취!' : '빼앗김!') : '전개'); fxShow(`<div class="gs">${txt}</div>`, 'save', 1500, false); movePitch();
+}
+function endLead(M) {
+  const L = MV.lead; if (!L) return; MV.lead = null; MV.force = null;
+  for (const k in L.force) { const c = MV.pos[k[0]][+k.slice(1)], f = L.fin[k[0]][+k.slice(1)]; if (c && f) { c.x = f.x; c.y = f.y; c.vx = c.vy = 0; } }   // 도착 못 한 선수만 남은 거리를 맞춘다
+  Object.assign(MV, { holder: L.fin.holder, act: L.fin.act, poss: L.fin.poss, stage: L.fin.stage, stageOpp: L.fin.stageOpp, settle: L.fin.settle, rs: L.fin.rs, run: L.fin.run });
+  MV.ball.x = L.fin.ball.x; MV.ball.y = L.fin.ball.y; MV.paused = true; MV.momentOpen = L.mo; MV.dec = 99;
+  retarget(M); fxShow(`<div class="gs">⚡ 내 차례!</div>`, 'save', 900, false); bringMeTop(); renderMatch();
 }
 function nearestOf(s, x, y, skipGK) { const arr = MV.pos[s]; let bi = -1, bd = 1e9; arr.forEach((c, i) => { if (!c || (skipGK && i === 0) || MV.red[s + i]) return; const dd = Math.hypot(c.x - x, c.y - y); if (dd < bd) { bd = dd; bi = i; } }); return bi; }
 function playOutcome(M, mo, r) {                                                      // 내 선택 결과대로 장면을 이어 간다
@@ -707,7 +748,7 @@ function bringMeTop() { const e = document.querySelector('#pitch .dot.me'); if (
 function fxShow(html, cls, ms, pause) {
   const el = $('#fx'); if (!el) return; el.innerHTML = `<div class="fxb ${cls}">${html}</div>`;
   if (pause) { MV.paused = true; }
-  if (pause) { clearTimeout(MV.fxP); MV.fxP = setTimeout(() => { if (MV && !MV.momentOpen && !MV.pg) MV.paused = false; }, ms); }   // 일시정지 해제는 배너가 덮어써져도 반드시 실행
+  if (pause) { clearTimeout(MV.fxP); MV.fxP = setTimeout(() => { if (MV && !MV.momentOpen && !MV.pg && !MV.lead) MV.paused = false; }, ms); }   // 일시정지 해제는 배너가 덮어써져도 반드시 실행
   clearTimeout(MV.fxT); MV.fxT = setTimeout(() => { const e = $('#fx'); if (e) e.innerHTML = ''; }, ms);
 }
 function emitAt(M, min, anim) {
@@ -769,7 +810,7 @@ function tick() {
   if (M.role==='sub' && MV.min===M.from) MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 투입 — ${esc(m.name)}` })
   if (M.role==='sub' && MV.min===M.from && !MV.mst.some(p => p.me)) { let ix = MV.mst.findIndex(p => p.sub === m.sub && p.sub !== 'GK'); if (ix < 0) ix = MV.mst.findIndex(p => p.sub !== 'GK'); if (ix >= 0) { const outp = MV.mst[ix]; MV.mst[ix] = m; lbl('교체 투입'); const pb = $('#pitchbox'); if (pb) { pb.innerHTML = pitchHTML(M); MV.els = null; bringMeTop(); } fxShow(`<div class="gchar">${sprH(m, MV.kc.m, 40)}</div><div class="gs">교체 투입 · ${esc(m.name)}</div><div class="dim">${esc(outp.name)} ↔ ${MV.min}분</div>`, 'save', 1800, false); } }
   const mo = M.moments[M.mi];
-  if (mo && !mo.done && mo.min <= MV.min && !MV.pg) { MV.paused = true; MV.momentOpen = mo; stageMoment(M, mo); }     // 골 연출 중이면 끝난 뒤에 장면을 연다
+  if (mo && !mo.done && mo.min <= MV.min && !MV.pg && !MV.lead && !MV.momentOpen) { MV.paused = true; beginLead(M, mo); }     // 골 연출 중이면 끝난 뒤에 장면을 연다
   if (!MV.htDone && MV.min >= 45 && MV.min < 90 && !MV.pg && !MV.momentOpen && !MV.fast && !MV.skipping) {         // 전반 종료 → 잠깐 멈춤 → 후반 킥오프
     MV.htDone = true; const [hh, ha] = scoreAt(45); MV.log.unshift({ min: 45, ic: '⏸️', cls: '', t: `<b>전반 종료</b> ${hh} : ${ha}` });
     fxShow(`<div class="endt">전반 종료</div><div class="ends">${hh} : ${ha}</div>`, 'end', 2200, true);
@@ -778,6 +819,7 @@ function tick() {
   movePitch(); renderMatch();
 }
 function skipMatch() {
+  if (MV.lead) { const M0 = G0().mm; clearInterval(MV.timer); MV.skipping = true; flushPg(); MV.timer = setInterval(tick, 40); endLead(M0); return; }
   clearInterval(MV.timer); const M = G0().mm; if (!M) return; MV.skipping = true; flushPg(); MV.paused = false;
   while (MV.min < 90) { MV.min++; emitAt(M, MV.min, false); const mo = M.moments[M.mi];
     if (M.role==='sub' && MV.min===M.from) MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 투입 — ${esc(Core.me().name)}` });

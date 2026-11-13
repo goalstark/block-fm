@@ -983,8 +983,13 @@ const MOM = {
   crossG:{ txt:'크로스가 박스 안으로 올라옵니다!', o:['catchB','punch','sweep','wait'] },
   distG:{ txt:'공을 잡았습니다. 배급 기회!', o:['distL','distS','throwQ'] },
   penG:{ txt:'페널티킥! 키커와 마주합니다.', o:['dive','wait','stand','narrow'] },
+  pressS:{ txt:'높은 압박으로 공을 가로챘습니다! 골문이 눈앞입니다.', o:['shoot','drib','thruP','onetwo','cutback'] },
+  pressW:{ txt:'측면에서 압박해 공을 뺏었습니다! 수비가 흐트러졌습니다.', o:['drib','crossO','cutin','thruP','onetwo'] },
+  winBall:{ txt:'공을 되찾았습니다! 빠르게 전개할 타이밍입니다.', o:['prog','thruP','onetwo','longP','dribOut','safe'] },
+  cutbackD:{ txt:'상대가 측면 깊숙이 파고들어 컷백을 노립니다!', o:['block','cover','intercept','tackle','jockey'] },
+  blockCB:{ txt:'상대가 박스 앞에서 슛 자세를 잡습니다!', o:['block','tackle','cover','clear','press'] },
 };
-const POSK = { ST:['box','through','crossIn','link','counter'], W:['wing','cutinM','counterW','far','setp'], AM:['zone14','setp','second','pressA'], CM:['pressA','longC','thruM','tackleM','setp'], DM:['interceptD','buildD','secondD','tackleM'], FB:['overlap','duelD','buildFB'], CB:['aerialM','duelCB','buildCB','cornerH'], GK:['shotG','oneone','crossG','distG','penG'] };
+const POSK = { ST:['box','through','crossIn','link','counter','pressS'], W:['wing','cutinM','counterW','far','setp','pressW'], AM:['zone14','setp','second','pressA','winBall'], CM:['pressA','longC','thruM','tackleM','setp','winBall'], DM:['interceptD','buildD','secondD','tackleM','winBall'], FB:['overlap','duelD','buildFB','cutbackD','aerialM'], CB:['aerialM','duelCB','buildCB','cornerH','blockCB'], GK:['shotG','oneone','crossG','distG','penG'] };
 function optInfo(id) { const d = OPT[id] || {}; return { t: d.t || null, def: !!d.def, gk: !!d.gk }; }
 function momentText(kind) { return (MOM[kind] || MOM.box).txt; }
 function momentOptions(mo) {
@@ -1195,5 +1200,5 @@ function dailyNews(t) {
 // ----- 저장 -----
 function serialize() { return JSON.stringify(G, (k,v) => { if (k==='ab'||k==='mm') return undefined; if ((k==='st'||k==='cst'||k==='nst') && v && v.a===0 && v.g===0 && v.as===0 && v.m===0 && v.y===0) return undefined; if (k==='form' || k==='rs') return Math.round(v*100)/100; return v; }); }
 function load(str) { const g = JSON.parse(str); if (g.v !== 2) throw new Error('old save'); G = g; for (const id in G.players) { const p = G.players[id]; if (!p.st) p.st = blankSt(); if (!p.cst) p.cst = blankSt(); if (!p.nst) p.nst = blankSt(); Eng.finalize(p); } G.mm = null; return G; }
-const API2 = { optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
+const API2 = { posKinds: (sub) => POSK[sub] || POSK.ST, optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
 if (typeof module !== 'undefined') module.exports = API2;
