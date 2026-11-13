@@ -94,3 +94,14 @@ select{width:100%;min-height:44px;border-radius:12px;border:2px solid #2A3A31;ba
 .spd{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.spd .btn{flex:1;min-width:120px}
 
 .act{display:flex;flex-direction:column;align-items:stretch;gap:8px}.actinfo{font-size:13px;color:#C9D4CB;text-align:center;font-weight:700}.actrow{display:flex;gap:8px}.actrow .big{flex:1}.actrow .skp{width:56px;font-size:20px;padding:0}.actrow .skp.on{outline:2px solid #C6F36B}.skiprow{display:flex;gap:8px}.skiprow .chip{flex:1;text-align:center;padding:10px 0}
+
+.card.mom{align-items:center;text-align:center;gap:6px;background:linear-gradient(160deg,#1F3025,#19241E);border:2px solid #C6F36B}
+.mom .momt{font-weight:700;color:#C9D4CB;font-size:13px}.mom .momsc{font-size:38px;font-weight:900;letter-spacing:3px;line-height:1.1}
+.mom .momch{position:relative;display:flex;justify-content:center;margin:4px 0 0}.mom .momch .crown{position:absolute;top:-14px;left:50%;transform:translateX(-50%)}.mom .momch .crown svg{width:22px;height:22px}
+.mom .momn{background:#2A3A30;border-radius:999px;padding:6px 14px;font-weight:800;font-size:14px}.mom .momn.me{background:#F7D117;color:#16221B}
+/* 홈 하단 바: 한 줄로 줄여 콘텐츠 영역 확보 */
+.act{flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:6px 12px}
+.act .actinfo{flex:1 1 0;min-width:0;text-align:left;font-size:12px;line-height:1.35}
+.act .actrow{flex:0 0 auto;display:flex;gap:6px}.act .actrow .big{flex:none;min-width:116px;min-height:46px;padding:0 14px}.act .actrow .skp{width:46px;min-height:46px}
+.act .skiprow{flex:1 1 100%;order:-1}
+nav{padding:4px 4px 10px}
