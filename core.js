@@ -184,7 +184,7 @@ function createMe(opts) {
   const age = opts.age || 19, sub = opts.pos || 'ST';
   const ovr = club.kind==='pro' ? club.strength - 1 : club.strength - 8 + (age-15)*2;
   const p = newPlayer(club, sub, ovr, 'balanced', age, opts.nat || 'KOR');
-  p.name = opts.name || '김도윤'; p.look = opts.look || { skin:'tan', hair:'brown', style:'sidepart' };
+  p.name = opts.name || '양메시'; p.look = opts.look || { skin:'tan', hair:'brown', style:'sidepart' };
   p.pot = Math.max(78, p.ovr + (26-age)*2.6) + ri(0,6); p.pot = Math.round(Math.min(95, p.pot));
   p.ct = { until: dateOf(G.day).y + 3, wage: wageFor(p, club) }; p.me = true; p.h = clamp(Math.round(opts.h || 178), 155, 205); p.prefs = (opts.prefs || []).filter(x => PREFS[x]).slice(0,3); p.trait = TRAITS[opts.trait] ? opts.trait : 'grinder'; p.cust = []; p.ach = {}; p.trust = 55; p.mor = 70; p.fat = 10; p.plan = 'shoot'; p.acc = {}; p.log = []; p.fame = 5; p.offers = []; p.goalsAll = 0; p.callup = null;
   { const dh = (p.h - 178)/10; const adj = (k, v) => { if (p.a[k] !== undefined) p.a[k] = clamp(Math.round(p.a[k] + v), 20, 97); };
