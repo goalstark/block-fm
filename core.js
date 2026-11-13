@@ -146,11 +146,12 @@ function buildCountry(code, used) {
     for (const id of l1.clubs) { const p = G.clubs[id]; const c = addClub({ name:p.name+' U18', lg:y.id, col:p.col, col2:p.col2, strength:p.strength-10, nat:code, cc:code, kind:'youth', tier:'Y', parent:id }); y.clubs.push(c.id); }
   }
 }
-function newWorld(seed, sel) {
+function* newWorldGen(seed, sel) {
   sel = (sel && sel.length) ? sel : ['KOR','ENG','ESP','ITA','GER'];
   G = { v:2, rs: seed|0, day: dayOf(2026,8,1), nextPid: 1, clubs: [], players: {}, leagues: [], comps: [], news: [], inbox: [], me: null, hall: [], flags: {}, fx: {}, nt: {}, sel, compHist: [], ntLog: [], lastRes: {}, fa: [] };
   const used = new Set();
-  for (const code of sel) buildCountry(code, used);
+  { let ci = 0; for (const code of sel) { yield [0.03 + 0.27 * ci / sel.length, (DD.COUNTRIES[code].name || code) + ' 리그와 구단 만드는 중']; buildCountry(code, used); ci++; } }
+  yield [0.31, '대륙 대회 준비 중'];
   // 대륙대회 보충용 외부 클럽
   for (const cont of ['EU','AS','SA','NA']) {
     const cs = sel.filter(c => DD.COUNTRIES[c].cont===cont && DD.COUNTRIES[c].slots>0); if (!cs.length) continue;
@@ -158,14 +159,16 @@ function newWorld(seed, sel) {
     const nm = genNames('EXT_'+cont, need, used);
     nm.forEach(n => { const col = pick(DD.COLS); addClub({ name:n, lg:'EXT', col:col[0], col2:col[1], strength: ({EU:60+ri(0,8), AS:54+ri(0,7), SA:56+ri(0,8), NA:50+ri(0,7)})[cont], nat:pick({EU:['FRA','POR','NED','BEL','CRO','SRB','DEN','SUI'], AS:['CHN','AUS','IRN','JPN','KOR','SAU'], SA:['ARG','URU','COL','BRA'], NA:['MEX','MEX','USA']}[cont]), cc:cont, kind:'ext', tier:0 }); });
   }
-  for (const c of G.clubs) buildClubSquad(c);
+  { const cl = G.clubs; for (let k = 0; k < cl.length; k++) { if (k % 10 === 0) yield [0.34 + 0.28 * k / cl.length, '선수를 만드는 중 (' + k + '/' + cl.length + '개 팀)']; buildClubSquad(cl[k]); } }
+  yield [0.63, '시즌 일정을 짜는 중'];
   for (const lg of G.leagues) { const y = lg.cal==='S' ? 2027 : 2026; buildSchedule(lg, seasonStart(lg, y)); lg.season = y; }
   for (const code of sel) G.flags['pr_'+code] = {};
   buildComps('E', 2026);
   addNews('world','2026/27 시즌, 월드가 열렸습니다.',false);
-  while (G.day < dayOf(2027,1,1)) step(true);
+  { const d0 = G.day, tot = dayOf(2027,1,1) - d0; let n = 0; while (G.day < dayOf(2027,1,1)) { step(true); if (++n % 6 === 0) yield [0.66 + 0.33 * (G.day - d0) / tot, '시즌을 미리 진행하는 중 (' + Math.min(5, Math.floor((G.day - d0) / 30) + 1) + '/5개월)']; } }
   return G;
 }
+function newWorld(seed, sel) { const g = newWorldGen(seed, sel); let r; while (!(r = g.next()).done); return r.value; }
 
 // 현실 기준 주급(만 원): 능력·리그 수준에 따른 연봉 ÷ 52
 const WMULT = { 1: 0.45, 2: 1.0, 3: 3.0 };
@@ -1182,5 +1185,5 @@ function dailyNews(t) {
 // ----- 저장 -----
 function serialize() { return JSON.stringify(G, (k,v) => { if (k==='ab'||k==='mm') return undefined; if ((k==='st'||k==='cst'||k==='nst') && v && v.a===0 && v.g===0 && v.as===0 && v.m===0 && v.y===0) return undefined; if (k==='form' || k==='rs') return Math.round(v*100)/100; return v; }); }
 function load(str) { const g = JSON.parse(str); if (g.v !== 2) throw new Error('old save'); G = g; for (const id in G.players) { const p = G.players[id]; if (!p.st) p.st = blankSt(); if (!p.cst) p.cst = blankSt(); if (!p.nst) p.nst = blankSt(); Eng.finalize(p); } G.mm = null; return G; }
-const API2 = { nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
+const API2 = { nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
 if (typeof module !== 'undefined') module.exports = API2;

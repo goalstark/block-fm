@@ -756,9 +756,20 @@ function advance(days) {
   else if (stopped==='move') toast('새 팀에 합류했습니다');
   else if (stopped==='call') toast('대표팀에 소집되었습니다');
 }
+const LOAD_TIPS = ['선호 플레이를 잘 고르면 경기 중 선택지 성공률이 올라갑니다', '휴식 없이 훈련만 하면 피로가 쌓여 부상 확률이 올라갑니다', '경기 중 내 차례가 오면 ★ 표시된 선호 플레이를 노려 보세요', '성격(트레이트)에 따라 성장 속도와 감독 신뢰가 달라집니다', '나이가 어릴수록 훈련 효과가 큽니다. 잠재력을 확인하세요', '이적 제안은 출전 기회와 주급을 함께 비교해서 고르세요', '유스에서 프로까지, 한 시즌 한 시즌이 커리어가 됩니다'];
+function loadView() {
+  return `<div class="ldg"><div class="ldg-grass"></div><svg class="ldg-ball" viewBox="0 0 16 16" shape-rendering="crispEdges"><rect x="3" y="1" width="10" height="14" fill="#fff"/><rect x="1" y="3" width="14" height="10" fill="#fff"/><rect x="6" y="6" width="4" height="4" fill="#111"/><rect x="2" y="4" width="2" height="2" fill="#111"/><rect x="12" y="4" width="2" height="2" fill="#111"/><rect x="2" y="10" width="2" height="2" fill="#111"/><rect x="12" y="10" width="2" height="2" fill="#111"/><rect x="7" y="1" width="2" height="2" fill="#111"/><rect x="7" y="13" width="2" height="2" fill="#111"/></svg><div class="ldg-logo">블록 <b>풋볼매니저</b></div><div class="ldg-bar"><i id="lbar" style="width:2%"></i></div><div class="ldg-st" id="lst">월드를 준비하는 중…</div><div class="ldg-tip" id="ltip">💡 ${LOAD_TIPS[0]}</div></div>`;
+}
 function makeWorld() {
-  S.busy = true; $('#app').innerHTML = '<div class="load">월드를 만드는 중… (선수 수천 명을 만들고 5개월을 미리 진행합니다)</div>';
-  setTimeout(() => { Core.newWorld(Date.now() % 1000000, S.sel.slice()); S.step = 'create'; S.busy = false; if (S.sel.includes('KOR')) { S.cr.cc = 'KOR'; S.cr.nat = 'KOR'; } else { S.cr.cc = S.sel[0]; S.cr.nat = S.sel[0]; } S.cr.club = null; render(); }, 60);
+  S.busy = true; $('#app').innerHTML = loadView();
+  const g = Core.newWorldGen(Date.now() % 1000000, S.sel.slice()); let ti = 0;
+  const tipT = setInterval(() => { const e = $('#ltip'); if (!e) return; ti = (ti + 1) % LOAD_TIPS.length; e.textContent = '💡 ' + LOAD_TIPS[ti]; }, 2600);
+  const fin = () => { clearInterval(tipT); S.step = 'create'; S.busy = false; if (S.sel.includes('KOR')) { S.cr.cc = 'KOR'; S.cr.nat = 'KOR'; } else { S.cr.cc = S.sel[0]; S.cr.nat = S.sel[0]; } S.cr.club = null; render(); };
+  const stepW = () => { let r; try { r = g.next(); } catch (e) { clearInterval(tipT); S.busy = false; S.step = 'setup'; render(); toast('월드 생성에 실패했습니다. 다시 시도해 주세요'); return; }
+    if (r.done) { const b = $('#lbar'); if (b) b.style.width = '100%'; setTimeout(fin, 180); return; }
+    const [pct, label] = r.value, b = $('#lbar'), st = $('#lst'); if (b) b.style.width = Math.round(pct * 100) + '%'; if (st) st.textContent = label + ' · ' + Math.round(pct * 100) + '%';
+    setTimeout(stepW, 8); };
+  setTimeout(stepW, 60);
 }
 document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-act]'); if (!t || S.busy) return; const a = t.dataset.act, id = t.dataset.id;
