@@ -576,6 +576,10 @@ function flushPg() { const pg = MV && MV.pg; if (!pg) return; MV.pg = null; pg.l
 function frame(ts) {
   if (!MV) return; MV.raf = requestAnimationFrame(frame);
   const M = G0().mm; if (!M || !MV.pos) return;
+  if (MV.over) {                                                                          // 경기 종료: 선수·공 정지 + 가운데 종료 표시
+    if (!MV.endShown) { MV.endShown = true; MV.lbl = null; { const lb0 = document.getElementById('blbl'); if (lb0) lb0.textContent = ''; } MV.act = null; MV.rs = null; MV.pg = null; MV.ln = null; MV.bz = 0; for (const pre of ['m', 'o']) (MV.pos[pre] || []).forEach(c => { if (c) c.vx = c.vy = 0; });
+      const [eh, ea] = scoreAt(90); fxShow(`<div class="endt">경기 종료</div><div class="ends">${eh} : ${ea}</div>`, 'end', 3600000, false); movePitch(); }
+    return; }
   let dt = MV.last ? Math.min(0.05, (ts - MV.last) / 1000) : 0.016; MV.last = ts; const realDt = dt; dt *= tsOf();
   MV.t += dt; MV.rt -= dt; if (MV.kick > 0) MV.kick -= dt; if (MV.pg) MV.pg.t += dt; if (MV.rt <= 0) { retarget(M); MV.rt = 0.22; }
   const all = [];

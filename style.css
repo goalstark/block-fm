@@ -115,3 +115,5 @@ nav{padding:4px 4px 10px}
 .ldg-bar{width:min(260px,70%);height:12px;border-radius:7px;background:#19241E;overflow:hidden;border:2px solid #000}.ldg-bar i{display:block;height:100%;background:#C6F36B;transition:width .25s ease-out}
 .ldg-st{font-size:12px;color:#8FA596;text-align:center;min-height:16px}
 .ldg-tip{font-size:13px;color:#C9D4CB;text-align:center;max-width:290px;line-height:1.6;min-height:42px}
+
+.fxb.end{background:rgba(8,20,12,.78);color:#fff;border:2px solid #C6F36B;padding:12px 28px}.fxb.end .endt{font-size:30px;font-weight:900;letter-spacing:3px;color:#C6F36B;text-shadow:0 2px 0 #000}.fxb.end .ends{font-size:22px;font-weight:800;margin-top:2px}
