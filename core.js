@@ -153,11 +153,11 @@ function* newWorldGen(seed, sel) {
   { let ci = 0; for (const code of sel) { yield [0.03 + 0.27 * ci / sel.length, (DD.COUNTRIES[code].name || code) + ' 리그와 구단 만드는 중']; buildCountry(code, used); ci++; } }
   yield [0.31, '대륙 대회 준비 중'];
   // 대륙대회 보충용 외부 클럽
-  for (const cont of ['EU','AS','SA','NA']) {
+  for (const cont of ['EU','AS','AF','SA','NA']) {
     const cs = sel.filter(c => DD.COUNTRIES[c].cont===cont && DD.COUNTRIES[c].slots>0); if (!cs.length) continue;
-    const slots = cs.reduce((s,c)=>s+DD.COUNTRIES[c].slots,0), need = Math.max(0, 16-slots);
+    const slots = cs.reduce((s,c)=>s+DD.COUNTRIES[c].slots,0), need = Math.max(cont==='EU' ? 4 : 0, 16-slots);
     const nm = genNames('EXT_'+cont, need, used);
-    nm.forEach(n => { const col = pick(DD.COLS); addClub({ name:n, lg:'EXT', col:col[0], col2:col[1], strength: ({EU:60+ri(0,8), AS:54+ri(0,7), SA:56+ri(0,8), NA:50+ri(0,7)})[cont], nat:pick({EU:['FRA','POR','NED','BEL','CRO','SRB','DEN','SUI'], AS:['CHN','AUS','IRN','JPN','KOR','SAU'], SA:['ARG','URU','COL','BRA'], NA:['MEX','MEX','USA']}[cont]), cc:cont, kind:'ext', tier:0 }); });
+    nm.forEach(n => { const col = pick(DD.COLS); addClub({ name:n, lg:'EXT', col:col[0], col2:col[1], strength: ({EU:64+ri(0,9), AF:52+ri(0,7), AS:54+ri(0,7), SA:56+ri(0,8), NA:50+ri(0,7)})[cont], nat:pick({EU:['FRA','POR','NED','BEL','CRO','SRB','DEN','SUI'], AS:['CHN','AUS','IRN','JPN','KOR','SAU'], AF:['EGY','MAR','NGA','SEN','GHA','CIV'], SA:['ARG','URU','COL','BRA'], NA:['MEX','MEX','USA']}[cont]), cc:cont, kind:'ext', tier:0 }); });
   }
   { const cl = G.clubs; for (let k = 0; k < cl.length; k++) { if (k % 10 === 0) yield [0.34 + 0.28 * k / cl.length, '선수를 만드는 중 (' + k + '/' + cl.length + '개 팀)']; buildClubSquad(cl[k]); } }
   yield [0.63, '시즌 일정을 짜는 중'];
@@ -338,7 +338,7 @@ function finishComp(comp, champ) {
 }
 function buildComps(cal, year) {
   for (const code of G.sel) { const C = DD.COUNTRIES[code]; if (C.cal===cal) buildCup(code); }
-  if (cal==='E') for (const cont of ['EU','AS']) buildCont(cont, year);
+  if (cal==='E') for (const cont of ['EU','AS','AF']) buildCont(cont, year);
   if (cal==='S') for (const cont of ['SA','NA']) buildCont(cont, year);
 }
 function buildCup(cc) {
@@ -360,12 +360,14 @@ function contTeams(cont) {
     ids.slice(0, C.slots).forEach((id,i) => rank.push([i, -G.clubs[id].strength, id])); }
   if (!rank.length) return null;
   rank.sort((a,b)=>a[0]-b[0] || a[1]-b[1]);
-  const t = rank.slice(0,16).map(x=>x[2]);
   const ext = shuffle(G.clubs.filter(c=>c.kind==='ext' && c.cc===cont).map(c=>c.id));
+  const keep = cont==='EU' ? Math.min(3, ext.length) : 0;   // 유럽대회: 리그 없는 나라의 주요 클럽 3팀은 항상 참가
+  const t = rank.slice(0, 16-keep).map(x=>x[2]);
+  for (let k=0;k<keep;k++) t.push(ext.pop());
   while (t.length < 16 && ext.length) t.push(ext.pop());
   return t.length>=8 ? t : null;
 }
-const CONT_NAME = { EU:'유럽 챔피언스컵', AS:'아시아 챔피언스', SA:'남미 리베르타도레스컵', NA:'북중미 챔피언스컵' };
+const CONT_NAME = { EU:'유럽 챔피언스컵', AS:'아시아 챔피언스', SA:'남미 리베르타도레스컵', NA:'북중미 챔피언스컵', AF:'아프리카 챔피언스리그' };
 function buildCont(cont, year) {
   const teams = contTeams(cont); if (!teams) return;
   const sorted = teams.slice().sort((a,b)=>G.clubs[b].strength-G.clubs[a].strength);
