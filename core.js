@@ -983,6 +983,7 @@ const MOM = {
   penG:{ txt:'페널티킥! 키커와 마주합니다.', o:['dive','wait','stand','narrow'] },
 };
 const POSK = { ST:['box','through','crossIn','link','counter'], W:['wing','cutinM','counterW','far','setp'], AM:['zone14','setp','second','pressA'], CM:['pressA','longC','thruM','tackleM','setp'], DM:['interceptD','buildD','secondD','tackleM'], FB:['overlap','duelD','buildFB'], CB:['aerialM','duelCB','buildCB','cornerH'], GK:['shotG','oneone','crossG','distG','penG'] };
+function optInfo(id) { const d = OPT[id] || {}; return { t: d.t || null, def: !!d.def, gk: !!d.gk }; }
 function momentText(kind) { return (MOM[kind] || MOM.box).txt; }
 function momentOptions(mo) {
   const m = me(), a = m.a, os = (G.mm.oppStr-60)*0.004, tb = traitOf(m).b, pf = m.prefs || [];
@@ -1015,7 +1016,7 @@ function resolveMoment(choice) {
   } else { text = pick(d.ko); M.myRate -= 0.15; }
   { const futG = M.evMine.filter(e => e.min > mo.min && !e.mine);                       // 대체할 팀 득점이 없으면 '추가 득점'은 경기당 1번까지만 인정
     if ((goal || assist) && !futG.length) { if ((M.xg || 0) >= 1) { if (goal) { goal = false; M.myGoals = M.myGoals; M.myRate -= 1.1 + fav; } if (assist) { assist = false; M.myRate -= 0.7 + fav; } text = pick(d.ko || d.ok); M.myRate += 0.15; } else M.xg = 1; } }
-  mo.done = true; mo.result = { choice: o.id, goal, assist, stop, conc, text };
+  mo.done = true; mo.result = { choice: o.id, goal, assist, stop, conc, ok, text };
   if (goal) { M.myGoals++;
     const fut = M.evMine.filter(e => e.min > mo.min && !e.mine); if (fut.length) { M.evMine.splice(M.evMine.indexOf(fut[0]),1); } M.evMine.push({ min: mo.min, side: M.mine.id, sc: m, as: null, mine: true }); }
   if (assist) { M.myAssists++; const fut = M.evMine.filter(e => e.min > mo.min && !e.mine); const tm = pick(startersOf(M.mg).filter(p=>!p.me)); if (fut.length) { M.evMine.splice(M.evMine.indexOf(fut[0]),1); } M.evMine.push({ min: mo.min, side: M.mine.id, sc: tm, as: m, mine: true }); }
@@ -1192,5 +1193,5 @@ function dailyNews(t) {
 // ----- 저장 -----
 function serialize() { return JSON.stringify(G, (k,v) => { if (k==='ab'||k==='mm') return undefined; if ((k==='st'||k==='cst'||k==='nst') && v && v.a===0 && v.g===0 && v.as===0 && v.m===0 && v.y===0) return undefined; if (k==='form' || k==='rs') return Math.round(v*100)/100; return v; }); }
 function load(str) { const g = JSON.parse(str); if (g.v !== 2) throw new Error('old save'); G = g; for (const id in G.players) { const p = G.players[id]; if (!p.st) p.st = blankSt(); if (!p.cst) p.cst = blankSt(); if (!p.nst) p.nst = blankSt(); Eng.finalize(p); } G.mm = null; return G; }
-const API2 = { nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
+const API2 = { optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
 if (typeof module !== 'undefined') module.exports = API2;
