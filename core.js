@@ -1006,7 +1006,7 @@ function momentOptions(mo) {
 function resolveMoment(choice) {
   const M = G.mm, m = me(), mo = M.moments[M.mi]; const opts = momentOptions(mo); const o = opts.find(x=>x.id===choice) || opts[0]; const d = OPT[o.id];
   let text, goal = false, assist = false, stop = false, conc = false; const ok = rnd() < o.p;
-  const fav = o.fav ? 0.1 : 0;
+  const fav = (o.fav ? 0.1 : 0) + ((G.mm && G.mm.talk) || 0);
   if (d.def) {
     if (ok) { text = pick(d.ok); M.myRate += 0.3 + fav;
       const fut = M.evOpp.filter(e => e.min > mo.min);
@@ -1200,5 +1200,20 @@ function dailyNews(t) {
 // ----- 저장 -----
 function serialize() { return JSON.stringify(G, (k,v) => { if (k==='ab'||k==='mm') return undefined; if ((k==='st'||k==='cst'||k==='nst') && v && v.a===0 && v.g===0 && v.as===0 && v.m===0 && v.y===0) return undefined; if (k==='form' || k==='rs') return Math.round(v*100)/100; return v; }); }
 function load(str) { const g = JSON.parse(str); if (g.v !== 2) throw new Error('old save'); G = g; for (const id in G.players) { const p = G.players[id]; if (!p.st) p.st = blankSt(); if (!p.cst) p.cst = blankSt(); if (!p.nst) p.nst = blankSt(); Eng.finalize(p); } G.mm = null; return G; }
-const API2 = { posKinds: (sub) => POSK[sub] || POSK.ST, optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
+// ----- 하프타임 팀토크: 감독 말 + 내 반응 -----
+function talkInfo(diff) {
+  const t = diff < 0 ? pick(['아직 늦지 않았다. 한 골만 따라가면 분위기는 바뀐다!', '전반 내용은 나쁘지 않았다. 침착하게 기회를 만들자.', '실점은 잊어라. 후반 첫 15분에 승부를 건다.'])
+    : diff > 0 ? pick(['좋은 흐름이다. 하지만 방심하면 바로 뒤집힌다.', '리드를 지키되 추가골 기회는 놓치지 말자.', '지금처럼만 하면 된다. 간격을 좁게 유지해라.'])
+    : pick(['균형이 팽팽하다. 먼저 한 골 넣는 팀이 이긴다.', '아직 아무것도 정해지지 않았다. 후반에 더 날카롭게 가자.']);
+  return { text: t, opts: [{ id: 'follow', t: '감독 지시를 그대로 따른다' }, { id: 'rally', t: '동료들을 독려한다' }, { id: 'ego', t: '내가 해결하겠다고 다짐한다' }] };
+}
+function talkPick(id) {
+  const m = me(), M = G.mm; let text = '', talk = 0, mor = 0, trust = 0;
+  if (id === 'follow') { talk = 0.03; mor = 1; text = '지시대로 라인을 지키며 후반을 준비합니다.'; }
+  else if (id === 'rally') { if (m.mor >= 60 || rnd() < 0.5) { talk = 0.06; mor = 2; text = '"한 번 더 뛰자!" 동료들이 고개를 끄덕입니다. 라커룸 분위기가 살아납니다.'; } else { talk = 0.01; mor = -1; text = '말은 했지만 동료들의 표정이 굳어 있습니다.'; } }
+  else { if (rnd() < 0.6) { talk = 0.08; mor = 2; text = '"내가 해결한다." 눈빛이 달라졌습니다. 후반이 기대됩니다.'; } else { talk = -0.04; mor = -1; trust = -1; text = '혼자 하려 한다는 시선이 느껴집니다. 감독이 고개를 젓습니다.'; } }
+  if (M) M.talk = talk; m.mor = clamp(m.mor + mor, 20, 100); m.trust = clamp(m.trust + trust, 0, 100);
+  return { text };
+}
+const API2 = { talkInfo, talkPick, posKinds: (sub) => POSK[sub] || POSK.ST, optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
 if (typeof module !== 'undefined') module.exports = API2;
