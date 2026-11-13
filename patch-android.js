@@ -7,6 +7,15 @@ try {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'debug.keystore'), Buffer.from(KS, 'base64')); console.log('fixed debug keystore installed');
 } catch (e) { console.log('keystore skipped', e.message); }
+try {   // gradle 이 홈 폴더 키를 무시하는 경우를 막기 위해 프로젝트 안에 키를 두고 debug 서명 설정을 직접 지정
+  const gp = path.join('android', 'app', 'build.gradle'); let g = fs.readFileSync(gp, 'utf8');
+  fs.writeFileSync(path.join('android', 'app', 'fixed-debug.keystore'), Buffer.from(KS, 'base64'));
+  if (!/fixed-debug\.keystore/.test(g)) {
+    g = g.replace(/android\s*\{/, (m) => m + "\n    signingConfigs {\n        debug {\n            storeFile file('fixed-debug.keystore')\n            storePassword 'android'\n            keyAlias 'androiddebugkey'\n            keyPassword 'android'\n        }\n    }");
+    fs.writeFileSync(gp, g);
+  }
+  console.log('gradle debug signing -> fixed keystore');
+} catch (e) { console.log('gradle signing patch skipped', e.message); }
 try {
   const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
   const root = path.join('android', 'app', 'src', 'main', 'java');
