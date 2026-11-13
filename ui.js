@@ -524,7 +524,8 @@ function movePitch() { const M = G0().mm; if (!M || !MV || !MV.pos) return; reta
 function lbl(t) { if (MV) MV.lbl = { t, l: 1 }; }
 function resetPos(M) { const dM = dM_(M); const f = (st, pre, d) => st.forEach((p, i) => { const b = FORM[Math.min(i, FORM.length - 1)], c = MV.pos[pre][i]; if (c) { c.x = d > 0 ? b[0] : 100 - b[0]; c.y = b[1] * 0.64; c.vx = c.vy = 0; } }); f(MV.mst, 'm', dM); f(MV.ost, 'o', -dM); MV.run = {}; }
 function sideOf(s) { return s === 'm' ? MV.mst : MV.ost; }
-function passTo(s, i, sp) { MV.act = { k: 'pass', to: { s, i }, sp }; MV.holder = null; }
+function passTo(s, i, sp) { const h0 = MV.holder; if (h0 && MV.st && !MV.pg) { const t0 = MV.st[h0.s]; t0.pa++; if (h0.s !== s) t0.pm++; if (h0.s === 'm' && MV.mst[h0.i] && MV.mst[h0.i].me) { MV.my.pa++; if (s !== 'm') MV.my.pm++; } }
+  MV.act = { k: 'pass', to: { s, i }, sp }; MV.holder = null; }
 function shoot(M, out) {
   const h = MV.holder, s = h.s, d = s === 'm' ? dM_(M) : -dM_(M), os = s === 'm' ? 'o' : 'm', cur = MV.pos[s][h.i], gx = d > 0 ? 99 : 1;
   let t = { x: gx, y: 32 }, to = null;
@@ -533,6 +534,7 @@ function shoot(M, out) {
   else if (out === 'post') t = { x: gx, y: 32 + (Math.random() < 0.5 ? -1 : 1) * 4.2 };
   else if (out === 'save') t = { x: MV.pos[os][0].x, y: MV.pos[os][0].y };
   else { let bi = -1, bd = 1e9; MV.pos[os].forEach((q, i) => { if (i === 0 || !q || MV.red[os + i]) return; const dd = Math.hypot(q.x - cur.x, q.y - cur.y); if (dd < bd) { bd = dd; bi = i; } }); if (bi < 0) { out = 'wide'; t = { x: gx, y: 32 + 10 }; } else to = { s: os, i: bi }; }
+  if (MV.st) { const u0 = uOf(cur.x, d), gd0 = Math.hypot(100 - u0, cur.y - 32) * 1.05, xg0 = clampN(0.85 * Math.exp(-gd0 / 11) * (1 - 0.35 * Math.min(1, Math.abs(cur.y - 32) / 30)), 0.02, 0.8), S0 = MV.st[s]; S0.sh++; S0.xg += out === 'goal' ? Math.max(xg0, 0.08) : xg0; if (out === 'goal' || out === 'save') S0.sot++; }
   MV.act = { k: 'shot', tx: t.x, ty: t.y, sp: 78, out, s, to }; MV.holder = null; lbl('슛!');
   if (out !== 'goal') { const nm = esc(sideOf(s)[h.i].name); MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${({ save: '골키퍼 선방', wide: '골대를 벗어남', block: '수비가 막아냄', post: '골대를 때림' })[out]}` }); }
 }
@@ -602,6 +604,7 @@ function frame(ts) {
   let dt = MV.last ? Math.min(0.05, (ts - MV.last) / 1000) : 0.016; MV.last = ts; const realDt = dt; dt *= tsOf();
   if (MV.momentOpen && MV.settle > 0) MV.settle -= realDt; const hold = !!MV.momentOpen && !(MV.settle > 0), pdt = hold ? 0 : dt;
   if (MV.cele) { MV.cele.t += realDt; if (MV.cele.t > 2.0) { MV.cele = null; MV.regroup = 1.0; MV.rt = 0; } } else if (MV.regroup > 0) MV.regroup -= realDt;
+  if (!MV.over && MV.min > 0 && !hold) { if (MV.poss && MV.st[MV.poss]) MV.st[MV.poss].pt += dt; const mi0 = MV.myI == null ? (MV.myI = MV.mst.findIndex(p => p.me)) : MV.myI, mc = mi0 >= 0 && MV.pos.m[mi0]; if (mc) { const uu = uOf(mc.x, dM_(M)); MV.heat[Math.min(5, Math.floor(mc.y / 64 * 6)) * 10 + Math.min(9, Math.max(0, Math.floor(uu / 10)))] += dt; } }
   MV.t += dt; MV.rt -= dt; if (MV.kick > 0) MV.kick -= dt; if (MV.pg) MV.pg.t += dt; if (MV.rt <= 0) { retarget(M); MV.rt = 0.22; }
   const all = [];
   for (const pre of ['m', 'o']) sideOf(pre).forEach((p, i) => {
@@ -812,7 +815,7 @@ function placeMe(M) {
 function startMatch() {
   const M = Core.prepareMine();
   const PT = pickPitch(M);
-  MV = { min: 0, timer: null, paused: false, log: [], over: false, momentOpen: null, speed: spdMs(), ball: { x: 50, y: 32 }, poss: 'm', holder: null, pos: { m: [], o: [] }, ballFree: false, red: {}, pitch: PT, kit: pickKits(M, PT), t: 0, rt: 0, kick: 0, act: null, dec: 1, els: null, raf: 0, last: 0, run: {}, tgt: { m: [], o: [] }, mst: sortSt(M.stMine), ost: sortSt(M.stOpp), fxT: null };
+  MV = { min: 0, timer: null, paused: false, log: [], over: false, momentOpen: null, speed: spdMs(), ball: { x: 50, y: 32 }, poss: 'm', holder: null, pos: { m: [], o: [] }, ballFree: false, red: {}, pitch: PT, kit: pickKits(M, PT), t: 0, rt: 0, kick: 0, act: null, dec: 1, els: null, raf: 0, last: 0, run: {}, tgt: { m: [], o: [] }, mst: sortSt(M.stMine), ost: sortSt(M.stOpp), fxT: null, st: { m: { pt: 0, sh: 0, sot: 0, xg: 0, pa: 0, pm: 0 }, o: { pt: 0, sh: 0, sot: 0, xg: 0, pa: 0, pm: 0 } }, heat: new Array(60).fill(0), my: { pa: 0, pm: 0 } };
   placeMe(M);
   MV.kc = { m: kitClub(M.mine, MV.kit.m), o: kitClub(M.opp, MV.kit.o) }; S.matchOpen = true; if (M.role==='bench' || M.role==='inj') { MV.speed = 60; MV.fast = true; }
   $('#match').innerHTML = `<div class="mh" id="mh"></div><div id="pitchbox">${pitchHTML(M)}</div><div class="mb" id="mb"></div><div class="mf" id="mf"></div>`;
@@ -849,6 +852,19 @@ function skipMatch() {
 }
 
 const lvl3 = (p) => p >= 0.62 ? ['높음', 'hi'] : p >= 0.4 ? ['보통', 'mid'] : ['낮음', 'lo'];
+function mtabs() { const T = [['flow', '경기 흐름'], ['stat', '통계'], ['me', '내 평점']]; return `<div class="mtabs">${T.map(([k, n]) => `<button class="mtb ${(S.mtab || 'flow') === k ? 'on' : ''}" data-act="mtab" data-id="${k}">${n}</button>`).join('')}</div>`; }
+function statView(M) {
+  const A = MV.st.m, B = MV.st.o, tot = (A.pt + B.pt) || 1, pa = Math.round(A.pt / tot * 100), pct = (st) => st.pa ? Math.round((st.pa - st.pm) / st.pa * 100) : 0;
+  const row = (n, a, b, fa, fb) => { const t = (+a + +b) || 1; return `<div class="strow"><b>${fa || a}</b><div class="stm"><span>${n}</span><i><u style="width:${a / t * 100}%"></u><u class="o" style="width:${b / t * 100}%"></u></i></div><b>${fb || b}</b></div>`; };
+  const [gm, go] = scoreAt(MV.min);
+  return `<div class="sec">경기 통계</div><div class="stnm"><span>${esc(M.mine.name)}</span><span>${esc(M.opp.name)}</span></div>${row('점유율', pa, 100 - pa, pa + '%', (100 - pa) + '%')}${row('슈팅', A.sh, B.sh)}${row('유효슈팅', A.sot, B.sot)}${row('기대득점 xG', A.xg.toFixed(2), B.xg.toFixed(2), A.xg.toFixed(2), B.xg.toFixed(2))}${row('주요 패스', A.pa, B.pa)}${row('패스 성공률', pct(A), pct(B), pct(A) + '%', pct(B) + '%')}<div class="dim" style="margin-top:6px">득점 ${gm} : ${go} — 슈팅·패스·점유는 지금 화면의 플레이 기준입니다.</div>`;
+}
+function meView(M) {
+  if (M.role !== 'start' && M.role !== 'sub') return `<div class="sec">내 평점</div><div class="dim">이번 경기는 출전하지 않습니다.</div>`;
+  const r = clampN(M.myRate, 3, 10), mx = Math.max(1, ...MV.heat), cells = MV.heat.map((v, i) => `<rect x="${(i % 10) * 10}" y="${Math.floor(i / 10) * 10.67}" width="10" height="10.67" fill="#C6F36B" fill-opacity="${(Math.sqrt(v / mx) * 0.85).toFixed(2)}"/>`).join('');
+  const my = MV.my, pc = my.pa ? Math.round((my.pa - my.pm) / my.pa * 100) : 0;
+  return `<div class="sec">내 평점</div><div class="merate ${r >= 7.5 ? 'hi' : r < 6 ? 'lo' : ''}"><b>${r.toFixed(1)}</b><span>골 ${M.myGoals} · 도움 ${M.myAssists} · 슈팅 ${M.sh || 0}${my.pa ? ' · 패스 ' + pc + '% (' + my.pa + ')' : ''}</span></div><div class="sec">내 활동 위치 (히트맵, 오른쪽이 상대 골문)</div><svg class="heat" viewBox="0 0 100 64" preserveAspectRatio="none"><rect width="100" height="64" fill="#1d3a26"/>${cells}<g fill="none" stroke="#fff" stroke-opacity=".35" stroke-width=".4"><rect x=".5" y=".5" width="99" height="63"/><line x1="50" y1=".5" x2="50" y2="63.5"/><circle cx="50" cy="32" r="8"/><rect x=".5" y="14" width="14" height="36"/><rect x="85.5" y="14" width="14" height="36"/></g></svg>`;
+}
 function renderMatch() {
   const G = G0(), M = G.mm; if (!M || !MV || !$('#mh')) return; const [sh, sa] = scoreAt(MV.pg ? MV.min - 1 : MV.min);
   let dec = '';
@@ -857,7 +873,7 @@ function renderMatch() {
     dec = `<div class="card mom"><div class="momt">경기 종료 · ${res}</div><div class="momsc">${fh} : ${fa}</div>${mv ? `<div class="momch">${sprH(mv.p, MV.kc[mv.mine ? 'm' : 'o'], 64, mv.me ? 'jump' : 'idle')}${mv.me ? '<i class="crown">' + IC.crown + '</i>' : ''}</div><div class="momn ${mv.me ? 'me' : ''}">${IC.crown} MVP ${esc(mv.p.name)}${mv.me ? ' (나!)' : ''}</div>` : ''}<div class="dim">내 역할: ${st}</div><div class="row g8 wrapx" style="justify-content:center">${M.myGoals ? `<span class="tag">${IC.ball} ${M.myGoals}골</span>` : ''}${M.myAssists ? `<span class="tag">${IC.boot} ${M.myAssists}도움</span>` : ''}</div><button class="btn wide" data-act="mend">결과 확인</button></div>`; }
   const roleTxt = M.role==='start' ? '선발 출전' : M.role==='sub' ? (MV && MV.min >= M.from ? `${M.from}분 교체 투입` : `벤치 → ${M.from}분 투입 예정`) : M.role==='inj' ? '부상으로 결장' : '벤치 (출전 명단 제외)';
   $('#mh').innerHTML = `<div class="dim">${esc(M.title)} · ${Core.fmtDate(G.day)}</div><div class="sc"><div>${crest(M.h,18)} ${esc(M.h.name)}</div><b>${sh} : ${sa}</b><div>${esc(M.a.name)} ${crest(M.a,18)}</div></div><div class="dim">${MV.min}' · ${roleTxt}</div><div class="bar"><i style="width:${MV.min/90*100}%"></i></div>`;
-  $('#mb').className = 'mb' + (MV.momentOpen ? ' hasdec' : MV.over ? ' isover' : ''); $('#mb').innerHTML = `${dec}<div class="sec">경기 흐름</div>${MV.log.map(x => `<div class="li ev ${x.cls||''}"><span class="mn">${x.min}'</span><span class="ico">${x.ic}</span><span class="et">${x.t}</span></div>`).join('') || '<div class="dim">킥오프!</div>'}`;
+  $('#mb').className = 'mb' + (MV.momentOpen ? ' hasdec' : MV.over ? ' isover' : ''); $('#mb').innerHTML = `${MV.momentOpen ? dec : mtabs() + ((S.mtab || 'flow') === 'flow' || !MV.over ? dec : '<button class="btn wide" data-act="mend" style="margin:4px 0">결과 확인</button>')}${MV.momentOpen || (S.mtab || 'flow') === 'flow' ? `<div class="sec">경기 흐름</div>${MV.log.map(x => `<div class="li ev ${x.cls||''}"><span class="mn">${x.min}'</span><span class="ico">${x.ic}</span><span class="et">${x.t}</span></div>`).join('') || '<div class="dim">킥오프!</div>'}` : S.mtab === 'stat' ? statView(M) : meView(M)}`;
   $('#mf').innerHTML = MV.over ? '' : `<div class="spd">${SPD.map(v => `<button class="chip ${(S.spd||1)===v?'on':''}" data-act="mspd" data-id="${v}">${v}배속</button>`).join('')}${MV.momentOpen ? '' : '<button class="btn sec" data-act="mskip">끝까지 자동 진행</button>'}</div>`;
 }
 function endMatchUI() {
@@ -978,6 +994,7 @@ document.addEventListener('click', (e) => {
   else if (a==='match') { advance(120); return; }
   else if (a==='mv') { if (!MV || !G0().mm || !MV.momentOpen) return; const M = G0().mm, mo = MV.momentOpen; const r = Core.resolveMoment(id); if (r.goal || r.assist) { MV.ballFree = false; } MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: esc(r.text) }); MV.momentOpen = null; MV.paused = false; try { playOutcome(M, mo, r); } catch (e) { MV.holder = MV.holder || null; } stepBall(M); emitAt(M, mo ? mo.min : MV.min, true); movePitch(); renderMatch(); return; }
   else if (a==='fs') { try { localStorage.setItem('bfm_fs', String(+id)); } catch (e) {} fsApply(); render(); return; }
+  else if (a==='mtab') { S.mtab = id; renderMatch(); return; }
   else if (a==='mspd') { S.spd = +id; try { localStorage.setItem('bfm_spd', String(S.spd)); } catch (e) {} if (MV) { MV.speed = spdMs(); if (MV.timer && !MV.skipping && !MV.over) { clearInterval(MV.timer); MV.timer = setInterval(tick, MV.speed); } renderMatch(); } return; }
   else if (a==='mskip') { if (!MV || !G0().mm || MV.over) return; skipMatch(); return; }
   else if (a==='mend') { if (!MV || !G0().mm || MV.ending) return; MV.ending = true; endMatchUI(); return; }

@@ -156,3 +156,10 @@ nav{padding:4px 4px 10px}
 /* 골 배너: 경기장을 가리지 않는 상단 카드 (세레머니가 보이도록) */
 .fxb.goal{inset:auto;top:6px;left:50%;margin-left:-105px;width:210px;height:auto;border-radius:14px;padding:6px 10px;background:rgba(10,30,15,.88)}
 .fxb.goal.opp{background:rgba(70,16,16,.88)}.fxb.goal .gchar,.fxb.goal .gb{display:none}.fxb.goal .gt{font-size:26px;line-height:1.1}
+/* 경기 통계·평점 탭 */
+.mtabs{display:flex;gap:6px;margin:4px 0 6px}.mtb{flex:1;min-height:32px;border-radius:10px;border:0;background:#19241E;color:#9DB0A4;font-family:inherit;font-size:calc(13px*var(--fs,1));font-weight:700;cursor:pointer}.mtb.on{background:#C6F36B;color:#10200f}
+.stnm{display:flex;justify-content:space-between;font-size:12px;font-weight:900;color:#EAF1EC;margin:2px 0 4px}.stnm span{max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.strow{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:6px;margin:5px 0;font-size:calc(13px*var(--fs,1))}.strow>b:first-child{text-align:left}.strow>b:last-child{text-align:right}
+.stm{display:flex;flex-direction:column;gap:3px;text-align:center;font-size:11px;color:#9DB0A4}.stm i{display:flex;height:5px;border-radius:3px;overflow:hidden;background:#0f1612}.stm u{display:block;background:#C6F36B}.stm u.o{background:#FF8A80;margin-left:auto}
+.merate{display:flex;align-items:center;gap:10px;margin:4px 0}.merate b{font-size:34px;font-weight:900;color:#EAF1EC}.merate.hi b{color:#C6F36B}.merate.lo b{color:#FF8A80}.merate span{font-size:12px;color:#9DB0A4}
+.heat{width:100%;height:auto;aspect-ratio:100/64;border-radius:8px;display:block}
