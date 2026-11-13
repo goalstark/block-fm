@@ -853,6 +853,7 @@ function genExtras(stMine, stOpp, evAll) {
   for (let i = ri(3,6); i > 0; i--) { const ms = rnd() < 0.5; add(ri(4,89), 'ch', ms, nm((ms ? stMine : stOpp).filter(p => ['ST','W','AM','CM'].includes(p.sub)))); }
   for (let i = ri(2,5); i > 0; i--) { const ms = rnd() < 0.5; add(ri(4,89), 'cn', ms, nm((ms ? stMine : stOpp).filter(p => ['W','FB','CM','AM'].includes(p.sub)))); }
   for (let i = ri(1,3); i > 0; i--) { const ms = rnd() < 0.5; add(ri(6,89), 'fl', ms, nm((ms ? stMine : stOpp).filter(p => p.sub !== 'GK'))); }
+  if (rnd() < 0.3) { const ms = rnd() < 0.5; add(ri(15,85), 'ij', ms, nm((ms ? stMine : stOpp).filter(p => p.sub !== 'GK'))); }
   return ex.sort((a, b) => a.min - b.min);
 }
 function mvpOf(M) {
