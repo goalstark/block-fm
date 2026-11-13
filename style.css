@@ -138,3 +138,21 @@ nav{padding:4px 4px 10px}
 @media (orientation:landscape) and (max-height:340px){#match .mb .card.gl .opts3,#match .mb .card.gl .optsn{grid-auto-rows:27px;gap:3px}#match .mb .opt{height:27px}#match .mb .opt b{font-size:12.5px}#match .mb .card.gl>.row{font-size:13px}#match .mf .chip,#match .mf .spd .btn{min-height:28px;font-size:12px}#match .mf{padding:4px 8px}}
 /* 글자·버튼 크기 설정 (경기장 제외) */
 #app .scr>*,#app nav .nv,#modal .sheet>*:not(.x){zoom:var(--fs,1)}
+/* 경기 화면 선택 버튼도 크기 설정 반영 */
+.opt{min-height:calc(56px*var(--fs,1))}.opt b{font-size:calc(14px*var(--fs,1))}
+@media (orientation:landscape) and (max-height:700px){
+  #match .mb{overflow-y:auto}
+  #match .mb .card.gl .opts3,#match .mb .card.gl .optsn{grid-auto-rows:calc(38px*var(--fs,1))}
+  #match .mb .opt{height:calc(38px*var(--fs,1))}#match .mb .opt b{font-size:calc(14.5px*var(--fs,1))}
+  #match .mb .card.gl .optsn:has(.opt:nth-child(7)){grid-auto-rows:calc(34px*var(--fs,1))}
+  #match .mb .card.gl .optsn:has(.opt:nth-child(7)) .opt{height:calc(34px*var(--fs,1))}#match .mb .card.gl .optsn:has(.opt:nth-child(7)) .opt b{font-size:calc(13px*var(--fs,1))}
+}
+@media (orientation:landscape) and (max-height:380px){
+  #match .mb .card.gl .opts3,#match .mb .card.gl .optsn{grid-auto-rows:calc(31px*var(--fs,1))}#match .mb .opt{height:calc(31px*var(--fs,1))}#match .mb .opt b{font-size:calc(13.5px*var(--fs,1))}
+}
+@media (orientation:landscape) and (max-height:340px){
+  #match .mb .card.gl .opts3,#match .mb .card.gl .optsn{grid-auto-rows:calc(27px*var(--fs,1))}#match .mb .opt{height:calc(27px*var(--fs,1))}#match .mb .opt b{font-size:calc(12.5px*var(--fs,1))}
+}
+/* 골 배너: 경기장을 가리지 않는 상단 카드 (세레머니가 보이도록) */
+.fxb.goal{inset:auto;top:6px;left:50%;margin-left:-105px;width:210px;height:auto;border-radius:14px;padding:6px 10px;background:rgba(10,30,15,.88)}
+.fxb.goal.opp{background:rgba(70,16,16,.88)}.fxb.goal .gchar,.fxb.goal .gb{display:none}.fxb.goal .gt{font-size:26px;line-height:1.1}
