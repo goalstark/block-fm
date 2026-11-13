@@ -848,6 +848,9 @@ function genExtras(stMine, stOpp, evAll) {
   if (rnd() < 0.07) { const ms = rnd() < 0.5, min = ri(30,88); const l = (ms ? stMine : stOpp).filter(p => !p.me && p.sub !== 'GK' && !evAll.some(e => e.min >= min && (e.sc === p || e.as === p))); add(min, 'rc', ms, l.length ? pick(l) : null); }
   for (let i = ri(1,3); i > 0; i--) { const ms = rnd() < 0.5; const gk = (ms ? stMine : stOpp).find(p => p.sub === 'GK' && !p.me); add(ri(5,89), 'sv', ms, gk); }
   for (let i = ri(0,2); i > 0; i--) { const ms = rnd() < 0.5; add(ri(5,89), 'pt', ms, nm((ms ? stMine : stOpp).filter(p => ['ST','W','AM','CM'].includes(p.sub)))); }
+  for (let i = ri(3,6); i > 0; i--) { const ms = rnd() < 0.5; add(ri(4,89), 'ch', ms, nm((ms ? stMine : stOpp).filter(p => ['ST','W','AM','CM'].includes(p.sub)))); }
+  for (let i = ri(2,5); i > 0; i--) { const ms = rnd() < 0.5; add(ri(4,89), 'cn', ms, nm((ms ? stMine : stOpp).filter(p => ['W','FB','CM','AM'].includes(p.sub)))); }
+  for (let i = ri(1,3); i > 0; i--) { const ms = rnd() < 0.5; add(ri(6,89), 'fl', ms, nm((ms ? stMine : stOpp).filter(p => p.sub !== 'GK'))); }
   return ex.sort((a, b) => a.min - b.min);
 }
 function mvpOf(M) {
@@ -878,13 +881,15 @@ function prepareMine() {
   const mineGoals = mineHome ? o.gA : o.gB, oppGoals = mineHome ? o.gB : o.gA;
   const evMine = genEvents(mine, mineGoals, mineHome?stH:stA, mineHome?bH:bA), evOpp = genEvents(opp, oppGoals, mineHome?stA:stH, mineHome?bA:bH);
   const evx = genExtras(mineHome?stH:stA, mineHome?stA:stH, evMine.concat(evOpp));
-  const sub0 = m.sub, nBase = (sub0==='ST'||sub0==='W'||sub0==='AM'||sub0==='GK') ? [3,5] : [3,4];
-  const nChance = role==='start' ? ri(nBase[0], nBase[1]) : role==='sub' ? ri(1,3) : 0;
+  const sub0 = m.sub, nBase = (sub0==='ST'||sub0==='W'||sub0==='AM'||sub0==='GK') ? [5,7] : [4,6];
+  const nChance = role==='start' ? ri(nBase[0], nBase[1]) : role==='sub' ? ri(2,4) : 0;
   const from = role==='sub' ? ri(55,70) : 3;
   const moments = [];
-  const usedMin = new Set(); const kinds = POSK[sub0] || POSK.ST;
-  for (let i=0;i<nChance;i++) { let mn = ri(Math.max(from,5), 88), g = 0; while (usedMin.has(mn) && g++ < 30) mn = ri(Math.max(from,5), 88); usedMin.add(mn); moments.push({ min: mn, kind: pick(kinds), done:false }); }
-  moments.sort((x,y)=>x.min-y.min);
+  const kinds = POSK[sub0] || POSK.ST;
+  { const lo = Math.max(from,5), hi = 88; let gap = 7;                                  // 장면 사이 최소 간격(분) — 한 곳에 몰리지 않게
+    for (let tries = 0; tries < 60 && moments.length < nChance; tries++) { const mn = ri(lo, hi); if (moments.every(o => Math.abs(o.min - mn) >= gap)) moments.push({ min: mn, kind: null, done:false }); if (tries === 30) gap = 4; }
+    moments.sort((x,y)=>x.min-y.min); let prev = null;
+    moments.forEach(o => { const pool = kinds.filter(k => k !== prev); o.kind = pick(pool.length ? pool : kinds); prev = o.kind; }); }
   G.mm = { pm, ctx: pm.ctx, title: matchTitle(pm.ctx), h, a, mineHome, mine, opp, evMine, evOpp, evx, stMine: mineHome?stH:stA, stOpp: mineHome?stA:stH, role, moments, mi: 0, oppStr: opp.strength, mg: mineHome? sqH:sqA, myGoals: 0, myAssists: 0, myRate: 6.0, sh: 0, from, state: 'ready', sqH, sqA };
   return G.mm;
 }
@@ -915,7 +920,7 @@ const OPT = {
   crossO:{ n:'크로스', tag:'cross', k:[['CRS',.7],['TEC',.3]], b:.36, s:.012, t:'pass', a:.42, lo:.1, hi:.85, osf:1.5, ta:['정확한 크로스! 헤딩 골로 이어집니다 — 어시스트!'], ok:['크로스는 좋았지만 마무리가 안 됩니다.'], ko:['크로스가 수비수에게 걸립니다.','크로스가 라인 밖으로 나갑니다.'] },
   holdup:{ n:'키핑 후 연계', tag:'build', k:[['STR',.4],['TEC',.3],['PAS',.3]], b:.45, s:.01, t:'pass', a:.25, lo:.15, hi:.88, ta:['버텨낸 뒤 내준 패스가 골로 이어집니다 — 어시스트!'], ok:['공을 지켜내며 동료를 끌어올립니다.'], ko:['몸싸움에서 공을 잃습니다.'] },
   setCross:{ n:'세트피스 크로스', tag:'cross', k:[['CRS',.7],['VIS',.3]], b:.4, s:.011, t:'pass', a:.35, lo:.15, hi:.86, ta:['세트피스 크로스가 헤딩 골로 이어집니다 — 어시스트!'], ok:['크로스가 박스 안에서 걷어내집니다.'], ko:['크로스가 첫 수비에 막힙니다.'] },
-  setShort:{ n:'짧게 연결', tag:'build', k:[['PAS',.6],['VIS',.4]], b:.55, s:.009, t:'pass', a:.1, lo:.2, hi:.9, ok:['짧은 패스로 안전하게 이어갑니다.'], ko:['짧게 주려던 패스가 끊깁니다.'] },
+  setShort:{ n:'짧게 연결', tag:'build', k:[['PAS',.6],['VIS',.4]], b:.55, s:.009, t:'pass', a:.1, lo:.2, hi:.9, ok:['짧은 패스로 안전하게 이어갑니다.'], ta:['짧은 패스가 결정적인 기회로 이어져 도움을 기록합니다!'], ko:['짧게 주려던 패스가 끊깁니다.'] },
   prog:{ n:'전진 패스', tag:'build', k:[['PAS',.6],['DEC',.4]], b:.5, s:.01, t:'pass', a:.1, lo:.2, hi:.9, ta:['전진 패스가 찬스로 이어집니다 — 어시스트!'], ok:['전진 패스로 공격 전개에 성공합니다.'], ko:['전진 패스가 수비에 끊깁니다.'] },
   longP:{ n:'롱패스 전환', tag:'build', k:[['PAS',.6],['VIS',.4]], b:.35, s:.011, t:'pass', a:.28, lo:.12, hi:.85, ta:['정확한 롱패스! 단숨에 득점으로 이어집니다 — 어시스트!'], ok:['롱패스로 공격 방향을 바꿉니다.'], ko:['롱패스가 라인 밖으로 나갑니다.','롱패스를 수비가 걷어냅니다.'] },
   safe:{ n:'안전한 패스', tag:'build', k:[['PAS',.5],['DEC',.5]], b:.7, s:.008, t:'pass', lo:.35, hi:.95, ok:['안전하게 공을 돌려 볼 점유를 지킵니다.'], ko:['쉬운 패스를 놓쳐 볼을 빼앗깁니다.'] },
@@ -936,7 +941,7 @@ const OPT = {
   wait:{ n:'기다리기', tag:'save', k:[['DEC',.5],['REF',.5]], b:.5, s:.011, def:1, gk:1, st:.5, cn:.35, lo:.15, hi:.88, ok:['끝까지 기다렸다 슛을 막아냅니다!'], ko:['움직임을 읽혀 실점 위기를 맞습니다.'] },
   sweep:{ n:'박스 밖 걷어내기', tag:'aer', k:[['DEC',.5],['KIC',.3],['REF',.2]], b:.45, s:.011, def:1, gk:1, st:.5, cn:.4, lo:.12, hi:.85, ok:['박스 밖까지 나와 위험한 공을 걷어냅니다!'], ko:['나왔지만 공을 놓쳐 빈 골문이 노출됩니다.'] },
   distL:{ n:'롱킥 배급', tag:'dist', k:[['KIC',.7],['DEC',.3]], b:.4, s:.011, t:'pass', a:.25, lo:.12, hi:.86, ta:['롱킥 한 방에 역습 골! — 어시스트!'], ok:['정확한 롱킥으로 공격을 시작합니다.'], ko:['롱킥이 상대에게 걸립니다.'] },
-  distS:{ n:'짧게 빌드업', tag:'build', k:[['KIC',.4],['DEC',.6]], b:.65, s:.009, t:'pass', a:.05, lo:.25, hi:.92, ok:['짧은 패스로 후방 빌드업을 시작합니다.'], ko:['빌드업 패스가 압박에 걸립니다.'] },
+  distS:{ n:'짧게 빌드업', tag:'build', k:[['KIC',.4],['DEC',.6]], b:.65, s:.009, t:'pass', a:.05, lo:.25, hi:.92, ok:['짧은 패스로 후방 빌드업을 시작합니다.'], ta:['빌드업 패스가 골로 연결되어 도움을 기록합니다!'], ko:['빌드업 패스가 압박에 걸립니다.'] },
   throwQ:{ n:'빠른 던지기 역습', tag:'dist', k:[['KIC',.4],['DEC',.6]], b:.45, s:.011, t:'pass', a:.3, lo:.15, hi:.88, ta:['빠른 던지기 역습! 골로 이어집니다 — 어시스트!'], ok:['빠른 스로로 역습을 열어줍니다.'], ko:['던진 공이 상대에게 연결됩니다.'] },
 };
 // 선호 플레이 10개씩 (id가 OPT id면 해당 선택지에 ★)
@@ -1008,6 +1013,8 @@ function resolveMoment(choice) {
     else if (d.a && rnd() < d.a) { assist = true; text = pick(d.ta); M.myRate += 0.9 + fav; }
     else { text = pick(d.ok); M.myRate += 0.2 + fav; }
   } else { text = pick(d.ko); M.myRate -= 0.15; }
+  { const futG = M.evMine.filter(e => e.min > mo.min && !e.mine);                       // 대체할 팀 득점이 없으면 '추가 득점'은 경기당 1번까지만 인정
+    if ((goal || assist) && !futG.length) { if ((M.xg || 0) >= 1) { if (goal) { goal = false; M.myGoals = M.myGoals; M.myRate -= 1.1 + fav; } if (assist) { assist = false; M.myRate -= 0.7 + fav; } text = pick(d.ko || d.ok); M.myRate += 0.15; } else M.xg = 1; } }
   mo.done = true; mo.result = { choice: o.id, goal, assist, stop, conc, text };
   if (goal) { M.myGoals++;
     const fut = M.evMine.filter(e => e.min > mo.min && !e.mine); if (fut.length) { M.evMine.splice(M.evMine.indexOf(fut[0]),1); } M.evMine.push({ min: mo.min, side: M.mine.id, sc: m, as: null, mine: true }); }
