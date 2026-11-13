@@ -360,6 +360,13 @@ function setupView() {
   const cards = Core.CODES.map(c => { const C = CO[c], on = S.sel.includes(c); return `<button class="opt ${on?'on':''}" data-act="sel" data-id="${c}"><b>${on?'✓ ':''}${Core.FLAG[c]||''} ${C.name}</b><span class="dim">${C.l1.name}${C.l2?' · '+C.l2.name:''}</span></button>`; }).join('');
   return `<div class="top"><div class="ttl">월드 설정</div><div class="dim">${n}/10개국</div></div><div class="body"><div class="dim">진행할 나라를 최대 10개까지 고르세요. 고른 나라의 1부·2부·유스 리그, 컵대회, 승강제가 전부 정밀 시뮬레이션되고, 선택하지 않은 나라는 만들어지지 않습니다.</div><div class="opts">${cards}</div><div class="card"><div class="dim">예상 선수 수 약 ${est.toLocaleString()}명 · 대륙대회(유럽·아시아·아프리카·남미·북중미)는 선택한 나라 팀과 외부 초청팀이 함께 참가합니다. 월드 생성에 몇 초가 걸립니다.</div></div><button class="btn wide" data-act="world" ${n<1?'disabled':''}>이 월드로 시작하기</button>${Object.keys(S.slots||{}).length?`<div class="sec">저장된 게임 불러오기</div>${slotRows(false)}`:''}</div>`;
 }
+const NAT_CONT = { EU: 'ENG ESP ITA GER FRA NED POR BEL CRO SRB DEN SUI SCO AUT TUR POL SWE NOR CZE GRE UKR RUS ROU HUN IRL WAL NIR FIN SVK SVN BIH ALB MKD MNE BUL ISL', AS: 'KOR JPN CHN AUS IRN SAU QAT VNM THA UZB IRQ UAE KSA IND IDN MAS', AF: 'EGY MAR RSA SEN NGA GHA CIV ALG TUN CMR MLI', SA: 'BRA ARG COL URU CHI PAR ECU PER VEN BOL', NA: 'USA MEX CAN CRC JAM HON PAN' };
+function natToCc(nat) {                                                   // 국적 → 가장 가까운 선택 리그(같은 나라 > 같은 대륙에서 가장 강한 리그)
+  if (S.sel.includes(nat)) return nat;
+  let cont = CO[nat] && CO[nat].cont; if (!cont) for (const k in NAT_CONT) if (NAT_CONT[k].split(' ').includes(nat)) cont = k;
+  const same = S.sel.filter(x => CO[x] && CO[x].cont === cont).sort((a, b) => (CO[b].l1.mean || 0) - (CO[a].l1.mean || 0));
+  return same[0] || null;
+}
 function creatorClubs() {
   const G = G0(), c = S.cr; const C = CO[c.cc];
   if (c.stage==='youth') return G.clubs.filter(x=>x.kind==='youth' && x.cc===c.cc).sort((a,b)=>b.strength-a.strength);
@@ -1037,7 +1044,7 @@ document.addEventListener('input', (e) => { if (e.target.id==='nm') S.cr.name = 
 document.addEventListener('change', (e) => {
   if (e.target.id==='clubsel') { S.cr.club = +e.target.value; }
   if (e.target.id==='homesel') { S.cr.home = e.target.value; rollHome(); const nm = $('#nm'); if (nm) S.cr.name = nm.value; render(); }
-  if (e.target.id==='natsel') { S.cr.nat = e.target.value; S.cr.natTouched = true; }
+  if (e.target.id==='natsel') { S.cr.nat = e.target.value; S.cr.natTouched = true; const nm0 = $('#nm'); if (nm0) S.cr.name = nm0.value; const cc = natToCc(S.cr.nat); if (cc && cc !== S.cr.cc) { S.cr.cc = cc; S.cr.home = ''; S.cr.club = null; } render(); }
 });
 // ---------- 저장 슬롯 (자동 저장 + 수동 3칸) ----------
 const SLOTS = ['slot1','slot2','slot3'];
