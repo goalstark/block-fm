@@ -331,8 +331,12 @@ function contractView() {
 }
 async function gzEnc(str) { const cs = new Blob([str]).stream().pipeThrough(new CompressionStream('gzip')); const u = new Uint8Array(await new Response(cs).arrayBuffer()); let b = ''; for (let i = 0; i < u.length; i += 0x8000) b += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return 'BFM1:' + btoa(b); }
 async function gzDec(code) { if (!code.startsWith('BFM1:')) throw new Error('bad'); const bin = atob(code.slice(5)), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).text(); }
+const FS_OPT = [[0.9,'작게'],[1,'보통'],[1.15,'크게'],[1.3,'아주 크게']];
+function fsGet() { try { const v = +localStorage.getItem('bfm_fs'); if (FS_OPT.some(o => o[0] === v)) return v; } catch (e) {} return 1; }
+function fsApply() { document.documentElement.style.setProperty('--fs', String(fsGet())); }
+fsApply();
 function settingsModal() {
-  return `<div class="ttl">설정</div><div class="sec">저장·불러오기</div><div class="dim">자동 저장은 매 진행마다 이뤄집니다. 칸에 따로 저장해 두면 되돌릴 수 있어요.</div>${slotRows(true)}<div class="sec">백업 코드</div><div class="dim">앱을 지우고 다시 설치할 때를 대비해 코드를 복사해 두세요(메모 앱 등에 붙여넣기). 새로 설치한 뒤 아래 칸에 붙여넣고 복원하면 이어서 할 수 있습니다.</div><textarea id="bkbox" rows="3" style="width:100%;background:#101814;color:#EAF1EC;border:1px solid #2A3A30;border-radius:10px;padding:8px;font-size:11px" placeholder="백업 코드"></textarea><div class="row g8"><button class="btn sec" data-act="bkcopy" style="flex:1">백업 코드 복사</button><button class="btn sec" data-act="bkrestore" style="flex:1">코드로 복원</button></div><div class="sec">게임</div><button class="btn sec wide" data-act="reset">${S.resetArm?'정말 지우고 새 게임 시작 (다시 누르면 삭제)':'새 게임 시작'}</button>`;
+  return `<div class="ttl">설정</div><div class="sec">저장·불러오기</div><div class="dim">자동 저장은 매 진행마다 이뤄집니다. 칸에 따로 저장해 두면 되돌릴 수 있어요.</div>${slotRows(true)}<div class="sec">백업 코드</div><div class="dim">앱을 지우고 다시 설치할 때를 대비해 코드를 복사해 두세요(메모 앱 등에 붙여넣기). 새로 설치한 뒤 아래 칸에 붙여넣고 복원하면 이어서 할 수 있습니다.</div><textarea id="bkbox" rows="3" style="width:100%;background:#101814;color:#EAF1EC;border:1px solid #2A3A30;border-radius:10px;padding:8px;font-size:11px" placeholder="백업 코드"></textarea><div class="row g8"><button class="btn sec" data-act="bkcopy" style="flex:1">백업 코드 복사</button><button class="btn sec" data-act="bkrestore" style="flex:1">코드로 복원</button></div><div class="sec">글자·버튼 크기</div><div class="row g8">${FS_OPT.map(([v,n])=>`<button class="btn ${fsGet()===v?'':'sec'}" data-act="fs" data-id="${v}" style="flex:1">${n}</button>`).join('')}</div><div class="dim">경기 화면 필드는 그대로, 메뉴·목록·버튼 크기만 바뀝니다.</div><div class="sec">게임</div><button class="btn sec wide" data-act="reset">${S.resetArm?'정말 지우고 새 게임 시작 (다시 누르면 삭제)':'새 게임 시작'}</button>`;
 }
 function teamView(lg) {
   const G = G0(), me = Core.me();
@@ -652,7 +656,8 @@ const SCN = {
 };
 function stageMoment(M, mo, soft) {
   const mi = MV.mst.findIndex(p => p.me); if (mi < 0) return; const me = MV.pos.m[mi]; if (!me) return;
-  const sc = SCN[mo.kind] || SCN.box, d = dM_(M), ab = (u) => d > 0 ? u : 100 - u, side = Math.random() < 0.5 ? 12 : 52;
+  const sc = SCN[mo.kind] || SCN.box, d = dM_(M), ab = (u) => d > 0 ? u : 100 - u, curU = d > 0 ? me.x : 100 - me.x, side = Math.random() < 0.75 ? (me.y < 32 ? 12 : 52) : (me.y < 32 ? 52 : 12);   // 지금 서 있는 쪽 측면을 우선
+  const KEEP = new Set(['buildD', 'buildFB', 'buildCB', 'distG', 'setp', 'cornerH']), mu0 = (sc.t === 'att' && !sc.cross && !KEEP.has(mo.kind)) ? Math.min(92, Math.max(sc.me[0], curU - 1)) : (sc.me ? sc.me[0] : 50);   // 탈취 후 뒤로 물러나지 않게: 이미 올라가 있으면 그 자리에서 시작
   const Y = (v) => v === 'w' ? side : v === 'c' ? (side < 32 ? 1.5 : 62.5) : v, C = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const put = (c, u, y) => { if (!c) return; c.x = C(ab(u), 2, 98); c.y = C(y, 2, 62); c.vx = c.vy = 0; };
   const mates = MV.mst.map((p, i) => ({ p, i })).filter(o => o.i !== mi && o.i !== 0 && !MV.red['m' + o.i]);
@@ -661,7 +666,7 @@ function stageMoment(M, mo, soft) {
   const um = new Set(), uo = new Set(); MV.act = null; MV.rs = null; MV.holder = null; MV.run = {}; MV.settle = sc.cross ? 1.0 : 0.05; MV.stage = sc.t;
   const setBall = (c) => { MV.ball.x = c.x; MV.ball.y = c.y; };
   if (sc.t === 'att') {
-    put(me, sc.me[0], Y(sc.me[1])); const mu = sc.me[0], my = me.y, up = my < 32 ? 1 : -1;
+    put(me, mu0, Y(sc.me[1])); const mu = mu0, my = me.y, up = my < 32 ? 1 : -1;
     const o1 = takeNear(opps, me.x, me.y, uo); if (o1) put(MV.pos.o[o1.i], mu + 4, my + up * 5);
     if (!sc.few) { const o2 = takeNear(opps, me.x, me.y, uo); if (o2) put(MV.pos.o[o2.i], mu + 8, my - up * 6); }
     const m1 = takeNear(mates, me.x, me.y, um); if (m1) put(MV.pos.m[m1.i], mu + 2, 64 - my);
@@ -956,6 +961,7 @@ document.addEventListener('click', (e) => {
   else if (a==='week') { advance(7); return; }
   else if (a==='match') { advance(120); return; }
   else if (a==='mv') { if (!MV || !G0().mm || !MV.momentOpen) return; const M = G0().mm, mo = MV.momentOpen; const r = Core.resolveMoment(id); if (r.goal || r.assist) { MV.ballFree = false; } MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: esc(r.text) }); MV.momentOpen = null; MV.paused = false; try { playOutcome(M, mo, r); } catch (e) { MV.holder = MV.holder || null; } stepBall(M); emitAt(M, mo ? mo.min : MV.min, true); movePitch(); renderMatch(); return; }
+  else if (a==='fs') { try { localStorage.setItem('bfm_fs', String(+id)); } catch (e) {} fsApply(); render(); return; }
   else if (a==='mspd') { S.spd = +id; try { localStorage.setItem('bfm_spd', String(S.spd)); } catch (e) {} if (MV) { MV.speed = spdMs(); if (MV.timer && !MV.skipping && !MV.over) { clearInterval(MV.timer); MV.timer = setInterval(tick, MV.speed); } renderMatch(); } return; }
   else if (a==='mskip') { if (!MV || !G0().mm || MV.over) return; skipMatch(); return; }
   else if (a==='mend') { if (!MV || !G0().mm || MV.ending) return; MV.ending = true; endMatchUI(); return; }

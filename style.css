@@ -136,3 +136,5 @@ nav{padding:4px 4px 10px}
 .fxb.end{background:rgba(8,20,12,.78);color:#fff;border:2px solid #C6F36B;padding:12px 28px}.fxb.end .endt{font-size:30px;font-weight:900;letter-spacing:3px;color:#C6F36B;text-shadow:0 2px 0 #000}.fxb.end .ends{font-size:22px;font-weight:800;margin-top:2px}
 @media (orientation:landscape) and (max-height:380px){#match .mb{padding:4px 8px}#match .mb .card.gl .opts3,#match .mb .card.gl .optsn{grid-auto-rows:31px;gap:4px}#match .mb .opt{height:31px;padding:2px 8px}#match .mb .opt b{font-size:13.5px}#match .mb .card.gl>.row{font-size:14px;margin-bottom:2px}#match .mb .card.gl .optsn:has(.opt:nth-child(7)){grid-auto-rows:30px}}
 @media (orientation:landscape) and (max-height:340px){#match .mb .card.gl .opts3,#match .mb .card.gl .optsn{grid-auto-rows:27px;gap:3px}#match .mb .opt{height:27px}#match .mb .opt b{font-size:12.5px}#match .mb .card.gl>.row{font-size:13px}#match .mf .chip,#match .mf .spd .btn{min-height:28px;font-size:12px}#match .mf{padding:4px 8px}}
+/* 글자·버튼 크기 설정 (경기장 제외) */
+#app .scr>*,#app nav .nv,#modal .sheet>*:not(.x){zoom:var(--fs,1)}
