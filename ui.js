@@ -347,13 +347,33 @@ function teamView(lg) {
 }
 function clubModal(id) {
   const c = Core.clubOf(id), G = G0(), lg = Core.leagueOf(c.lg), me = Core.me();
-  const pl = c.pl.map(x=>G.players[x]).filter(Boolean).sort((a,b)=>POS_ORDER.indexOf(a.sub)-POS_ORDER.indexOf(b.sub)||b.ovr-a.ovr);
-  let tm = '';
-  if (lg && lg.table[id]) { const tb = Core.sortedTable(lg), t = lg.table[id]; tm = `<div class="tiles t5"><div class="tile"><div class="dim">순위</div><div class="big">${tb.indexOf(id)+1}</div></div><div class="tile"><div class="dim">승점</div><div class="big">${t.pts}</div></div><div class="tile"><div class="dim">승무패</div><div class="big s14">${t.w}-${t.d}-${t.l}</div></div><div class="tile"><div class="dim">${IC.ball} 득점</div><div class="big">${t.gf}</div></div><div class="tile"><div class="dim">실점</div><div class="big">${t.ga}</div></div></div>`; }
-  const best = (k) => pl.slice().sort((a,b) => b.st[k] - a.st[k])[0];
-  const bg = best('g'), ba = best('as'), br = pl.filter(p => p.st.a >= 3).sort((a,b) => b.st.rs/b.st.a - a.st.rs/a.st.a)[0];
-  const lead = `<div class="chips w">${bg && bg.st.g ? `<span class="tag">${IC.ball} ${pLink(bg)} ${bg.st.g}</span>` : ''}${ba && ba.st.as ? `<span class="tag">${IC.boot} ${pLink(ba)} ${ba.st.as}</span>` : ''}${br ? `<span class="tag">${IC.star} ${pLink(br)} ${f1(br.st.rs/br.st.a)}</span>` : ''}</div>`;
-  return `<div class="ttl">${crest(c,28)} ${esc(c.name)}${c.id===me.club?' <span class="tag">마이팀</span>':''}</div><div class="dim">${lg?lg.name:'대표팀'} · ${Core.stageOf(c)} · 전력 ${Math.round(c.strength)} · 선수 ${pl.length}명</div>${tm}${lead}<table class="tb"><tr><th>포지션</th><th>선수</th><th>나이</th><th>종합</th><th>출전</th><th>${IC.ball}</th><th>${IC.boot}</th><th>${IC.star}</th></tr>${pl.map(p=>`<tr class="${p.me?'hl':''}"><td>${p.sub}</td><td>${pLink(p)}</td><td>${p.age}</td><td>${p.ovr}</td><td>${p.st.a}</td><td>${p.st.g}</td><td>${p.st.as}</td><td>${p.st.a?f1(p.st.rs/p.st.a):'-'}</td></tr>`).join('')}</table>`;
+  if (S.cmid !== id) { S.cmid = id; S.cmt = 'sq'; }
+  const tab = S.cmt || 'sq';
+  const pl = c.pl.map(x => G.players[x]).filter(p => p && !p.mgr).sort((a, b) => POS_ORDER.indexOf(a.sub) - POS_ORDER.indexOf(b.sub) || b.ovr - a.ovr);
+  const isMine = c.id === me.club;
+  let tm = '', pos = 0;
+  if (lg && lg.table[id]) { const tb = Core.sortedTable(lg), t = lg.table[id]; pos = tb.indexOf(id) + 1; tm = `<div class="tiles"><div class="tile"><div class="dim">순위</div><div class="big">${pos}</div><div class="s">/ ${tb.length}팀</div></div><div class="tile"><div class="dim">승점</div><div class="big">${t.pts}</div><div class="s">${t.p}경기</div></div><div class="tile"><div class="dim">승무패</div><div class="big s14">${t.w}-${t.d}-${t.l}</div></div><div class="tile"><div class="dim">득실</div><div class="big s14">${t.gf}:${t.ga}</div><div class="s">${t.gf - t.ga >= 0 ? '+' : ''}${t.gf - t.ga}</div></div></div>`; }
+  const frm = (c.form5 || []).map(x => `<i class="fd ${x}">${x === 'W' ? '승' : x === 'D' ? '무' : '패'}</i>`).join('') || '<span class="dim">경기 전</span>';
+  const hist = lg ? (lg.hist || []).filter(h => h.table.some(r => r[0] === id)) : [];
+  const titles = hist.filter(h => h.champ === id).length;
+  const hero = `<div class="chero" style="background:linear-gradient(135deg,${c.col},${c.col2})"><div class="cshade"></div><div class="crow">${crest(c, 56)}<div><div class="ctn">${esc(c.name)}${isMine ? ' <span class="tag">마이팀</span>' : ''}</div><div class="cdn">${lg ? esc(lg.name) : '대표팀'} · ${Core.stageOf(c)}${regionOf(c) ? ' · ' + esc(regionOf(c)) : ''}</div></div></div><div class="cmeta"><span>전력 <b>${Math.round(c.strength)}</b></span><span>선수 <b>${pl.length}명</b></span><span>우승 <b>${titles ? '🏆'.repeat(Math.min(titles, 5)) + (titles > 5 ? '×' + titles : '') : '0'}</b></span></div></div>`;
+  const TABS = [['sq', '선수단'], ['rec', '기록'], ['his', '역사']];
+  const tabs = `<div class="chips">${TABS.map(([k, n]) => `<button class="chip ${tab === k ? 'on' : ''}" data-act="cmt" data-id="${k}">${n}</button>`).join('')}</div>`;
+  let body = '';
+  if (tab === 'sq') {
+    const mgrN = (G.mode === 'mgr' && isMine) ? 1 : 0;
+    body = `<div class="pgrid">${pl.map(p => `<div class="pcard ${p.me ? 'me' : ''}" data-act="pl" data-id="${p.id}"><div class="pov ${p.ovr >= 80 ? 'g' : p.ovr >= 70 ? 's' : ''}">${p.ovr}</div>${sprH(p, c, 30)}<div class="pnm">${esc(p.name)}</div><div class="psb"><span class="tag pos">${p.sub}</span> ${p.age}세</div>${p.inj > 0 ? '<i class="pinj">🩹</i>' : ''}</div>`).join('')}</div>`;
+  } else if (tab === 'rec') {
+    const top = (k, n) => pl.slice().sort((a, b) => b.st[k] - a.st[k]).filter(p => p.st[k] > 0).slice(0, n);
+    const board = (title, ic, arr, f) => `<div class="sec">${ic} ${title}</div><div class="card">${arr.map((p, i) => `<div class="sqr mini" data-act="pl" data-id="${p.id}"><b style="width:18px">${i + 1}</b>${sprH(p, c, 18)}<div class="grow">${esc(p.name)} <span class="dim">${p.sub}</span></div><b>${f(p)}</b></div>`).join('') || '<div class="dim">아직 기록이 없습니다.</div>'}</div>`;
+    const rated = pl.filter(p => p.st.a >= 3).sort((a, b) => b.st.rs / b.st.a - a.st.rs / a.st.a).slice(0, 5);
+    body = board('득점 순위', IC.ball, top('g', 5), p => p.st.g + '골') + board('도움 순위', IC.boot, top('as', 5), p => p.st.as + '도움') + board('평균 평점', IC.star, rated, p => f1(p.st.rs / p.st.a)) + board('출전 경기', '👟', top('a', 5), p => p.st.a + '경기');
+  } else {
+    const rows = hist.slice().reverse().map(h => { const rk = h.table.findIndex(r => r[0] === id) + 1; return `<tr><td>${esc(h.season)}</td><td><b>${rk}위</b>${rk === 1 ? ' 🏆' : ''}</td><td>${h.table[rk - 1][1]}점</td><td>${clubLink(h.champ)}</td></tr>`; }).join('');
+    body = `<div class="sec">시즌별 성적</div>${rows ? `<table class="tb"><tr><th>시즌</th><th>순위</th><th>승점</th><th>우승팀</th></tr>${rows}</table>` : '<div class="dim">아직 지난 시즌 기록이 없습니다. 시즌이 끝나면 쌓입니다.</div>'}`;
+    if (isMine && G.mode === 'mgr' && G.mgr.seasons.length) body += `<div class="sec">감독 기록</div><div class="card">${G.mgr.seasons.slice().reverse().map(s => `<div class="li">${esc(s.season)} · ${esc(s.club)} ${s.rank}위 (목표 ${s.target}위) <span class="tag ${s.ok ? '' : 'warn'}">${s.ok ? '달성' : '미달'}</span></div>`).join('')}</div>`;
+  }
+  return hero + tm + `<div class="crow2"><span class="dim">최근 5경기</span><span class="fds">${frm}</span></div>` + tabs + body;
 }
 function setupView() {
   const n = S.sel.length, est = S.sel.reduce((s,c)=>s+(c==='KOR'?1560:c==='USA'?1250:1380),0) + (S.sel.some(c=>CO[c].slots>0)?300:0);
@@ -919,8 +939,8 @@ function renderMatch() {
 }
 function endMatchUI() {
   if (MV && MV.raf) cancelAnimationFrame(MV.raf);
-  const r = Core.finishMine(); $('#match').classList.remove('on'); lockOrient('portrait'); S.matchOpen = false; MV = null; save();
-  const rt = r.rating ? ` · 평점 ${f1(r.rating)}` : ''; toast(`종료 ${r.res.gh}-${r.res.ga}${rt}`); render();
+  const ctx0 = G0().mm && G0().mm.ctx; G0().wcLast = null; const r = Core.finishMine(); $('#match').classList.remove('on'); lockOrient('portrait'); S.matchOpen = false; MV = null; save();
+  const rt = r.rating ? ` · 평점 ${f1(r.rating)}` : ''; { const wl = G0().wcLast; toast(wl ? `종료 ${r.res.gh}-${r.res.ga} · 승부차기 ${Core.clubOf(wl.w).name} 승` : `종료 ${r.res.gh}-${r.res.ga}${rt}`); } render();
 }
 // ---------- 렌더 ----------
 // ===================== 감독 모드 화면 =====================
@@ -932,6 +952,7 @@ function modeView() {
   return `<div class="top"><div class="ttl">블록 풋볼매니저</div></div><div class="body"><div class="dim">어떤 길로 시작할까요? 나라·리그(월드) 선택은 다음 단계입니다.</div>
   <div class="card lnk modec" data-act="mode" data-id="player"><div><div class="mi">⚽</div><b>선수 육성 모드</b><div class="dim">유스·신인에서 출발해 훈련과 경기 속 선택으로 한 명의 선수를 월드클래스로 키웁니다.</div></div></div>
   <div class="card lnk modec" data-act="mode" data-id="mgr"><div><div class="mi">📋</div><b>감독 모드</b><div class="dim">구단을 맡아 선발·포메이션·역할·팀 지시를 직접 정하고, 이적 시장과 이사회 신임을 관리하며 시즌 목표에 도전합니다. 경기는 직접 관전하거나 요약으로 빠르게 진행할 수 있습니다.</div></div></div>
+  <div class="card lnk modec" data-act="mode" data-id="wc"><div><div class="mi">🌍</div><b>월드컵 모드</b><div class="dim">48개국 중 한 나라의 감독이 되어 조별리그부터 결승까지 한 대회를 치릅니다. 선발·전술·교체를 직접 정하고, 우승에 도전하세요. 월드 생성 없이 바로 시작합니다.</div></div></div>
   ${Object.keys(S.slots || {}).length ? `<div class="sec">저장된 게임 불러오기</div>${slotRows(false)}` : ''}</div>`;
 }
 function mcreateView() {
@@ -947,6 +968,62 @@ function mcreateView() {
   <div class="sec">리그 국가</div><div class="chips w">${S.sel.map(x => `<button class="chip ${c.cc === x ? 'on' : ''}" data-act="cr" data-k="cc" data-id="${x}">${Core.FLAG[x] || ''} ${CO[x].name}</button>`).join('')}</div>
   <div class="sec">부임 구단 <span class="dim">제안 3곳 중 선택</span></div>${cards || '<div class="dim">이 나라에는 1부 구단이 없습니다.</div>'}
   <button class="btn wide" data-act="mstart" ${c.mclub == null ? 'disabled' : ''}>이 구단 감독으로 시작하기</button></div>`;
+}
+function wcselView() {
+  const c = S.cr, W = Core.WCN;
+  const codes = Object.keys(W).sort((a, b) => W[b][2] - W[a][2]); if (!c.wcn) c.wcn = 'KOR';
+  const ch = (key, arr, map) => `<div class="chips w">${arr.map(v => `<button class="chip ${c[key] === v ? 'on' : ''}" data-act="cr" data-k="${key}" data-id="${v}">${map ? map[v] : v}</button>`).join('')}</div>`;
+  const sw = (key, map) => `<div class="chips">${Object.keys(map).map(v => `<button class="sw ${c[key] === v ? 'on' : ''}" data-act="cr" data-k="${key}" data-id="${v}" style="background:#${map[v]}" aria-label="${v}"></button>`).join('')}</div>`;
+  const cards = codes.map((k, i) => `<div class="wcn ${c.wcn === k ? 'on' : ''}" data-act="wcpick" data-id="${k}"><div class="wcf">${(Core.FLAG[k] || W[k][1] || '')}</div><div class="wcnm">${esc(Core.NATK(k).replace(/^\S+\s/, ''))}</div><div class="wcs"><i style="width:${Math.round((W[k][2] - 58) / 28 * 100)}%"></i></div><div class="dim s11">${i < 8 ? '우승 후보' : i < 20 ? '강팀' : i < 34 ? '중위권' : '도전자'} · ${W[k][2]}</div></div>`).join('');
+  return `<div class="top"><div class="ttl">월드컵 모드 <span class="dim">· 2026</span></div></div><div class="body"><div class="card row g8"><span class="spr" style="width:96px;height:204px;background-image:url(${sprite({ skin: c.skin, hair: c.hair, style: c.style }, ['#2B3A55', '#F3F3F3'])})"></span><div class="grow"><div class="dim">감독 이름</div><input id="nm" value="${esc(c.name)}" maxlength="8"><div class="dim" style="margin-top:8px">조 추첨은 시작할 때 자동으로 진행됩니다. 약한 나라일수록 목표가 낮고 이변의 재미가 큽니다.</div></div></div>
+  <div class="sec">피부색</div>${sw('skin', SKIN_C)}<div class="sec">머리 모양</div>${ch('style', Object.keys(STYLE_N), STYLE_N)}<div class="sec">머리 색</div>${sw('hair', HAIR_C)}
+  <div class="sec">맡을 나라 <span class="dim">${esc(Core.NATK(c.wcn))}</span></div><div class="wcgrid">${cards}</div>
+  <button class="btn wide" data-act="wcstart">이 나라 감독으로 월드컵 시작</button><button class="btn sec wide" data-act="modeback">← 모드 다시 고르기</button></div>`;
+}
+const WNAV = [['home', '홈'], ['squad', '선수단'], ['mtac', '전술'], ['wcg', '대진·순위'], ['news', '뉴스']];
+const isW = () => { try { return !!(Core.G && Core.G.wc); } catch (e) { return false; } };
+function wcRow(id, mine, adv, i) {
+  const c = Core.clubOf(id), G = G0(), t = G.comps.find(x => x.id === 'WC').groups.find(g => g.teams.includes(id)).table[id];
+  return `<tr class="${id === mine ? 'hl' : ''}"><td>${i + 1}</td><td>${clubLink(id)}</td><td>${t.p}</td><td>${t.w}-${t.d}-${t.l}</td><td>${t.gf - t.ga >= 0 ? '+' : ''}${t.gf - t.ga}</td><td><b>${t.pts}</b></td></tr>`;
+}
+function wcGroupTable(gi, info) {
+  const g = info.groups[gi], names = 'ABCDEFGHIJKL';
+  return `<div class="sec">${names[gi]}조</div><table class="tb wct"><tr><th>#</th><th>팀</th><th>경기</th><th>승무패</th><th>득실</th><th>승점</th></tr>${g.teams.map((id, i) => wcRow(id, info.mine, i < 2, i)).join('')}</table>`;
+}
+function wcTieRow(t, mine) {
+  const a = Core.clubOf(t.a), b = Core.clubOf(t.b), done = t.w != null;
+  const sc = done ? `<b>${t.sa}:${t.sb}</b>${t.pen ? ' <span class="tag">승부차기</span>' : ''}` : '<span class="dim">vs</span>';
+  return `<div class="tie ${t.a === mine || t.b === mine ? 'hl' : ''}"><div class="${done && t.w === t.a ? 'tw' : ''}">${crest(a, 18)} ${esc(a.name)}</div><div class="tsc">${sc}</div><div class="${done && t.w === t.b ? 'tw' : ''}" style="text-align:right">${esc(b.name)} ${crest(b, 18)}</div></div>`;
+}
+function wcView() {
+  const info = Core.wcInfo(), G = G0(); if (!info) return '';
+  const tabs = [['grp', '조별리그'], ['ko', '토너먼트']]; const tab = S.wct || (info.stage === 'G' ? 'grp' : 'ko');
+  let body = '';
+  if (tab === 'grp') {
+    const mineFirst = [info.gi].concat(info.groups.map((_, i) => i).filter(i => i !== info.gi));
+    body = mineFirst.map(i => wcGroupTable(i, info)).join('');
+  } else {
+    const rounds = info.hist.concat(info.stage === 'END' ? [] : [{ rl: info.rl, ties: info.ties }]);
+    body = rounds.length ? rounds.slice().reverse().map(r => `<div class="sec">${esc(r.rl)}</div><div class="card">${r.ties.map(t => wcTieRow(t, info.mine)).join('')}</div>`).join('') : '<div class="dim">조별리그가 끝나면 32강 대진이 나옵니다.</div>';
+  }
+  return mgrTop() + `<div class="body"><div class="chips">${tabs.map(([k, n]) => `<button class="chip ${tab === k ? 'on' : ''}" data-act="wct" data-id="${k}">${n}</button>`).join('')}</div>${body}</div>`;
+}
+function wcHomeView() {
+  const G = G0(), g = G.mgr, m = Core.me(), c = Core.clubOf(m.club), info = Core.wcInfo(), nf = nextFixture(m.club);
+  const names = 'ABCDEFGHIJKL', over = info.stage === 'END';
+  let status = info.stage === 'G' ? `조별리그 ${names[info.gi]}조` : over ? '대회 종료' : info.rl;
+  const out = info.out;
+  const hero = `<div class="chero" style="background:linear-gradient(135deg,${c.col},${c.col2})"><div class="cshade"></div><div class="crow">${crest(c, 56)}<div><div class="ctn">${esc(c.name)} 대표팀</div><div class="cdn">${esc(status)} · 전력 ${Math.round(c.strength)} (세계 ${g.rank}위권)</div></div></div><div class="cmeta"><span>목표 <b>${esc(g.wcGoal)}</b></span><span>전적 <b>${g.w}승 ${g.d}무 ${g.l}패</b></span></div></div>`;
+  let banner = '';
+  if (over) banner = `<div class="card ${info.champ === m.club ? 'gl' : ''}"><b>${info.champ === m.club ? '🏆 월드컵 우승!' : '대회 종료'}</b><div class="dim">우승: ${esc(Core.clubOf(info.champ).name)} · 내 성적: ${esc(out || '-')}</div><button class="btn wide" data-act="wcnew">새 게임 시작</button></div>`;
+  else if (out) banner = `<div class="card warn"><b>${esc(out)}</b><div class="dim">우리 대표팀의 대회가 끝났습니다. 남은 경기를 진행해 결과를 지켜보세요.</div></div>`;
+  let nx = '';
+  if (G.pendingMine) nx = `<div class="card gl"><b>오늘은 경기일입니다</b><div class="dim">${esc(Core.clubOf(G.pendingMine.h).name)} vs ${esc(Core.clubOf(G.pendingMine.a).name)}</div><button class="btn wide" data-act="mpre">경기 준비 ⚽</button></div>`;
+  else if (nf && !over && !out) { const h = Core.clubOf(nf.h), a = Core.clubOf(nf.a), d = nf.day - G.day, op = nf.h === m.club ? a : h; nx = `<div class="card"><div class="row"><span class="dim">다음 경기 · ${Core.fmtDate(nf.day)} ${d === 0 ? '· 오늘' : '· D-' + d}</span><span class="tag">${esc(nf.label)}</span></div><div class="vs"><div>${crest(h, 30)}<div>${esc(h.name)}</div></div><b>vs</b><div>${crest(a, 30)}<div>${esc(a.name)}</div></div></div><div class="dim">상대 전력 ${Math.round(op.strength)} · 우리 ${Math.round(c.strength)}</div></div>`; }
+  const grp = info.stage === 'G' ? wcGroupTable(info.gi, info) : '';
+  const L = Core.mgrLineup(), inj = L.injured.length ? `<div class="card warn"><b>부상자 ${L.injured.length}명</b><div class="dim">${L.injured.slice(0, 6).map(p => esc(p.name) + '(' + p.inj + '일)').join(' · ')}</div></div>` : '';
+  const news = G.news.filter(n => n.me).slice(0, 5).map(n => `<div class="li"><span class="dim">${Core.fmtDate(n.d).slice(5, 10)}</span> ${esc(n.text)}</div>`).join('') || '<div class="dim">아직 소식이 없습니다.</div>';
+  return mgrTop() + `<div class="body">${hero}${banner}${nx}${grp}${inj}<div class="sec">대표팀 소식</div><div class="card">${news}</div></div>`;
 }
 function mgrTop() {
   const G = G0(), m = Core.me(), c = Core.clubOf(m.club);
@@ -970,8 +1047,8 @@ function mgrSquadView() {
   const sq = Core.mgrSquad(), L = Core.mgrLineup(), xi = new Set(L.slots.map(e => e.p.id)), f = S.sqf || 'ALL';
   const list = sq.filter(p => f === 'ALL' || p.sub === f).sort((a, b) => b.ovr - a.ovr);
   const chips = `<div class="chips">${POSL.map(k => `<button class="chip ${f === k ? 'on' : ''}" data-act="sqf" data-id="${k}">${k === 'ALL' ? '전체' : k}</button>`).join('')}</div>`;
-  const rows = list.map(p => `<div class="card sqr" data-act="pl" data-id="${p.id}"><span class="tag pos">${p.sub}</span><div class="grow"><b>${esc(p.name)}</b>${xi.has(p.id) ? ' <span class="tag">선발</span>' : ''}${p.inj > 0 ? ` <span class="tag warn">부상 ${p.inj}일</span>` : ''}<div class="dim">${p.age}세 · ${Core.NATK(p.nat)} · 계약 ${p.ct ? p.ct.until : '-'} · 가치 ${Core.mgrValue(p)}억</div></div><b class="ovr">${p.ovr}</b><button class="btn sec sm" data-act="msell" data-id="${p.id}">${S.sellArm === p.id ? '확정?' : '매각'}</button></div>`).join('');
-  return mgrTop() + `<div class="body"><div class="row"><b>선수단 ${sq.length}명</b><span class="dim">탭하면 능력치 · 매각은 이적 시장 기간에만</span></div>${chips}${rows || '<div class="dim">선수가 없습니다.</div>'}</div>`;
+  const rows = list.map(p => `<div class="card sqr" data-act="pl" data-id="${p.id}"><span class="tag pos">${p.sub}</span><div class="grow"><b>${esc(p.name)}</b>${xi.has(p.id) ? ' <span class="tag">선발</span>' : ''}${p.inj > 0 ? ` <span class="tag warn">부상 ${p.inj}일</span>` : ''}<div class="dim">${p.age}세 · ${Core.NATK(p.nat)} · 계약 ${p.ct ? p.ct.until : '-'} · 가치 ${Core.mgrValue(p)}억</div></div><b class="ovr">${p.ovr}</b>${isW() ? '' : `<button class="btn sec sm" data-act="msell" data-id="${p.id}">${S.sellArm === p.id ? '확정?' : '매각'}</button>`}</div>`).join('');
+  return mgrTop() + `<div class="body"><div class="row"><b>선수단 ${sq.length}명</b><span class="dim">${isW() ? '탭하면 능력치' : '탭하면 능력치 · 매각은 이적 시장 기간에만'}</span></div>${chips}${rows || '<div class="dim">선수가 없습니다.</div>'}</div>`;
 }
 function mgrTacView() {
   const L = Core.mgrLineup(), t = L.tactic, E = Core.Eng, G = G0();
@@ -998,7 +1075,7 @@ function sackView() {
   ${jobs.map(o => { const cl = Core.clubOf(o.id); return `<div class="card mclub" data-act="mjob" data-id="${o.id}"><div class="row g8">${crest(cl, 30)}<div class="grow"><b>${esc(o.name)}</b><div class="dim">${esc(o.tag)}</div></div><span class="tag">전력 ${o.strength}</span></div><div class="dim">목표: ${esc(o.goal)} · 예산 ${o.cash}억 원</div></div>`; }).join('') || '<div class="dim">제안이 없습니다.</div>'}</div>`;
 }
 function mgrPre() {                                                         // 경기 전 모달
-  const G = G0(), pm = G.pendingMine; if (!pm) return; const m = Core.me(), h = Core.clubOf(pm.h), a = Core.clubOf(pm.a), mine = Core.clubOf(m.club), L = Core.mgrLineup();
+  const G = G0(), pm = G.pendingMine; if (!pm) return; if (pm.ctx.t === 'wc' && pm.ctx.g === undefined && !S.koWarn) { } const m = Core.me(), h = Core.clubOf(pm.h), a = Core.clubOf(pm.a), mine = Core.clubOf(m.club), L = Core.mgrLineup();
   const t = mine.tactic, op = pm.h === m.club ? a : h;
   const rows = L.slots.map(e => `<div class="sqr mini"><span class="tag pos">${e.slot}</span><div class="grow">${esc(e.p.name)} <span class="dim">${esc(roleNm(e.role))}</span></div><b>${e.p.ovr}</b></div>`).join('');
   S.modalKind = 'pre'; S.modal = `<div class="ttl">경기 준비</div><div class="dim">${esc(matchTitleUI(pm.ctx))}</div><div class="vs"><div>${crest(h, 34)}<div>${esc(h.name)}</div></div><b>vs</b><div>${crest(a, 34)}<div>${esc(a.name)}</div></div></div><div class="dim" style="text-align:center">상대 전력 ${Math.round(op.strength)} · 우리 ${Math.round(mine.strength)} · ${esc(t.formation)}</div>
@@ -1035,17 +1112,17 @@ const NAV = [['home','홈'],['me','내 선수'],['ctr','이적'],['league','순�
 function navBadge(id) { try { const m = Core.me(); if (id==='home') return m.meet ? '●' : ''; if (id==='ctr') return (m.offers.length || m.pending || m.renewal) ? '●' : ''; } catch (e) {} return ''; }
 function render() {
   const app = $('#app');
-  if (S.step==='setup' || S.step==='create' || S.step==='mode' || S.step==='mcreate') {
+  if (S.step==='setup' || S.step==='create' || S.step==='mode' || S.step==='mcreate' || S.step==='wcsel') {
     const o0 = document.querySelector('.scr'); const k0 = S.step + '|' + (S.step==='setup' ? (S.sel ? 'x' : '') : '') ; const t0 = (o0 && S._sk === k0) ? o0.scrollTop : 0;
-    app.innerHTML = `<div class="scr">${S.step==='mode' ? modeView() : S.step==='mcreate' ? mcreateView() : S.step==='setup' ? setupView() : creatorView()}</div>`;
+    app.innerHTML = `<div class="scr">${S.step==='mode' ? modeView() : S.step==='mcreate' ? mcreateView() : S.step==='wcsel' ? wcselView() : S.step==='setup' ? setupView() : creatorView()}</div>`;
     const n0 = document.querySelector('.scr'); if (n0 && t0) n0.scrollTop = t0; S._sk = k0; return;
   }
   const oldSc = document.querySelector('.scr'); const keyNow = S.step + '|' + S.tab; const keepTop = (oldSc && S._sk === keyNow) ? oldSc.scrollTop : 0;
   const MG = isM();
-  if (MG && G0().mgr.sacked && !G0().pendingMine) { app.innerHTML = `<div class="scr">${sackView()}</div>`; $('#modal').style.display = S.modal ? 'block' : 'none'; return; }
-  let v; try { v = MG ? (S.tab==='home' ? mgrHomeView() : S.tab==='squad' ? mgrSquadView() : S.tab==='mtac' ? mgrTacView() : S.tab==='mkt' ? mgrMktView() : S.tab==='news' ? newsView() : leagueView()) : S.tab==='home' ? homeView() : S.tab==='news' ? newsView() : S.tab==='league' ? leagueView() : S.tab==='me' ? meView() : contractView(); }
+  if (MG && !isW() && G0().mgr.sacked && !G0().pendingMine) { app.innerHTML = `<div class="scr">${sackView()}</div>`; $('#modal').style.display = S.modal ? 'block' : 'none'; return; }
+  let v; try { v = MG ? (S.tab==='home' ? (isW() ? wcHomeView() : mgrHomeView()) : S.tab==='wcg' ? wcView() : S.tab==='squad' ? mgrSquadView() : S.tab==='mtac' ? mgrTacView() : S.tab==='mkt' ? mgrMktView() : S.tab==='news' ? newsView() : leagueView()) : S.tab==='home' ? homeView() : S.tab==='news' ? newsView() : S.tab==='league' ? leagueView() : S.tab==='me' ? meView() : contractView(); }
   catch (err) { v = `<div class="card"><b>화면 오류</b><div class="dim">${esc(String(err && err.message || err))}</div><div class="dim">이 글자를 화면 캡처해서 알려주세요.</div><button class="btn sec" data-act="tab" data-id="home">홈으로</button></div>`; try { console.error(err); } catch (e2) {} }
-  app.innerHTML = `<div class="scr">${v}</div>${actBar()}<nav>${(MG ? MNAV : NAV).map(([id,n])=>`<button class="nv ${S.tab===id?'on':''}" data-act="tab" data-id="${id}">${n}${(!MG && navBadge(id))?'<i class="bdg"></i>':''}</button>`).join('')}</nav>`;
+  app.innerHTML = `<div class="scr">${v}</div>${actBar()}<nav>${(MG ? (isW() ? WNAV : MNAV) : NAV).map(([id,n])=>`<button class="nv ${S.tab===id?'on':''}" data-act="tab" data-id="${id}">${n}${(!MG && navBadge(id))?'<i class="bdg"></i>':''}</button>`).join('')}</nav>`;
   { const ns = document.querySelector('.scr'); if (ns && keepTop) ns.scrollTop = keepTop; S._sk = keyNow; }
   if (S.tab!=='home') S.trfx = null; else animBars();
   if (S.modalKind==='settings') S.modal = settingsModal();
@@ -1106,7 +1183,11 @@ function makeWorld() {
 }
 document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-act]'); if (!t || S.busy) return; const a = t.dataset.act, id = t.dataset.id;
-  if (a==='mode') { S.mode = id; S.step = 'setup'; render(); return; }
+  if (a==='wcpick') { const nm = $('#nm'); if (nm) S.cr.name = nm.value; S.cr.wcn = id; render(); return; }
+  if (a==='wct') { S.wct = id; render(); return; }
+  if (a==='wcnew') { idbDel('save'); S.step = 'mode'; S.tab = 'home'; render(); return; }
+  if (a==='wcstart') { const nm = $('#nm'); const name = (nm && nm.value.trim()) || '양메시'; S.busy = true; $('#app').innerHTML = loadView(); setTimeout(() => { try { Core.wcStart({ name, nat: S.cr.wcn || 'KOR', look: { skin: S.cr.skin, hair: S.cr.hair, style: S.cr.style } }); S.step = 'game'; S.tab = 'home'; S.wct = null; S.lc = null; S.ld = null; save(); } catch (e) { toast('시작에 실패했습니다: ' + (e && e.message)); S.step = 'wcsel'; } S.busy = false; render(); }, 80); return; }
+  if (a==='mode') { S.mode = id; S.step = id === 'wc' ? 'wcsel' : 'setup'; render(); return; }
   if (a==='modeback') { S.step = 'mode'; render(); return; }
   if (a==='mclub') { const nm = $('#nm'); if (nm) S.cr.name = nm.value; S.cr.mclub = +id; render(); return; }
   if (a==='mstart') { const nm = $('#nm'); const name = (nm && nm.value.trim()) || '양메시'; if (S.cr.mclub == null) return; Core.createMgr({ name, nat: S.cr.nat, club: S.cr.mclub, look: { skin: S.cr.skin, hair: S.cr.hair, style: S.cr.style } }); S.step = 'game'; S.tab = 'home'; S.lc = null; S.ld = null; save(); render(); return; }
@@ -1142,7 +1223,8 @@ document.addEventListener('click', (e) => {
   else if (a==='ofd') S.modal = offerModal(+id);
   else if (a==='nf') S.nf = id; else if (a==='lc') { S.lc = id; S.ld = null; } else if (a==='ld') S.ld = id; else if (a==='lt') S.lt = id; else if (a==='cv') S.cv = id;
   else if (a==='pl') S.modal = profileHTML(G0().players[id]);
-  else if (a==='club') S.modal = clubModal(+id);
+  else if (a==='club') { S.modal = clubModal(+id); }
+  else if (a==='cmt') { S.cmt = id; S.modal = clubModal(S.cmid); }
   else if (a==='close') { S.modal = null; S.modalKind = null; }
   else if (a==='news') { const n = G0().news[+id]; if (n) S.modal = articleOf(n); }
   else if (a==='acc') { S.modal = null; const k = (Core.me().offers[+id]||{}).kind; const r = Core.acceptOffer(+id); save(); toast(k ? (r||'합의') : '계약이 완료되었습니다'); }
