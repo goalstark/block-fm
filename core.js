@@ -257,9 +257,11 @@ function record(T, h, a, gh, ga) {
 function genEvents(club, goals, starters, bench) {
   const ev = [];
   for (let i=0;i<goals;i++) {
-    const sc = wpick(starters.concat(bench.slice(0,3)), SC_W);
-    const asp = rnd() < 0.72 ? wpick(starters, AS_W, sc) : null;
-    ev.push({ min: ri(2,90), side: club.id, sc, as: asp });
+    const pen = rnd() < 0.09;                                                           // 페널티킥 득점(약 9%): 키커는 결정력 높은 선발 선수
+    let sc = wpick(starters.concat(bench.slice(0,3)), SC_W);
+    if (pen) { const f = starters.filter(p => p.sub !== 'GK' && !p.me); if (f.length) { f.sort((a, b) => ((b.a && b.a.FIN) || 50) - ((a.a && a.a.FIN) || 50)); sc = f[Math.min(f.length - 1, rnd() < 0.7 ? 0 : 1)]; } }
+    const asp = !pen && rnd() < 0.72 ? wpick(starters, AS_W, sc) : null;
+    ev.push({ min: ri(2,90), side: club.id, sc, as: asp, pen });
   }
   return ev.sort((a,b)=>a.min-b.min);
 }
@@ -337,12 +339,13 @@ function compResult(comp, ctx, h, a, gh, ga) {
   if (t.legs.filter(Boolean).length < t.n) return;
   let sa = 0, sb = 0; for (const L of t.legs) { if (L.h===t.a) { sa += L.gh; sb += L.ga; } else { sb += L.gh; sa += L.ga; } }
   t.sa = sa; t.sb = sb;
-  if (sa===sb && comp.kind==='wc') {                                      // 월드컵: 90분 무승부 → 연장전(30분) → 승부차기
+  if (sa===sb && comp.kind==='wc' && !ctx.xt) {                                      // 월드컵: 90분 무승부 → 연장전(30분) → 승부차기
     const dA = clubOf(t.a).strength - clubOf(t.b).strength, poi = (l) => { let L = Math.exp(-l), k = 0, p = 1; do { k++; p *= rnd(); } while (p > L); return k - 1; };
     const ea = poi(0.36 * Math.exp(dA * 0.012)), eb = poi(0.36 * Math.exp(-dA * 0.012)); t.et = [ea, eb]; sa += ea; sb += eb; t.sa = sa; t.sb = sb;
   }
+  if (ctx.xt) { const ha = h === t.a; t.et = [ha ? ctx.xt.eh : ctx.xt.ea, ha ? ctx.xt.ea : ctx.xt.eh]; }           // 경기장에서 이미 진행한 연장전(득점은 합산 완료)
   if (sa!==sb) t.w = sa>sb ? t.a : t.b;
-  else { t.pen = true; const pa = clamp(0.5 + (clubOf(t.a).strength - clubOf(t.b).strength)*0.004, 0.3, 0.7); t.w = rnd()<pa ? t.a : t.b; }
+  else { t.pen = true; if (ctx.xt) t.w = ctx.xt.w; else { const pa = clamp(0.5 + (clubOf(t.a).strength - clubOf(t.b).strength)*0.004, 0.3, 0.7); t.w = rnd()<pa ? t.a : t.b; } }
   if (t.pen || t.et) G.wcLast = { a: t.a, b: t.b, w: t.w, sa, sb, pen: !!t.pen, et: t.et || null };
   if (comp.ties.every(x => x.w!==null)) advanceRound(comp);
 }
@@ -926,6 +929,19 @@ function mvpOf(M) {
   if (!cand.length) { const l = (M.stMine || []).filter(p => !p.me); if (l.length) cand.push({ p: pick(l), me: false, mine: true, v: 1 }); }
   cand.sort((a, b) => b.v - a.v);
   return (M.mvp = cand[0] || null);
+}
+// 월드컵 토너먼트 90분 무승부 → 경기장에서 연장전(91~120분) 진행: 연장 득점 생성 + 승부차기 승자 결정
+function wcKO(M) { return !!(M && M.ctx && M.ctx.t === 'wc' && M.ctx.ti !== undefined && M.ctx.g === undefined); }
+function wcExtra(M) {
+  if (M.xt) return M.xt;
+  const dA = M.mine.strength - M.opp.strength, poi = (l) => { let L = Math.exp(-l), k = 0, p = 1; do { k++; p *= rnd(); } while (p > L); return k - 1; };
+  const gm = poi(0.36 * Math.exp(dA * 0.012)), go = poi(0.36 * Math.exp(-dA * 0.012));
+  const mk = (club, n, st) => genEvents(club, n, st, []).map(e => { e.min = ri(91, 119); e.pen = false; return e; }).sort((a, b) => a.min - b.min);
+  const em = mk(M.mine, gm, M.stMine), eo = mk(M.opp, go, M.stOpp);
+  M.evMine.push(...em); M.evOpp.push(...eo);
+  const pm = clamp(0.5 + dA * 0.004, 0.3, 0.7), mineWins = rnd() < pm;
+  M.xt = { gm, go, eh: M.mineHome ? gm : go, ea: M.mineHome ? go : gm, mineWins, w: mineWins ? M.mine.id : M.opp.id };
+  M.ctx.xt = M.xt; return M.xt;
 }
 function prepareMine() {
   const pm = G.pendingMine, m = me();
@@ -1630,5 +1646,5 @@ function mgrReplan(min) {                                                  // �
 }
 
 const NATFLAG = (c) => DD.FLAG[c] || (WCN[c] && WCN[c][1]) || '';
-const API2 = { wcAutoPick, wcSquadCheck, wcSquadSet, mgrK, SP_SLOT, mgrSponsorGen, mgrSponsorSign, mgrPreGen, mgrCerPress, renamePlayer, renameClub, NATFLAG, mgrTrophy, mgrX, STAFF, mgrStaffUp, mgrStaffCost, mgrStaffLv, mgrWage, mgrFanText, mgrPressGen, mgrPressPick, rivalOf, wcStart, wcInfo, wcRank, WCN, Eng, isMgr, mgrWin, createMgr, mgrOffers, mgrJobs, mgrGoal, mgrSquad, mgrLineup, mgrSetXi, mgrSetRole, mgrSetFormation, mgrSetInstr, mgrAutoXi, mgrMarket, mgrBuy, mgrSell, mgrValue, mgrStanding, mgrTakeJob, mgrTalkInfo, mgrTalkPick, mgrSub, mgrReplan, talkInfo, talkPick, posKinds: (sub) => POSK[sub] || POSK.ST, optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
+const API2 = { wcKO, wcExtra, wcAutoPick, wcSquadCheck, wcSquadSet, mgrK, SP_SLOT, mgrSponsorGen, mgrSponsorSign, mgrPreGen, mgrCerPress, renamePlayer, renameClub, NATFLAG, mgrTrophy, mgrX, STAFF, mgrStaffUp, mgrStaffCost, mgrStaffLv, mgrWage, mgrFanText, mgrPressGen, mgrPressPick, rivalOf, wcStart, wcInfo, wcRank, WCN, Eng, isMgr, mgrWin, createMgr, mgrOffers, mgrJobs, mgrGoal, mgrSquad, mgrLineup, mgrSetXi, mgrSetRole, mgrSetFormation, mgrSetInstr, mgrAutoXi, mgrMarket, mgrBuy, mgrSell, mgrValue, mgrStanding, mgrTakeJob, mgrTalkInfo, mgrTalkPick, mgrSub, mgrReplan, talkInfo, talkPick, posKinds: (sub) => POSK[sub] || POSK.ST, optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
 if (typeof module !== 'undefined') module.exports = API2;
