@@ -251,7 +251,13 @@ function pickRole(p, slot, need) {
   return best;
 }
 function buildLineup(squad, tactic, userRoles) {
-  const asg = assignSlots(squad, tactic.formation), need = needVec(tactic);
+  let asg = null;                                                              // 감독 지정 선발(tactic.xi): 포메이션 슬롯 순서의 선수 id
+  if (tactic.xi && FORMATIONS[tactic.formation] && tactic.xi.length === FORMATIONS[tactic.formation].length) {
+    const by = new Map(squad.map((p) => [p.id, p])), ps = tactic.xi.map((id) => by.get(id));
+    if (ps.every(Boolean) && new Set(ps).size === ps.length) asg = FORMATIONS[tactic.formation].map((s, i) => ({ slot: s, player: ps[i] }));
+  }
+  if (!asg) asg = assignSlots(squad, tactic.formation);
+  const need = needVec(tactic); userRoles = userRoles || tactic.roles;
   return asg.map((x, i) => {
     const role = (userRoles && userRoles[i]) || pickRole(x.player, x.slot, need);
     return { p: x.player, slot: x.slot, role, fam: 0.75 + 0.25 * FAM[x.player.sub][x.slot], stam: x.player.cond };

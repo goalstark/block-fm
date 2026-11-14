@@ -358,7 +358,7 @@ function clubModal(id) {
 function setupView() {
   const n = S.sel.length, est = S.sel.reduce((s,c)=>s+(c==='KOR'?1560:c==='USA'?1250:1380),0) + (S.sel.some(c=>CO[c].slots>0)?300:0);
   const cards = Core.CODES.map(c => { const C = CO[c], on = S.sel.includes(c); return `<button class="opt ${on?'on':''}" data-act="sel" data-id="${c}"><b>${on?'✓ ':''}${Core.FLAG[c]||''} ${C.name}</b><span class="dim">${C.l1.name}${C.l2?' · '+C.l2.name:''}</span></button>`; }).join('');
-  return `<div class="top"><div class="ttl">월드 설정</div><div class="dim">${n}/10개국</div></div><div class="body"><div class="dim">진행할 나라를 최대 10개까지 고르세요. 고른 나라의 1부·2부·유스 리그, 컵대회, 승강제가 전부 정밀 시뮬레이션되고, 선택하지 않은 나라는 만들어지지 않습니다.</div><div class="opts">${cards}</div><div class="card"><div class="dim">예상 선수 수 약 ${est.toLocaleString()}명 · 대륙대회(유럽·아시아·아프리카·남미·북중미)는 선택한 나라 팀과 외부 초청팀이 함께 참가합니다. 월드 생성에 몇 초가 걸립니다.</div></div><button class="btn wide" data-act="world" ${n<1?'disabled':''}>이 월드로 시작하기</button>${Object.keys(S.slots||{}).length?`<div class="sec">저장된 게임 불러오기</div>${slotRows(false)}`:''}</div>`;
+  return `<div class="top"><div class="ttl">월드 설정 <span class="dim">${S.mode==='mgr'?'· 감독 모드':'· 선수 육성'}</span></div><div class="dim">${n}/10개국</div></div><div class="body"><div class="dim">진행할 나라를 최대 10개까지 고르세요. 고른 나라의 1부·2부·유스 리그, 컵대회, 승강제가 전부 정밀 시뮬레이션되고, 선택하지 않은 나라는 만들어지지 않습니다.</div><div class="opts">${cards}</div><div class="card"><div class="dim">예상 선수 수 약 ${est.toLocaleString()}명 · 대륙대회(유럽·아시아·아프리카·남미·북중미)는 선택한 나라 팀과 외부 초청팀이 함께 참가합니다. 월드 생성에 몇 초가 걸립니다.</div></div><button class="btn wide" data-act="world" ${n<1?'disabled':''}>이 월드로 시작하기</button><button class="btn sec wide" data-act="modeback">← 모드 다시 고르기</button>${Object.keys(S.slots||{}).length?`<div class="sec">저장된 게임 불러오기</div>${slotRows(false)}`:''}</div>`;
 }
 const NAT_CONT = { EU: 'ENG ESP ITA GER FRA NED POR BEL CRO SRB DEN SUI SCO AUT TUR POL SWE NOR CZE GRE UKR RUS ROU HUN IRL WAL NIR FIN SVK SVN BIH ALB MKD MNE BUL ISL', AS: 'KOR JPN CHN AUS IRN SAU QAT VNM THA UZB IRQ UAE KSA IND IDN MAS', AF: 'EGY MAR RSA SEN NGA GHA CIV ALG TUN CMR MLI', SA: 'BRA ARG COL URU CHI PAR ECU PER VEN BOL', NA: 'USA MEX CAN CRC JAM HON PAN' };
 function natToCc(nat) {                                                   // 국적 → 가장 가까운 선택 리그(같은 나라 > 같은 대륙에서 가장 강한 리그)
@@ -780,7 +780,7 @@ function bringMeTop() { const e = document.querySelector('#pitch .dot.me'); if (
 function fxShow(html, cls, ms, pause) {
   const el = $('#fx'); if (!el) return; el.innerHTML = `<div class="fxb ${cls}">${html}</div>`;
   if (pause) { MV.paused = true; }
-  if (pause) { clearTimeout(MV.fxP); MV.fxP = setTimeout(() => { if (MV && !MV.momentOpen && !MV.pg && !MV.lead && !MV.talk) MV.paused = false; }, ms); }   // 일시정지 해제는 배너가 덮어써져도 반드시 실행
+  if (pause) { clearTimeout(MV.fxP); MV.fxP = setTimeout(() => { if (MV && !MV.momentOpen && !MV.pg && !MV.lead && !MV.talk && !MV.mgrPanel) MV.paused = false; }, ms); }   // 일시정지 해제는 배너가 덮어써져도 반드시 실행
   clearTimeout(MV.fxT); MV.fxT = setTimeout(() => { const e = $('#fx'); if (e) e.innerHTML = ''; }, ms);
 }
 function startSp(M, type, ms) {                                                  // 세트피스 연출: 코너킥·프리킥 위치로 이동 → 박스 안 배치 → 킥
@@ -840,6 +840,7 @@ function placeMe(M) {
 }
 function startMatch() {
   if (S.matchOpen) return;
+  if (isM() && !S.mgrGo) { if (G0().pendingMine) { mgrPre(); render(); } return; } S.mgrGo = false;
   const M = Core.prepareMine(); if (!M) return;
   const PT = pickPitch(M);
   MV = { min: 0, timer: null, paused: false, log: [], over: false, momentOpen: null, speed: spdMs(), ball: { x: 50, y: 32 }, poss: 'm', holder: null, pos: { m: [], o: [] }, ballFree: false, red: {}, pitch: PT, kit: pickKits(M, PT), t: 0, rt: 0, kick: 0, act: null, dec: 1, els: null, raf: 0, last: 0, run: {}, tgt: { m: [], o: [] }, mst: sortSt(M.stMine), ost: sortSt(M.stOpp), fxT: null, st: { m: { pt: 0, sh: 0, sot: 0, xg: 0, pa: 0, pm: 0 }, o: { pt: 0, sh: 0, sot: 0, xg: 0, pa: 0, pm: 0 } }, heat: new Array(60).fill(0), my: { pa: 0, pm: 0 } };
@@ -866,13 +867,14 @@ function tick() {
   if (!MV.htDone && MV.min >= 45 && MV.min < 90 && !MV.pg && !MV.momentOpen && !MV.fast && !MV.skipping) {         // 전반 종료 → 잠깐 멈춤 → 후반 킥오프
     MV.htDone = true; const [hh, ha] = scoreAt(45); MV.log.unshift({ min: 45, ic: '⏸️', cls: '', t: `<b>전반 종료</b> ${hh} : ${ha}` });
     MV.regroup = 2.2; fxShow(`<div class="endt">전반 종료</div><div class="ends">${hh} : ${ha}</div>`, 'end', 2200, true);
-    if (M.role === 'start' || M.role === 'sub') MV.talk = Object.assign(Core.talkInfo(M.mineHome ? hh - ha : ha - hh), { }); 
+    if (M.role === 'mgr') { MV.talkDiff = M.mineHome ? hh - ha : ha - hh; MV.talk = Core.mgrTalkInfo(MV.talkDiff); }
+    else if (M.role === 'start' || M.role === 'sub') MV.talk = Object.assign(Core.talkInfo(M.mineHome ? hh - ha : ha - hh), { }); 
     else setTimeout(startSecond, 2300); }
   if (MV.min >= 90 && !MV.pg) { MV.min = 90; clearInterval(MV.timer); MV.over = true; finishLog(M); }
   movePitch(); renderMatch();
 }
 function skipMatch() {
-  if (MV.lead) { const M0 = G0().mm; clearInterval(MV.timer); if (MV.talk) { Core.talkPick('follow'); MV.talk = null; MV.paused = false; MV.goalRes = 'o'; }
+  if (MV.lead) { const M0 = G0().mm; clearInterval(MV.timer); if (MV.talk) { if (G0().mm && G0().mm.role === 'mgr') Core.mgrTalkPick('calm', 0); else Core.talkPick('follow'); MV.talk = null; MV.paused = false; MV.goalRes = 'o'; }
   MV.skipping = true; MV.sp = null; MV.cele = null; MV.regroup = 0; flushPg(); MV.timer = setInterval(tick, 40); endLead(M0); return; }
   clearInterval(MV.timer); const M = G0().mm; if (!M) return; MV.skipping = true; flushPg(); MV.paused = false;
   while (MV.min < 90) { MV.min++; emitAt(M, MV.min, false); const mo = M.moments[M.mi];
@@ -883,7 +885,7 @@ function skipMatch() {
 
 const lvl3 = (p) => p >= 0.62 ? ['높음', 'hi'] : p >= 0.4 ? ['보통', 'mid'] : ['낮음', 'lo'];
 function startSecond() { if (!MV || MV.over || !G0().mm) return; MV.talk = null; MV.paused = false; MV.regroup = 0; MV.goalRes = 'o'; MV.log.unshift({ min: 46, ic: '▶️', cls: '', t: '<b>후반 시작</b>' }); fxShow('<div class="endt" style="font-size:26px">후반 시작</div>', 'end', 1100, false); renderMatch(); }
-function mtabs() { const T = [['flow', '경기 흐름'], ['stat', '통계'], ['tac', '전술'], ['me', '내 평점']]; return `<div class="mtabs">${T.map(([k, n]) => `<button class="mtb ${(S.mtab || 'flow') === k ? 'on' : ''}" data-act="mtab" data-id="${k}">${n}</button>`).join('')}</div>`; }
+function mtabs() { const T = [['flow', '경기 흐름'], ['stat', '통계'], ['tac', '전술']].concat(isM() ? [] : [['me', '내 평점']]); return `<div class="mtabs">${T.map(([k, n]) => `<button class="mtb ${(S.mtab || 'flow') === k ? 'on' : ''}" data-act="mtab" data-id="${k}">${n}</button>`).join('')}</div>`; }
 function statView(M) {
   const A = MV.st.m, B = MV.st.o, tot = (A.pt + B.pt) || 1, pa = Math.round(A.pt / tot * 100), pct = (st) => st.pa ? Math.round((st.pa - st.pm) / st.pa * 100) : 0;
   const row = (n, a, b, fa, fb) => { const t = (+a + +b) || 1; return `<div class="strow"><b>${fa || a}</b><div class="stm"><span>${n}</span><i><u style="width:${a / t * 100}%"></u><u class="o" style="width:${b / t * 100}%"></u></i></div><b>${fb || b}</b></div>`; };
@@ -894,7 +896,7 @@ const INSTR_L = { width: ['폭', ['좁게', '보통', '넓게']], build: ['빌�
 function tacView(M) {
   const card = (c, st) => { const t = c.tactic || {}; return `<div class="tacc"><b>${esc(c.name)}</b><span class="tf">${esc(t.formation || '4-4-2')}</span><div class="tacg">${Object.keys(INSTR_L).map(k => `<i><em>${INSTR_L[k][0]}</em>${INSTR_L[k][1][t[k] == null ? 1 : t[k]]}</i>`).join('')}</div></div>`; };
   const me = Core.me(), role = { GK: '골키퍼', CB: '센터백', FB: '풀백', DM: '수비형 미드필더', CM: '중앙 미드필더', AM: '공격형 미드필더', W: '윙어', ST: '스트라이커' }[me.sub] || me.sub;
-  return `<div class="sec">팀 전술 (감독 결정)</div>${card(M.mine)}<div class="sec">상대 전술</div>${card(M.opp)}<div class="sec">내 역할</div><div class="dim">${esc(role)} · 선호 플레이는 장면 선택지에서 보너스를 받습니다.</div>`;
+  return `<div class="sec">팀 전술 (감독 결정)</div>${card(M.mine)}<div class="sec">상대 전술</div>${card(M.opp)}${isM() ? '' : `<div class="sec">내 역할</div><div class="dim">${esc(role)} · 선호 플레이는 장면 선택지에서 보너스를 받습니다.</div>`}`;
 }
 function matchMeView(M) {
   if (M.role !== 'start' && M.role !== 'sub') return `<div class="sec">내 평점</div><div class="dim">이번 경기는 출전하지 않습니다.</div>`;
@@ -908,11 +910,12 @@ function renderMatch() {
   if (MV.talk) dec = `<div class="card gl"><div class="row g8"><b style="font-size:13.5px;line-height:1.25">감독: “${esc(MV.talk.text)}”</b></div><div class="opts3">${MV.talk.opts.map(o => `<button class="opt" data-act="talk" data-id="${o.id}"><b>${o.t}</b></button>`).join('')}</div></div>`;
   else if (MV.momentOpen) { const mo = MV.momentOpen; const opts = Core.momentOptions(mo); dec = `<div class="card gl"><div class="row g8" style="align-items:flex-end"><span class="mebub">${sprH(Core.me(), MV.kc.m, 28, 'idle')}</span><b>${Core.momentText(mo.kind)}</b></div><div class="dim">${MV.min}분 · 어떻게 할까?</div><div class="${opts.length===3?'opts3':'optsn'}">${opts.map(o => { const lv = lvl3(o.shown); return `<button class="opt ${o.fav?'fav':''}" data-act="mv" data-id="${o.id}"><b>${o.fav?'★ ':''}${o.n}</b><span class="lv ${lv[1]}">${lv[0]}</span><span class="pbar sm"><i class="${lv[1]}" style="width:${Math.round(o.shown*100)}%"></i></span><span class="dim s11 pc ${lv[1]}">성공 ${Math.round(o.shown*100)}%</span></button>`; }).join('')}</div></div>`; }
   else if (MV.over) { const st = M.role==='start'?'선발':M.role==='sub'?'교체':M.role==='inj'?'부상 결장':'벤치(결장)'; const mv = M.mvp || Core.mvpOf(M), [fh, fa] = scoreAt(90), won = (M.mineHome ? fh - fa : fa - fh), res = won > 0 ? '승리' : won < 0 ? '패배' : '무승부';
-    dec = `<div class="card mom"><div class="momt">경기 종료 · ${res}</div><div class="momsc">${fh} : ${fa}</div>${mv ? `<div class="momch">${sprH(mv.p, MV.kc[mv.mine ? 'm' : 'o'], 64, mv.me ? 'jump' : 'idle')}${mv.me ? '<i class="crown">' + IC.crown + '</i>' : ''}</div><div class="momn ${mv.me ? 'me' : ''}">${IC.crown} MVP ${esc(mv.p.name)}${mv.me ? ' (나!)' : ''}</div>` : ''}<div class="dim">내 역할: ${st}</div><div class="row g8 wrapx" style="justify-content:center">${M.myGoals ? `<span class="tag">${IC.ball} ${M.myGoals}골</span>` : ''}${M.myAssists ? `<span class="tag">${IC.boot} ${M.myAssists}도움</span>` : ''}</div><button class="btn wide" data-act="mend">결과 확인</button></div>`; }
-  const roleTxt = M.role==='start' ? '선발 출전' : M.role==='sub' ? (MV && MV.min >= M.from ? `${M.from}분 교체 투입` : `벤치 → ${M.from}분 투입 예정`) : M.role==='inj' ? '부상으로 결장' : '벤치 (출전 명단 제외)';
+    dec = `<div class="card mom"><div class="momt">경기 종료 · ${res}</div><div class="momsc">${fh} : ${fa}</div>${mv ? `<div class="momch">${sprH(mv.p, MV.kc[mv.mine ? 'm' : 'o'], 64, mv.me ? 'jump' : 'idle')}${mv.me ? '<i class="crown">' + IC.crown + '</i>' : ''}</div><div class="momn ${mv.me ? 'me' : ''}">${IC.crown} MVP ${esc(mv.p.name)}${mv.me ? ' (나!)' : ''}</div>` : ''}<div class="dim">${M.role==='mgr' ? '감독 모드' : '내 역할: ' + st}</div><div class="row g8 wrapx" style="justify-content:center">${M.myGoals ? `<span class="tag">${IC.ball} ${M.myGoals}골</span>` : ''}${M.myAssists ? `<span class="tag">${IC.boot} ${M.myAssists}도움</span>` : ''}</div><button class="btn wide" data-act="mend">결과 확인</button></div>`; }
+  const roleTxt = M.role==='mgr' ? '감독석' : M.role==='start' ? '선발 출전' : M.role==='sub' ? (MV && MV.min >= M.from ? `${M.from}분 교체 투입` : `벤치 → ${M.from}분 투입 예정`) : M.role==='inj' ? '부상으로 결장' : '벤치 (출전 명단 제외)';
   $('#mh').innerHTML = `<div class="dim">${esc(M.title)} · ${Core.fmtDate(G.day)}</div><div class="sc"><div>${crest(M.h,18)} ${esc(M.h.name)}</div><b>${sh} : ${sa}</b><div>${esc(M.a.name)} ${crest(M.a,18)}</div></div><div class="dim">${MV.min}' · ${roleTxt}</div><div class="bar"><i style="width:${MV.min/90*100}%"></i></div>`;
   $('#mb').className = 'mb' + (MV.momentOpen || MV.talk ? ' hasdec' : MV.over ? ' isover' : ''); $('#mb').innerHTML = `${MV.momentOpen || MV.talk ? dec : mtabs() + ((S.mtab || 'flow') === 'flow' || !MV.over ? dec : '<button class="btn wide" data-act="mend" style="margin:4px 0">결과 확인</button>')}${MV.momentOpen || MV.talk || (S.mtab || 'flow') === 'flow' ? `<div class="sec">경기 흐름</div>${MV.log.map(x => `<div class="li ev ${x.cls||''}"><span class="mn">${x.min}'</span><span class="ico">${x.ic}</span><span class="et">${x.t}</span></div>`).join('') || '<div class="dim">킥오프!</div>'}` : S.mtab === 'stat' ? statView(M) : S.mtab === 'tac' ? tacView(M) : matchMeView(M)}`;
-  $('#mf').innerHTML = MV.over ? '' : `<div class="spd">${SPD.map(v => `<button class="chip ${(S.spd||1)===v?'on':''}" data-act="mspd" data-id="${v}">${v}배속</button>`).join('')}${MV.momentOpen ? '' : '<button class="btn sec" data-act="mskip">끝까지 자동 진행</button>'}</div>`;
+  $('#mf').innerHTML = MV.over ? '' : `<div class="spd">${SPD.map(v => `<button class="chip ${(S.spd||1)===v?'on':''}" data-act="mspd" data-id="${v}">${v}배속</button>`).join('')}${MV.momentOpen || MV.mgrPanel ? '' : (M.role==='mgr' ? '<button class="btn sec" data-act="mpopen">전술·교체</button>' : '') + '<button class="btn sec" data-act="mskip">끝까지 자동 진행</button>'}</div>`;
+  if (MV.mgrPanel) { $('#mb').className = 'mb'; $('#mb').innerHTML = mgrPanelHTML(M); $('#mf').innerHTML = '<button class="btn wide" data-act="mpclose">경기 재개 ▶</button>'; }
 }
 function endMatchUI() {
   if (MV && MV.raf) cancelAnimationFrame(MV.raf);
@@ -920,19 +923,129 @@ function endMatchUI() {
   const rt = r.rating ? ` · 평점 ${f1(r.rating)}` : ''; toast(`종료 ${r.res.gh}-${r.res.ga}${rt}`); render();
 }
 // ---------- 렌더 ----------
+// ===================== 감독 모드 화면 =====================
+const isM = () => { try { return !!(Core.G && Core.G.mode === 'mgr'); } catch (e) { return false; } };
+const MNAV = [['home', '홈'], ['squad', '선수단'], ['mtac', '전술'], ['mkt', '이적'], ['league', '순위']];
+const POSL = ['ALL', 'GK', 'CB', 'FB', 'DM', 'CM', 'AM', 'W', 'ST'];
+const roleNm = (id) => { const R = Core.Eng.ROLES[id]; return R ? R.name : (id || '-'); };
+function modeView() {
+  return `<div class="top"><div class="ttl">블록 풋볼매니저</div></div><div class="body"><div class="dim">어떤 길로 시작할까요? 나라·리그(월드) 선택은 다음 단계입니다.</div>
+  <div class="card lnk modec" data-act="mode" data-id="player"><div><div class="mi">⚽</div><b>선수 육성 모드</b><div class="dim">유스·신인에서 출발해 훈련과 경기 속 선택으로 한 명의 선수를 월드클래스로 키웁니다.</div></div></div>
+  <div class="card lnk modec" data-act="mode" data-id="mgr"><div><div class="mi">📋</div><b>감독 모드</b><div class="dim">구단을 맡아 선발·포메이션·역할·팀 지시를 직접 정하고, 이적 시장과 이사회 신임을 관리하며 시즌 목표에 도전합니다. 경기는 직접 관전하거나 요약으로 빠르게 진행할 수 있습니다.</div></div></div>
+  ${Object.keys(S.slots || {}).length ? `<div class="sec">저장된 게임 불러오기</div>${slotRows(false)}` : ''}</div>`;
+}
+function mcreateView() {
+  const c = S.cr, G = G0(); if (!S.sel.includes(c.cc)) c.cc = S.sel[0];
+  const offers = Core.mgrOffers(c.cc); if (!offers.some(o => o.id === c.mclub)) c.mclub = offers.length ? (offers[1] || offers[0]).id : null;
+  const ch = (key, arr, map) => `<div class="chips w">${arr.map(v => `<button class="chip ${c[key] === v ? 'on' : ''}" data-act="cr" data-k="${key}" data-id="${v}">${map ? map[v] : v}</button>`).join('')}</div>`;
+  const sw = (key, map) => `<div class="chips">${Object.keys(map).map(v => `<button class="sw ${c[key] === v ? 'on' : ''}" data-act="cr" data-k="${key}" data-id="${v}" style="background:#${map[v]}" aria-label="${v}"></button>`).join('')}</div>`;
+  const natOpts = ['KOR'].concat(Core.NAT_CODES.filter(x => x !== 'KOR')).map(n => `<option value="${n}" ${c.nat === n ? 'selected' : ''}>${Core.NATK(n)}</option>`).join('');
+  const cards = offers.map(o => { const cl = Core.clubOf(o.id); return `<div class="card mclub ${c.mclub === o.id ? 'on' : ''}" data-act="mclub" data-id="${o.id}"><div class="row g8">${crest(cl, 30)}<div class="grow"><b>${esc(o.name)}</b><div class="dim">${esc(o.tag)}</div></div><span class="tag">전력 ${o.strength}</span></div><div class="dim">목표: ${esc(o.goal)} · 예산 ${o.cash}억 원 · 현재 전력 ${o.rank}/${o.n}위</div></div>`; }).join('');
+  return `<div class="top"><div class="ttl">감독 만들기</div><div class="dim">${Core.fmtDate(G.day)} 부임</div></div><div class="body"><div class="card row g8"><span class="spr" style="width:96px;height:204px;background-image:url(${sprite({ skin: c.skin, hair: c.hair, style: c.style }, ['#2B3A55', '#F3F3F3'])})"></span><div class="grow"><div class="dim">이름</div><input id="nm" value="${esc(c.name)}" maxlength="8"><div class="dim" style="margin-top:8px">감독으로 부임합니다. 선수단은 구단이 가진 선수들입니다.</div></div></div>
+  <div class="sec">국적</div><select id="natsel">${natOpts}</select>
+  <div class="sec">피부색</div>${sw('skin', SKIN_C)}<div class="sec">머리 모양</div>${ch('style', Object.keys(STYLE_N), STYLE_N)}<div class="sec">머리 색</div>${sw('hair', HAIR_C)}
+  <div class="sec">리그 국가</div><div class="chips w">${S.sel.map(x => `<button class="chip ${c.cc === x ? 'on' : ''}" data-act="cr" data-k="cc" data-id="${x}">${Core.FLAG[x] || ''} ${CO[x].name}</button>`).join('')}</div>
+  <div class="sec">부임 구단 <span class="dim">제안 3곳 중 선택</span></div>${cards || '<div class="dim">이 나라에는 1부 구단이 없습니다.</div>'}
+  <button class="btn wide" data-act="mstart" ${c.mclub == null ? 'disabled' : ''}>이 구단 감독으로 시작하기</button></div>`;
+}
+function mgrTop() {
+  const G = G0(), m = Core.me(), c = Core.clubOf(m.club);
+  return `<div class="top"><div><div class="dim">${Core.fmtDate(G.day)}</div><div class="ttl">${esc(G.mgr.name)} 감독 <span class="dim">${Core.NATK(m.nat)}</span></div></div><div class="row g8"><div class="pill" data-act="club" data-id="${m.club}">${crest(c, 18)}${esc(c.name)} ›</div><button class="gear" data-act="settings" aria-label="설정">⚙</button></div></div>`;
+}
+function mgrHomeView() {
+  const G = G0(), g = G.mgr, m = Core.me(), c = Core.clubOf(m.club), st = Core.mgrStanding(), nf = nextFixture(m.club), L = Core.mgrLineup(), sq = Core.mgrSquad();
+  const bd = Math.round(g.board), bc = bd >= 65 ? '#C6F36B' : bd >= 35 ? '#FFD46B' : '#FF7A6B', bt = bd < 25 ? '⚠ 경질 위험' : bd >= 75 ? '매우 신뢰' : bd >= 50 ? '안정' : '불안';
+  const ontrack = st ? st.rank <= g.target : true;
+  const board = `<div class="card"><div class="row"><b>이사회 신임</b><span class="tag ${bd < 35 ? 'warn' : ''}">${bt}</span></div><div class="mbar"><i style="width:${bd}%;background:${bc}"></i></div><div class="row"><span class="dim">시즌 목표</span><b>${g.target}위 이내</b></div><div class="row"><span class="dim">현재 순위</span><b style="color:${ontrack ? '#C6F36B' : '#FFB27A'}">${st ? st.rank + '위 / ' + st.n + '팀 · ' + st.pts + '점 (' + st.p + '경기)' : '-'}</b></div></div>`;
+  let nx = '';
+  if (G.pendingMine) nx = `<div class="card gl"><b>오늘은 경기일입니다</b><div class="dim">${esc(Core.clubOf(G.pendingMine.h).name)} vs ${esc(Core.clubOf(G.pendingMine.a).name)}</div><button class="btn wide" data-act="mpre">경기 준비 ⚽</button></div>`;
+  else if (nf) { const h = Core.clubOf(nf.h), a = Core.clubOf(nf.a), d = nf.day - G.day, op = nf.h === m.club ? a : h; nx = `<div class="card"><div class="row"><span class="dim">다음 경기 · ${Core.fmtDate(nf.day)} ${d === 0 ? '· 오늘' : '· D-' + d}</span><span class="tag">${esc(nf.label)}</span></div><div class="vs"><div>${crest(h, 30)}<div>${esc(h.name)}</div></div><b>vs</b><div>${crest(a, 30)}<div>${esc(a.name)}</div></div></div><div class="dim">상대 전력 ${Math.round(op.strength)} · 우리 ${Math.round(c.strength)}</div></div>`; }
+  const inj = L.injured.length ? `<div class="card warn"><b>부상자 ${L.injured.length}명</b><div class="dim">${L.injured.slice(0, 6).map(p => esc(p.name) + '(' + p.inj + '일)').join(' · ')}</div></div>` : '';
+  const news = G.news.filter(n => n.me).slice(0, 5).map(n => `<div class="li"><span class="dim">${Core.fmtDate(n.d).slice(5, 10)}</span> ${esc(n.text)}</div>`).join('') || '<div class="dim">아직 소식이 없습니다.</div>';
+  const hist = g.seasons.length ? `<div class="sec">지난 시즌</div><div class="card">${g.seasons.slice(-5).reverse().map(s => `<div class="li">${esc(s.season)} · ${esc(s.club)} ${s.rank}위 <span class="tag ${s.ok ? '' : 'warn'}">${s.ok ? '목표 달성' : '미달'}</span></div>`).join('')}</div>` : '';
+  return mgrTop() + `<div class="body">${board}${nx}<div class="tiles">${tile('예산', g.cash + '억', '이적 자금')}${tile('전적', g.w + '-' + g.d + '-' + g.l, '승-무-패')}${tile('선수단', sq.length + '명', '16~30')}${tile('전력', Math.round(c.strength), '1부 평균 비교')}</div>${inj}
+  <div class="sec">구단 소식 <span class="dim" data-act="tab" data-id="news" style="float:right">전체 ›</span></div><div class="card">${news}</div>${hist}</div>`;
+}
+function mgrSquadView() {
+  const sq = Core.mgrSquad(), L = Core.mgrLineup(), xi = new Set(L.slots.map(e => e.p.id)), f = S.sqf || 'ALL';
+  const list = sq.filter(p => f === 'ALL' || p.sub === f).sort((a, b) => b.ovr - a.ovr);
+  const chips = `<div class="chips">${POSL.map(k => `<button class="chip ${f === k ? 'on' : ''}" data-act="sqf" data-id="${k}">${k === 'ALL' ? '전체' : k}</button>`).join('')}</div>`;
+  const rows = list.map(p => `<div class="card sqr" data-act="pl" data-id="${p.id}"><span class="tag pos">${p.sub}</span><div class="grow"><b>${esc(p.name)}</b>${xi.has(p.id) ? ' <span class="tag">선발</span>' : ''}${p.inj > 0 ? ` <span class="tag warn">부상 ${p.inj}일</span>` : ''}<div class="dim">${p.age}세 · ${Core.NATK(p.nat)} · 계약 ${p.ct ? p.ct.until : '-'} · 가치 ${Core.mgrValue(p)}억</div></div><b class="ovr">${p.ovr}</b><button class="btn sec sm" data-act="msell" data-id="${p.id}">${S.sellArm === p.id ? '확정?' : '매각'}</button></div>`).join('');
+  return mgrTop() + `<div class="body"><div class="row"><b>선수단 ${sq.length}명</b><span class="dim">탭하면 능력치 · 매각은 이적 시장 기간에만</span></div>${chips}${rows || '<div class="dim">선수가 없습니다.</div>'}</div>`;
+}
+function mgrTacView() {
+  const L = Core.mgrLineup(), t = L.tactic, E = Core.Eng, G = G0();
+  const forms = `<div class="chips w">${E.FORM_IDS.map(f => `<button class="chip ${t.formation === f ? 'on' : ''}" data-act="mform" data-id="${f}">${f}</button>`).join('')}</div>`;
+  const ins = Object.keys(INSTR_L).map(k => `<div class="inrow"><span class="dim">${INSTR_L[k][0]}</span><div class="seg">${INSTR_L[k][1].map((n, v) => `<button class="${(t[k] == null ? 1 : t[k]) === v ? 'on' : ''}" data-act="minstr" data-k="${k}" data-id="${v}">${n}</button>`).join('')}</div></div>`).join('');
+  const slots = L.slots.map((e, i) => { const rs = (E.SLOT_ROLES[e.slot] || []).map(id => `<option value="${id}" ${e.role === id ? 'selected' : ''}>${esc(roleNm(id))}</option>`).join('');
+    return `<div class="card slotr ${S.msel === i ? 'on' : ''}"><span class="tag pos">${e.slot}</span><div class="grow" data-act="mslot" data-id="${i}"><b>${esc(e.p.name)}</b> <span class="dim">${e.p.sub} · ${e.p.ovr}${e.fam < 0.97 ? ' · <i style="color:#FFB27A;font-style:normal">낯선 포지션</i>' : ''}</span></div><select class="rsel" data-slot="${i}">${rs}</select></div>`; }).join('');
+  let pick = '';
+  if (S.msel != null && L.slots[S.msel]) { const sl = L.slots[S.msel], cand = L.bench.concat(L.slots.filter((e, i) => i !== S.msel).map(e => e.p)).sort((a, b) => ((b.sub === sl.slot) - (a.sub === sl.slot)) || (b.ovr - a.ovr));
+    pick = `<div class="card gl"><b>${esc(sl.slot)} 자리에 넣을 선수</b><div class="dim">같은 포지션이 위에 나옵니다. 이미 선발인 선수를 고르면 서로 자리를 바꿉니다.</div>${cand.slice(0, 18).map(p => `<div class="sqr mini" data-act="mpick" data-id="${p.id}"><span class="tag pos">${p.sub}</span><div class="grow">${esc(p.name)}${L.slots.some(e => e.p.id === p.id) ? ' <span class="dim">(선발)</span>' : ''}</div><b>${p.ovr}</b></div>`).join('')}</div>`; }
+  const bench = L.bench.slice(0, 10).map(p => `<div class="sqr mini" data-act="pl" data-id="${p.id}"><span class="tag pos">${p.sub}</span><div class="grow">${esc(p.name)}</div><b>${p.ovr}</b></div>`).join('');
+  return mgrTop() + `<div class="body"><div class="sec">포메이션</div>${forms}<div class="sec">팀 지시</div><div class="card">${ins}</div><div class="row"><div class="sec" style="margin:0">선발 11명</div><button class="btn sec sm" data-act="mauto">${L.custom ? '자동 선발로' : '자동 선발 사용 중'}</button></div><div class="dim">선수 이름을 탭하면 교체, 오른쪽에서 역할을 고릅니다.</div>${slots}${pick}<div class="sec">벤치 후보 <span class="dim">상위 ${Math.min(10, L.bench.length)}명</span></div><div class="card">${bench || '<div class="dim">후보가 없습니다.</div>'}</div></div>`;
+}
+function mgrMktView() {
+  const g = G0().mgr, w = Core.mgrWin(), f = S.mkf || 'ALL';
+  const list = Core.mgrMarket(f).slice(0, 40);
+  const chips = `<div class="chips">${POSL.map(k => `<button class="chip ${f === k ? 'on' : ''}" data-act="mkf" data-id="${k}">${k === 'ALL' ? '전체' : k}</button>`).join('')}</div>`;
+  const rows = list.map(o => `<div class="card sqr" data-act="pl" data-id="${o.p.id}"><span class="tag pos">${o.p.sub}</span><div class="grow"><b>${esc(o.p.name)}</b><div class="dim">${o.p.age}세 · ${esc(o.club)} · 계약 ${o.p.ct ? o.p.ct.until : '-'}</div></div><b class="ovr">${o.p.ovr}</b><button class="btn sm ${o.price > g.cash ? 'sec' : ''}" data-act="mbuy" data-id="${o.p.id}">${o.price}억</button></div>`).join('');
+  return mgrTop() + `<div class="body"><div class="card"><div class="row"><b>이적 자금 ${g.cash}억 원</b><span class="tag ${w.open ? '' : 'warn'}">${w.open ? '시장 열림' : w.days + '일 뒤 개장'}</span></div><div class="dim">같은 리그 1부 구단 선수를 영입합니다. 선수단은 16~30명을 유지해야 합니다. 가치는 종합·나이로 정해집니다.</div></div>${chips}${rows || '<div class="dim">해당 포지션 선수가 없습니다.</div>'}</div>`;
+}
+function sackView() {
+  const G = G0(), g = G.mgr, c = Core.clubOf(Core.me().club), jobs = Core.mgrJobs();
+  return `<div class="top"><div class="ttl">경질</div></div><div class="body"><div class="card warn"><b>${esc(c.name)} 이사회가 ${esc(g.name)} 감독과 결별을 발표했습니다</b><div class="dim">성적 부진으로 이사회 신임을 잃었습니다. 다른 구단의 제안 중 하나를 골라 새로 시작하세요.</div></div>
+  ${jobs.map(o => { const cl = Core.clubOf(o.id); return `<div class="card mclub" data-act="mjob" data-id="${o.id}"><div class="row g8">${crest(cl, 30)}<div class="grow"><b>${esc(o.name)}</b><div class="dim">${esc(o.tag)}</div></div><span class="tag">전력 ${o.strength}</span></div><div class="dim">목표: ${esc(o.goal)} · 예산 ${o.cash}억 원</div></div>`; }).join('') || '<div class="dim">제안이 없습니다.</div>'}</div>`;
+}
+function mgrPre() {                                                         // 경기 전 모달
+  const G = G0(), pm = G.pendingMine; if (!pm) return; const m = Core.me(), h = Core.clubOf(pm.h), a = Core.clubOf(pm.a), mine = Core.clubOf(m.club), L = Core.mgrLineup();
+  const t = mine.tactic, op = pm.h === m.club ? a : h;
+  const rows = L.slots.map(e => `<div class="sqr mini"><span class="tag pos">${e.slot}</span><div class="grow">${esc(e.p.name)} <span class="dim">${esc(roleNm(e.role))}</span></div><b>${e.p.ovr}</b></div>`).join('');
+  S.modalKind = 'pre'; S.modal = `<div class="ttl">경기 준비</div><div class="dim">${esc(matchTitleUI(pm.ctx))}</div><div class="vs"><div>${crest(h, 34)}<div>${esc(h.name)}</div></div><b>vs</b><div>${crest(a, 34)}<div>${esc(a.name)}</div></div></div><div class="dim" style="text-align:center">상대 전력 ${Math.round(op.strength)} · 우리 ${Math.round(mine.strength)} · ${esc(t.formation)}</div>
+  ${L.injured.length ? `<div class="dim">부상: ${L.injured.slice(0, 5).map(p => esc(p.name)).join(', ')}</div>` : ''}<div class="sec">선발 라인업</div><div class="card">${rows}</div>
+  <div class="row g8" style="flex-wrap:wrap"><button class="btn grow" data-act="mwatch">관전 모드 ⚽</button><button class="btn sec grow" data-act="msum">요약 모드 ⏩</button></div><button class="btn sec wide" data-act="mtacgo">전술 수정하러 가기</button>`;
+}
+function matchTitleUI(ctx) { try { return compLabel(ctx); } catch (e) { return '경기'; } }
+// ----- 경기 중 감독 패널 -----
+function mgrPanelHTML(M) {
+  const t = M.mine.tactic, left = 5 - (M.mgrSubs || 0), chg = Math.max(0, 3 - (M.mgrChanges || 0));
+  const ins = Object.keys(INSTR_L).map(k => `<div class="inrow"><span class="dim">${INSTR_L[k][0]}</span><div class="seg">${INSTR_L[k][1].map((n, v) => `<button class="${(t[k] == null ? 1 : t[k]) === v ? 'on' : ''}" data-act="mpinstr" data-k="${k}" data-id="${v}">${n}</button>`).join('')}</div></div>`).join('');
+  const st = MV.mst.map(p => `<div class="sqr mini ${S.mpout === p.id ? 'on' : ''}" data-act="mpout" data-id="${p.id}"><span class="tag pos">${p.sub}</span><div class="grow">${esc(p.name)}</div><b>${p.ovr}</b></div>`).join('');
+  const bn = (M.benchMine || []).slice().sort((a, b) => b.ovr - a.ovr).map(p => `<div class="sqr mini" data-act="mpin" data-id="${p.id}"><span class="tag pos">${p.sub}</span><div class="grow">${esc(p.name)}</div><b>${p.ovr}</b></div>`).join('');
+  return `<div class="card gl"><b>전술·교체</b><div class="dim">경기 일시정지 중 · 교체 ${left}회 남음 · 전술 반영 ${chg}회 남음${MV.min >= 88 ? ' · 종료 직전이라 효과가 거의 없습니다' : ''}</div></div><div class="sec">팀 지시</div><div class="card">${ins}</div>
+  <div class="sec">교체 <span class="dim">나갈 선수 → 들어올 선수 순서로 탭</span></div><div class="card"><div class="dim">그라운드</div>${st}</div><div class="card"><div class="dim">벤치</div>${bn || '<div class="dim">벤치 선수가 없습니다.</div>'}</div>`;
+}
+function mgrPanelOpen() {
+  if (!MV || MV.over || !G0().mm || MV.pg || MV.lead || MV.sp || MV.momentOpen || MV.mgrPanel) { if (MV && !MV.over) toast('잠시 후에 열 수 있습니다'); return; }
+  MV.mgrPanel = true; MV.mgrPrev = MV.paused; MV.paused = true; MV.mgrDirty = false; S.mpout = null; renderMatch();
+}
+function mgrPanelClose() {
+  if (!MV || !MV.mgrPanel) return; const M = G0().mm;
+  if (MV.mgrDirty && M) { if ((M.mgrChanges || 0) < 3) { Core.mgrReplan(MV.min); M.mgrChanges = (M.mgrChanges || 0) + 1; MV.log.unshift({ min: MV.min, ic: '📋', cls: '', t: '<b>감독 지시</b> 전술을 조정했습니다' }); } else MV.log.unshift({ min: MV.min, ic: '📋', cls: '', t: '전술 변경 한도를 넘어 효과가 반영되지 않습니다' }); }
+  MV.mgrPanel = false; MV.mgrDirty = false; MV.paused = (MV.mgrPrev === true) || !!MV.talk; renderMatch();
+}
+function mgrSubUI(outId, inId) {
+  const M = G0().mm, r = Core.mgrSub(outId, inId, MV.min); if (!r) { toast('교체할 수 없습니다 (5회 한도)'); return; }
+  const i = MV.mst.findIndex(p => p.id === outId); if (i >= 0) MV.mst[i] = r.inn;
+  MV.mgrDirty = true; MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 — ${esc(r.inn.name)} IN / ${esc(r.out.name)} OUT` });
+  const pb = $('#pitchbox'); if (pb) { pb.innerHTML = pitchHTML(M); MV.els = null; } S.mpout = null; renderMatch();
+}
+
 const NAV = [['home','홈'],['me','내 선수'],['ctr','이적'],['league','순위·대회'],['news','뉴스']];
 function navBadge(id) { try { const m = Core.me(); if (id==='home') return m.meet ? '●' : ''; if (id==='ctr') return (m.offers.length || m.pending || m.renewal) ? '●' : ''; } catch (e) {} return ''; }
 function render() {
   const app = $('#app');
-  if (S.step==='setup' || S.step==='create') {
+  if (S.step==='setup' || S.step==='create' || S.step==='mode' || S.step==='mcreate') {
     const o0 = document.querySelector('.scr'); const k0 = S.step + '|' + (S.step==='setup' ? (S.sel ? 'x' : '') : '') ; const t0 = (o0 && S._sk === k0) ? o0.scrollTop : 0;
-    app.innerHTML = `<div class="scr">${S.step==='setup' ? setupView() : creatorView()}</div>`;
+    app.innerHTML = `<div class="scr">${S.step==='mode' ? modeView() : S.step==='mcreate' ? mcreateView() : S.step==='setup' ? setupView() : creatorView()}</div>`;
     const n0 = document.querySelector('.scr'); if (n0 && t0) n0.scrollTop = t0; S._sk = k0; return;
   }
   const oldSc = document.querySelector('.scr'); const keyNow = S.step + '|' + S.tab; const keepTop = (oldSc && S._sk === keyNow) ? oldSc.scrollTop : 0;
-  let v; try { v = S.tab==='home' ? homeView() : S.tab==='news' ? newsView() : S.tab==='league' ? leagueView() : S.tab==='me' ? meView() : contractView(); }
+  const MG = isM();
+  if (MG && G0().mgr.sacked && !G0().pendingMine) { app.innerHTML = `<div class="scr">${sackView()}</div>`; $('#modal').style.display = S.modal ? 'block' : 'none'; return; }
+  let v; try { v = MG ? (S.tab==='home' ? mgrHomeView() : S.tab==='squad' ? mgrSquadView() : S.tab==='mtac' ? mgrTacView() : S.tab==='mkt' ? mgrMktView() : S.tab==='news' ? newsView() : leagueView()) : S.tab==='home' ? homeView() : S.tab==='news' ? newsView() : S.tab==='league' ? leagueView() : S.tab==='me' ? meView() : contractView(); }
   catch (err) { v = `<div class="card"><b>화면 오류</b><div class="dim">${esc(String(err && err.message || err))}</div><div class="dim">이 글자를 화면 캡처해서 알려주세요.</div><button class="btn sec" data-act="tab" data-id="home">홈으로</button></div>`; try { console.error(err); } catch (e2) {} }
-  app.innerHTML = `<div class="scr">${v}</div>${actBar()}<nav>${NAV.map(([id,n])=>`<button class="nv ${S.tab===id?'on':''}" data-act="tab" data-id="${id}">${n}${navBadge(id)?'<i class="bdg"></i>':''}</button>`).join('')}</nav>`;
+  app.innerHTML = `<div class="scr">${v}</div>${actBar()}<nav>${(MG ? MNAV : NAV).map(([id,n])=>`<button class="nv ${S.tab===id?'on':''}" data-act="tab" data-id="${id}">${n}${(!MG && navBadge(id))?'<i class="bdg"></i>':''}</button>`).join('')}</nav>`;
   { const ns = document.querySelector('.scr'); if (ns && keepTop) ns.scrollTop = keepTop; S._sk = keyNow; }
   if (S.tab!=='home') S.trfx = null; else animBars();
   if (S.modalKind==='settings') S.modal = settingsModal();
@@ -942,6 +1055,9 @@ function render() {
 }
 function toast(t) { const el = $('#toast'); el.textContent = t; el.style.opacity = 1; setTimeout(() => el.style.opacity = 0, 2200); }
 function actBar() {
+  if (isM()) { const G = G0(); let ev = null; try { ev = Core.nextEvent(); } catch (e) {} const mt = ev && ev.match; const dd = (n) => n <= 0 ? '오늘' : n === 1 ? '내일' : n + '일 뒤'; const info = G.pendingMine ? '오늘은 경기일입니다' : mt ? `다음 경기 · ${dd(mt.days)} ${mt.home ? 'vs' : '@'} ${esc(mt.opp)}` : '예정된 경기가 없습니다'; const go = G.pendingMine ? '경기 준비 ⚽' : (mt && mt.days === 1 ? '경기 시작 ⚽' : '계속 ▶');
+    const open = S.skipOpen ? `<div class="skiprow"><button class="chip" data-act="skip" data-id="7">일주일</button><button class="chip" data-act="skip" data-id="30">한 달</button><button class="chip" data-act="skip" data-id="200">다음 경기까지</button></div>` : '';
+    return `<div class="act"><div class="actinfo">${info}</div>${open}<div class="actrow"><button class="btn big" data-act="go">${go}</button><button class="btn sec skp ${S.skipOpen?'on':''}" data-act="skipm" aria-label="건너뛰기 메뉴">⏩</button></div></div>`; }
   let ev = null; try { ev = Core.nextEvent(); } catch (e) {} const mt = ev && ev.match, mv = ev && ev.move, m = Core.me();
   const dd = (n) => n <= 0 ? '오늘' : n === 1 ? '내일' : n + '일 뒤';
   const md = (day) => { const t = Core.dateOf(day); return `${t.m}/${t.d}`; };
@@ -953,6 +1069,7 @@ function actBar() {
 }
 function advance(days) {
   let stopped = null;
+  if (isM()) { let st = null; for (let i = 0; i < days; i++) { const pm = Core.step(); if (pm) { st = 'match'; break; } if (G0().mgr.sacked) break; } save(); render(); if (st === 'match') setTimeout(startMatch, 50); return; }
   { const m = Core.me(); S.trfx = { acc0: Object.assign({}, m.acc||{}), a0: Object.assign({}, m.a), fat0: m.fat }; }
   for (let i=0;i<days;i++) {
     const m0 = Core.me(), before = m0.offers.length, cu0 = !!m0.callup;
@@ -980,7 +1097,7 @@ function makeWorld() {
   S.busy = true; $('#app').innerHTML = loadView();
   const g = Core.newWorldGen(Date.now() % 1000000, S.sel.slice()); let ti = 0;
   const tipT = setInterval(() => { const e = $('#ltip'); if (!e) return; ti = (ti + 1) % LOAD_TIPS.length; e.textContent = '💡 ' + LOAD_TIPS[ti]; }, 2600);
-  const fin = () => { clearInterval(tipT); S.step = 'create'; S.busy = false; if (S.sel.includes('KOR')) { S.cr.cc = 'KOR'; S.cr.nat = 'KOR'; } else { S.cr.cc = S.sel[0]; S.cr.nat = S.sel[0]; } S.cr.club = null; render(); };
+  const fin = () => { clearInterval(tipT); S.step = S.mode === 'mgr' ? 'mcreate' : 'create'; S.cr.mclub = null; S.busy = false; if (S.sel.includes('KOR')) { S.cr.cc = 'KOR'; S.cr.nat = 'KOR'; } else { S.cr.cc = S.sel[0]; S.cr.nat = S.sel[0]; } S.cr.club = null; render(); };
   const stepW = () => { let r; try { r = g.next(); } catch (e) { clearInterval(tipT); S.busy = false; S.step = 'setup'; render(); toast('월드 생성에 실패했습니다. 다시 시도해 주세요'); return; }
     if (r.done) { const b = $('#lbar'); if (b) b.style.width = '100%'; setTimeout(fin, 180); return; }
     const [pct, label] = r.value, b = $('#lbar'), st = $('#lst'); if (b) b.style.width = Math.round(pct * 100) + '%'; if (st) st.textContent = label + ' · ' + Math.round(pct * 100) + '%';
@@ -989,9 +1106,31 @@ function makeWorld() {
 }
 document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-act]'); if (!t || S.busy) return; const a = t.dataset.act, id = t.dataset.id;
+  if (a==='mode') { S.mode = id; S.step = 'setup'; render(); return; }
+  if (a==='modeback') { S.step = 'mode'; render(); return; }
+  if (a==='mclub') { const nm = $('#nm'); if (nm) S.cr.name = nm.value; S.cr.mclub = +id; render(); return; }
+  if (a==='mstart') { const nm = $('#nm'); const name = (nm && nm.value.trim()) || '양메시'; if (S.cr.mclub == null) return; Core.createMgr({ name, nat: S.cr.nat, club: S.cr.mclub, look: { skin: S.cr.skin, hair: S.cr.hair, style: S.cr.style } }); S.step = 'game'; S.tab = 'home'; S.lc = null; S.ld = null; save(); render(); return; }
+  if (a==='sqf') { S.sqf = id; render(); return; }
+  if (a==='mkf') { S.mkf = id; render(); return; }
+  if (a==='msell') { if (S.sellArm !== +id) { S.sellArm = +id; render(); return; } S.sellArm = null; const r = Core.mgrSell(+id); toast(r.msg); save(); render(); return; }
+  if (a==='mbuy') { const r = Core.mgrBuy(+id); toast(r.msg); if (r.ok) save(); render(); return; }
+  if (a==='mform') { Core.mgrSetFormation(id); S.msel = null; save(); render(); return; }
+  if (a==='minstr') { Core.mgrSetInstr(t.dataset.k, +id); save(); render(); return; }
+  if (a==='mauto') { Core.mgrAutoXi(); S.msel = null; save(); render(); return; }
+  if (a==='mslot') { S.msel = (S.msel === +id) ? null : +id; render(); return; }
+  if (a==='mpick') { if (S.msel != null) Core.mgrSetXi(S.msel, +id); S.msel = null; save(); render(); return; }
+  if (a==='mpre') { mgrPre(); render(); return; }
+  if (a==='mtacgo') { S.modal = null; S.modalKind = null; S.tab = 'mtac'; render(); return; }
+  if (a==='mwatch' || a==='msum') { S.modal = null; S.modalKind = null; S.mgrGo = true; render(); startMatch(); if (a==='msum' && MV && !MV.over) { S.mtab = 'flow'; skipMatch(); } return; }
+  if (a==='mjob') { Core.mgrTakeJob(+id); S.tab = 'home'; save(); render(); return; }
+  if (a==='mpopen') { mgrPanelOpen(); return; }
+  if (a==='mpclose') { mgrPanelClose(); return; }
+  if (a==='mpinstr') { Core.mgrSetInstr(t.dataset.k, +id); if (MV) MV.mgrDirty = true; renderMatch(); return; }
+  if (a==='mpout') { S.mpout = (S.mpout === +id) ? null : +id; renderMatch(); return; }
+  if (a==='mpin') { if (S.mpout == null) { toast('먼저 나갈 선수를 탭하세요'); return; } mgrSubUI(S.mpout, +id); return; }
   if (a==='sel') { const i = S.sel.indexOf(id); if (i>=0) S.sel.splice(i,1); else if (S.sel.length<10) S.sel.push(id); else toast('최대 10개국입니다'); render(); return; }
   if (a==='world') { if (S.sel.length) makeWorld(); return; }
-  if (a==='cr') { const nm = $('#nm'); if (nm) S.cr.name = nm.value; S.cr[t.dataset.k] = id; if (t.dataset.k==='pos') S.cr.prefs = []; if (t.dataset.k==='cc' || t.dataset.k==='stage') { S.cr.home = ''; S.cr.club = null; } if (t.dataset.k==='cc' && !S.cr.natTouched) S.cr.nat = id; render(); return; }
+  if (a==='cr') { const nm = $('#nm'); if (nm) S.cr.name = nm.value; S.cr[t.dataset.k] = id; if (t.dataset.k==='pos') S.cr.prefs = []; if (t.dataset.k==='cc' || t.dataset.k==='stage') { S.cr.home = ''; S.cr.club = null; S.cr.mclub = null; } if (t.dataset.k==='cc' && !S.cr.natTouched) S.cr.nat = id; render(); return; }
   if (a==='start') { const nm = $('#nm'); const name = (nm && nm.value.trim()) || '양메시'; fixCreator(); Core.createMe({ name, h: S.cr.h, prefs: (S.cr.prefs||[]).filter(k => (Core.PREF_POS[S.cr.pos]||[]).includes(k)), trait: S.cr.trait, pos: S.cr.pos, club: S.cr.club, nat: S.cr.nat, age: S.cr.stage==='youth'?15:19, look: { skin:S.cr.skin, hair:S.cr.hair, style:S.cr.style } }); S.step = 'game'; S.lc = null; S.ld = null; save(); render(); return; }
   if (a==='tab') { S.tab = id; S.modal = null; S.modalKind = null; S._sk = null; }
   else if (a==='plan') { Core.me().plan = id; }
@@ -1024,16 +1163,16 @@ document.addEventListener('click', (e) => {
   else if (a==='sdel') { slotDel(id); return; }
   else if (a==='dec') { S.modal = null; Core.declineOffer(+id); }
   else if (a==='ren') { Core.acceptRenewal(); save(); }
-  else if (a==='reset') { if (!S.resetArm) { S.resetArm = true; } else { S.resetArm = false; idbDel('save'); S.step = 'setup'; S.tab = 'home'; refreshSlots0().then(render); } }
-  else if (a==='go') { S.skipOpen = false; advance(1); return; }
+  else if (a==='reset') { if (!S.resetArm) { S.resetArm = true; } else { S.resetArm = false; idbDel('save'); S.step = 'mode'; S.tab = 'home'; refreshSlots0().then(render); } }
+  else if (a==='go') { S.skipOpen = false; if (isM() && G0().pendingMine) { mgrPre(); render(); return; } advance(1); return; }
   else if (a==='skipm') { S.skipOpen = !S.skipOpen; render(); return; }
-  else if (a==='skip') { S.skipOpen = false; advance(+id); return; }
-  else if (a==='day') { advance(1); return; }
+  else if (a==='skip') { S.skipOpen = false; if (isM() && G0().pendingMine) { mgrPre(); render(); return; } advance(+id); return; }
+  else if (a==='day') { if (isM() && G0().pendingMine) return; advance(1); return; }
   else if (a==='week') { advance(7); return; }
   else if (a==='match') { advance(120); return; }
   else if (a==='mv') { if (!MV || !G0().mm || !MV.momentOpen) return; const M = G0().mm, mo = MV.momentOpen; const r = Core.resolveMoment(id); if (r.goal || r.assist) { MV.ballFree = false; } MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: esc(r.text) }); MV.momentOpen = null; MV.paused = false; try { playOutcome(M, mo, r); } catch (e) { MV.holder = MV.holder || null; } stepBall(M); emitAt(M, mo ? mo.min : MV.min, true); movePitch(); renderMatch(); return; }
   else if (a==='fs') { try { localStorage.setItem('bfm_fs', String(+id)); } catch (e) {} fsApply(); render(); return; }
-  else if (a==='talk') { if (!MV || !MV.talk) return; const r = Core.talkPick(id); MV.log.unshift({ min: 45, ic: '💬', cls: '', t: `<b>하프타임</b> ${esc(r.text)}` }); MV.talk = null; setTimeout(startSecond, 600); renderMatch(); return; }
+  else if (a==='talk') { if (!MV || !MV.talk) return; const r = (G0().mm && G0().mm.role === 'mgr') ? Core.mgrTalkPick(id, MV.talkDiff || 0) : Core.talkPick(id); MV.log.unshift({ min: 45, ic: '💬', cls: '', t: `<b>하프타임</b> ${esc(r.text)}` }); MV.talk = null; setTimeout(startSecond, 600); renderMatch(); return; }
   else if (a==='mtab') { S.mtab = id; renderMatch(); return; }
   else if (a==='mspd') { S.spd = +id; try { localStorage.setItem('bfm_spd', String(S.spd)); } catch (e) {} if (MV) { MV.speed = spdMs(); if (MV.timer && !MV.skipping && !MV.over) { clearInterval(MV.timer); MV.timer = setInterval(tick, MV.speed); } renderMatch(); } return; }
   else if (a==='mskip') { if (!MV || !G0().mm || MV.over) return; skipMatch(); return; }
@@ -1042,13 +1181,14 @@ document.addEventListener('click', (e) => {
 });
 document.addEventListener('input', (e) => { if (e.target.id==='nm') S.cr.name = e.target.value; if (e.target.id==='hrange') { S.cr.h = +e.target.value; const lab = e.target.previousElementSibling; if (lab) lab.querySelector('.dim').textContent = S.cr.h + 'cm · 크면 헤딩·몸싸움↑ 작으면 스피드·민첩↑'; } });
 document.addEventListener('change', (e) => {
+  if (e.target.classList && e.target.classList.contains('rsel')) { Core.mgrSetRole(+e.target.dataset.slot, e.target.value); save(); render(); return; }
   if (e.target.id==='clubsel') { S.cr.club = +e.target.value; }
   if (e.target.id==='homesel') { S.cr.home = e.target.value; rollHome(); const nm = $('#nm'); if (nm) S.cr.name = nm.value; render(); }
-  if (e.target.id==='natsel') { S.cr.nat = e.target.value; S.cr.natTouched = true; const nm0 = $('#nm'); if (nm0) S.cr.name = nm0.value; const cc = natToCc(S.cr.nat); if (cc && cc !== S.cr.cc) { S.cr.cc = cc; S.cr.home = ''; S.cr.club = null; } render(); }
+  if (e.target.id==='natsel') { S.cr.nat = e.target.value; S.cr.natTouched = true; const nm0 = $('#nm'); if (nm0) S.cr.name = nm0.value; const cc = natToCc(S.cr.nat); if (cc && cc !== S.cr.cc) { S.cr.cc = cc; S.cr.home = ''; S.cr.club = null; S.cr.mclub = null; } render(); }
 });
 // ---------- 저장 슬롯 (자동 저장 + 수동 3칸) ----------
 const SLOTS = ['slot1','slot2','slot3'];
-function slotMeta() { try { const m = Core.me(), c = Core.clubOf(m.club); return { name: m.name, club: c.name, age: m.age, ovr: m.ovr, date: Core.fmtDate(G0().day), at: Date.now() }; } catch (e) { return null; } }
+function slotMeta() { try { const m = Core.me(), c = Core.clubOf(m.club); if (isM()) return { name: G0().mgr.name + ' 감독', club: c.name, age: '-', ovr: '-', mgr: true, date: Core.fmtDate(G0().day), at: Date.now() }; return { name: m.name, club: c.name, age: m.age, ovr: m.ovr, date: Core.fmtDate(G0().day), at: Date.now() }; } catch (e) { return null; } }
 async function refreshSlots() { await refreshSlots0(); render(); }
 async function slotSave(k) { const meta = slotMeta(); if (!meta) return; await idbSet(k, { meta, d: Core.serialize() }); toast('저장했습니다'); await refreshSlots(); }
 async function slotLoad(k) { try { const o = await idbGet(k); const d = typeof o === 'string' ? o : (o && o.d); if (!d) return; Core.load(d); S.step = 'game'; S.tab = 'home'; S.lc = null; S.ld = null; S.modal = null; save(); render(); toast('불러왔습니다'); if (G0().pendingMine) setTimeout(startMatch, 50); } catch (e) { toast('불러오기에 실패했습니다'); } }
@@ -1056,7 +1196,7 @@ async function slotDel(k) { await idbDel(k); await refreshSlots(); }
 async function refreshSlots0() { const out = {}; for (const k of ['save'].concat(SLOTS)) { try { const v = await idbGet(k); if (v) out[k] = (typeof v === 'string') ? { meta: null, d: v } : v; } catch (e) {} } S.slots = out; }
 function slotRows(inGame) {
   const sl = S.slots || {}; const rows = [];
-  const row = (k, label) => { const o = sl[k]; const meta = o && o.meta; const info = o ? (meta ? `${esc(meta.name)} · ${meta.age}세 · 종합 ${meta.ovr} · ${esc(meta.club)} · ${meta.date}` : '자동 저장 데이터') : '<span class="dim">비어 있음</span>';
+  const row = (k, label) => { const o = sl[k]; const meta = o && o.meta; const info = o ? (meta ? `${esc(meta.name)} · ${meta.mgr ? '' : meta.age + '세 · 종합 ' + meta.ovr + ' · '}${esc(meta.club)} · ${meta.date}` : '자동 저장 데이터') : '<span class="dim">비어 있음</span>';
     return `<div class="card"><div class="row"><b>${label}</b><span class="dim">${meta&&meta.at?new Date(meta.at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):''}</span></div><div class="dim">${info}</div><div class="row g8" style="flex-wrap:wrap">${inGame && k!=='save' ? `<button class="btn" data-act="ssave" data-id="${k}">${o?'덮어쓰기':'여기에 저장'}</button>` : ''}${o ? `<button class="btn sec" data-act="sload" data-id="${k}">불러오기</button>` : ''}${o && k!=='save' ? `<button class="btn sec" data-act="sdel" data-id="${k}">삭제</button>` : ''}</div></div>`; };
   rows.push(row('save', '자동 저장'));
   SLOTS.forEach((k,i) => rows.push(row(k, '저장 칸 ' + (i+1))));
@@ -1067,7 +1207,7 @@ async function boot() {
   refreshSlots0();
   const ok = await loadSave();
   if (ok) { S.step = 'game'; render(); if (G0().pendingMine) setTimeout(startMatch, 50); }
-  else { S.step = 'setup'; render(); }
+  else { S.step = 'mode'; render(); }
 }
 boot();
 
