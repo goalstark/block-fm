@@ -321,8 +321,9 @@ function koRound(comp, pairs) {
   comp.ties = pairs.map(([a,b]) => ({ a, b, legs:[], w:null }));
   const days = comp.rdays[comp.round] || comp.rdays[comp.rdays.length-1];
   comp.ties.forEach((t,i) => {
-    t.n = days.length;
-    days.forEach((d,l) => { const day = Math.max(d, G.day+1); const home = l%2===0 ? t.a : t.b, away = l%2===0 ? t.b : t.a; addFx(day, home, away, { t:comp.kind, id:comp.id, ti:i, leg:l, fin: comp.kind==='cont' && days.length===1 }); });
+    const dd = (comp.tdays && comp.tdays[comp.round] && comp.tdays[comp.round][i] != null) ? [comp.tdays[comp.round][i]] : days;
+    t.n = dd.length;
+    dd.forEach((d,l) => { const day = Math.max(d, G.day+1); const home = l%2===0 ? t.a : t.b, away = l%2===0 ? t.b : t.a; addFx(day, home, away, { t:comp.kind, id:comp.id, ti:i, leg:l, fin: comp.kind==='cont' && dd.length===1 }); });
   });
 }
 function compResult(comp, ctx, h, a, gh, ga) {
@@ -1277,6 +1278,16 @@ function startWcKO(comp) {
   const win = rk.map(r => r[0]), run = rk.map(r => r[1]);
   const th = rk.map(r => r[2]).sort((x, y) => { const g1 = comp.groups[gi(x)].table[x], g2 = comp.groups[gi(y)].table[y]; return (g2.pts - g1.pts) || ((g2.gf - g2.ga) - (g1.gf - g1.ga)) || (g2.gf - g1.gf) || (x - y); });
   const q3 = th.slice(0, 8); comp.q3 = q3; comp.out3 = th.slice(8);
+  if (comp.draw === 'real') {
+    const T = wcThirdSlots(q3, gi);
+    if (T) {
+      const ref = (sl, n) => sl[0] === 'T' ? T[n] : (sl[0] === '1' ? win : run)[sl.charCodeAt(1) - 65];
+      const pairs = WC_R32_ORDER.map(n => [ref(WC_R32[n][0], n), ref(WC_R32[n][1], n)]);
+      comp.stage = 'KO'; comp.round = 0; comp.alive = pairs.flat(); koRound(comp, pairs);
+      addNews('cup', `${comp.name} 조별리그 종료 — 32강 대진이 확정됐습니다`, true);
+      return;
+    }
+  }
   const A = win.concat(q3.slice(0, 4)), B = run.concat(q3.slice(4));
   let pairs = null;
   for (let tr = 0; tr < 200 && !pairs; tr++) { const b = shuffle(B.slice()); if (A.every((x, i) => gi(x) !== gi(b[i]))) pairs = A.map((x, i) => [x, b[i]]); }
@@ -1286,6 +1297,32 @@ function startWcKO(comp) {
   addNews('cup', `${comp.name} 조별리그 종료 — 32강 대진이 확정됐습니다`, true);
 }
 const WC_REAL = [['MEX','RSA','KOR','CZE'],['CAN','BIH','QAT','SUI'],['BRA','MAR','HAI','SCO'],['USA','PAR','AUS','TUR'],['GER','CUW','CIV','ECU'],['NED','JPN','SWE','TUN'],['BEL','EGY','IRN','NZL'],['ESP','CPV','SAU','URU'],['FRA','SEN','IRQ','NOR'],['ARG','ALG','AUT','JOR'],['POR','COD','UZB','COL'],['ENG','CRO','GHA','PAN']];
+// 실제 2026 월드컵 조별리그 일정(월, 일, 홈, 원정) — 조 순서 A~L
+const WC_SCHED = [
+  [[6,11,'MEX','RSA'],[6,11,'KOR','CZE'],[6,18,'CZE','RSA'],[6,18,'MEX','KOR'],[6,24,'CZE','MEX'],[6,24,'RSA','KOR']],
+  [[6,12,'CAN','BIH'],[6,13,'QAT','SUI'],[6,18,'SUI','BIH'],[6,18,'CAN','QAT'],[6,24,'SUI','CAN'],[6,24,'BIH','QAT']],
+  [[6,13,'BRA','MAR'],[6,13,'HAI','SCO'],[6,19,'SCO','MAR'],[6,19,'BRA','HAI'],[6,24,'SCO','BRA'],[6,24,'MAR','HAI']],
+  [[6,12,'USA','PAR'],[6,13,'AUS','TUR'],[6,19,'TUR','PAR'],[6,19,'USA','AUS'],[6,25,'TUR','USA'],[6,25,'PAR','AUS']],
+  [[6,14,'CIV','ECU'],[6,14,'GER','CUW'],[6,20,'GER','CIV'],[6,20,'ECU','CUW'],[6,25,'CUW','CIV'],[6,25,'ECU','GER']],
+  [[6,14,'NED','JPN'],[6,14,'SWE','TUN'],[6,20,'NED','SWE'],[6,20,'TUN','JPN'],[6,25,'JPN','SWE'],[6,25,'TUN','NED']],
+  [[6,15,'IRN','NZL'],[6,15,'BEL','EGY'],[6,21,'BEL','IRN'],[6,21,'NZL','EGY'],[6,26,'EGY','IRN'],[6,26,'NZL','BEL']],
+  [[6,15,'SAU','URU'],[6,15,'ESP','CPV'],[6,21,'URU','CPV'],[6,21,'ESP','SAU'],[6,26,'CPV','SAU'],[6,26,'URU','ESP']],
+  [[6,16,'FRA','SEN'],[6,16,'IRQ','NOR'],[6,22,'NOR','SEN'],[6,22,'FRA','IRQ'],[6,26,'NOR','FRA'],[6,26,'SEN','IRQ']],
+  [[6,16,'ARG','ALG'],[6,16,'AUT','JOR'],[6,22,'ARG','AUT'],[6,22,'JOR','ALG'],[6,27,'ALG','AUT'],[6,27,'JOR','ARG']],
+  [[6,17,'POR','COD'],[6,17,'UZB','COL'],[6,23,'POR','UZB'],[6,23,'COL','COD'],[6,27,'COL','POR'],[6,27,'COD','UZB']],
+  [[6,17,'GHA','PAN'],[6,17,'ENG','CRO'],[6,23,'ENG','GHA'],[6,23,'PAN','CRO'],[6,27,'PAN','ENG'],[6,27,'CRO','GHA']]];
+// 실제 토너먼트 대진표: 32강 경기번호별 [슬롯A, 슬롯B, 날짜]. '1E'=E조 1위, '2A'=A조 2위, 'T:ABCDF'=해당 조 3위 중 한 팀
+const WC_R32 = { 73:['2A','2B',[6,28]], 74:['1E','T:ABCDF',[6,29]], 75:['1F','2C',[6,29]], 76:['1C','2F',[6,29]], 77:['1I','T:CDFGH',[6,30]], 78:['2E','2I',[6,30]], 79:['1A','T:CEFHI',[6,30]], 80:['1L','T:EHIJK',[7,1]],
+  81:['1D','T:BEFIJ',[7,1]], 82:['1G','T:AEHIJ',[7,1]], 83:['2K','2L',[7,2]], 84:['1H','2J',[7,2]], 85:['1B','T:EFGIJ',[7,2]], 86:['1J','2H',[7,3]], 87:['1K','T:DEIJL',[7,3]], 88:['2D','2G',[7,3]] };
+// 16강 이후 진행 순서(인접한 두 경기 승자끼리 만남): 32강 → 16강(89~96) → 8강(97~100) → 4강(101·102)
+const WC_R32_ORDER = [74,77,73,75,83,84,81,82,76,78,79,80,86,88,85,87];
+const WC_TDAYS = [WC_R32_ORDER.map(n => WC_R32[n][2]), [[7,4],[7,4],[7,6],[7,6],[7,5],[7,5],[7,7],[7,7]], [[7,9],[7,10],[7,11],[7,11]], [[7,14],[7,15]], [[7,19]]];
+function wcThirdSlots(q3, gi) {                          // 3위 8팀을 규정의 허용 조 조건에 맞춰 슬롯에 배정(가능한 조합 탐색)
+  const slots = WC_R32_ORDER.filter(n => WC_R32[n][1][0] === 'T'), res = {};
+  const go = (k, used) => { if (k === slots.length) return true; const n = slots[k], allow = WC_R32[n][1].slice(2);
+    for (const t of q3) { if (used.has(t) || !allow.includes(String.fromCharCode(65 + gi(t)))) continue; used.add(t); res[n] = t; if (go(k + 1, used)) return true; used.delete(t); } return false; };
+  return go(0, new Set()) ? res : null;
+}
 function wcStart(opts) {
   const seed = opts.seed || (Date.now() % 1000000);
   rs = seed | 0;
@@ -1302,7 +1339,8 @@ function wcStart(opts) {
   else for (let pot = 0; pot < 4; pot++) { const p = shuffle(ids.slice(pot * 12, pot * 12 + 12)); p.forEach((id, g) => putG(g, id)); }
   comp.left = 0;
   const md = [dayOf(2026, 6, 11), dayOf(2026, 6, 16), dayOf(2026, 6, 21)];
-  comp.groups.forEach((g, gi) => circle(g.teams).forEach((ms, i) => ms.forEach(([h, a]) => { addFx(md[i] + (i < 2 ? gi % 4 : gi % 4), h, a, { t: 'wc', id: 'WC', g: gi }); comp.left++; })));
+  if (comp.draw === 'real') { const idOf = (cd) => G.clubs.find(c => c.nat === cd).id; WC_SCHED.forEach((ms, gi) => ms.forEach(([m, d, h, a]) => { addFx(dayOf(2026, m, d), idOf(h), idOf(a), { t: 'wc', id: 'WC', g: gi }); comp.left++; })); comp.tdays = WC_TDAYS.map(r => r.map(([m, d]) => dayOf(2026, m, d))); }
+  else comp.groups.forEach((g, gi) => circle(g.teams).forEach((ms, i) => ms.forEach(([h, a]) => { addFx(md[i] + (i < 2 ? gi % 4 : gi % 4), h, a, { t: 'wc', id: 'WC', g: gi }); comp.left++; })));
   comp.rdays = [[dayOf(2026, 6, 28)], [dayOf(2026, 7, 3)], [dayOf(2026, 7, 9)], [dayOf(2026, 7, 14)], [dayOf(2026, 7, 19)]];
   comp.rl = '조별리그';
   addNews('world', '월드컵 2026 개막 — 48개국이 우승을 향해 출발합니다', true);

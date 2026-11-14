@@ -1099,7 +1099,7 @@ function wcselView() {
   return `<div class="top"><div class="ttl">월드컵 모드 <span class="dim">· 2026</span></div></div><div class="body"><div class="card row g8"><span class="spr" style="width:96px;height:204px;background-image:url(${sprite({ skin: c.skin, hair: c.hair, style: c.style }, ['#2B3A55', '#F3F3F3'])})"></span><div class="grow"><div class="dim">감독 이름</div><input id="nm" value="${esc(c.name)}" maxlength="8"><div class="dim" style="margin-top:8px">시작하면 먼저 26명 최종 명단을 직접 뽑습니다. 약한 나라일수록 목표가 낮고 이변의 재미가 큽니다.</div></div></div>
   <div class="sec">피부색</div>${sw('skin', SKIN_C)}<div class="sec">머리 모양</div>${ch('style', Object.keys(STYLE_N), STYLE_N)}<div class="sec">머리 색</div>${sw('hair', HAIR_C)}
   <div class="sec">조 편성 방식</div><div class="row g8"><button class="chip ${(c.wcdraw || 'real') === 'real' ? 'on' : ''}" data-act="cr" data-k="wcdraw" data-id="real" style="flex:1">실제 2026 월드컵 조</button><button class="chip ${c.wcdraw === 'rand' ? 'on' : ''}" data-act="cr" data-k="wcdraw" data-id="rand" style="flex:1">랜덤 조 추첨</button></div><div class="dim">${(c.wcdraw || 'real') === 'real' ? '2025년 12월 실제 추첨 결과(A~L조) 그대로 진행합니다.' : '48개국을 전력순 4개 포트로 나눠 무작위로 조를 추첨합니다.'}</div><div class="sec">맡을 나라 <span class="dim">${esc(Core.NATK(c.wcn))}</span></div><div class="wcgrid">${cards}</div>
-  <button class="btn wide" data-act="wcstart">이 나라 감독으로 월드컵 시작</button><button class="btn sec wide" data-act="modeback">← 모드 다시 고르기</button></div>`;
+  <div class="dim" style="text-align:center">시작을 누르면 <b>실제 조 / 랜덤 조</b>를 고릅니다</div><button class="btn wide" data-act="wcstart">이 나라 감독으로 월드컵 시작</button><button class="btn sec wide" data-act="modeback">← 모드 다시 고르기</button></div>`;
 }
 function wcSquadView() {
   const G = Core.G, club = Core.clubOf(Core.me().club), pick = S.wcPick || (S.wcPick = new Set()), f = S.wcf || 'ALL';
@@ -1374,6 +1374,8 @@ document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-act]'); if (!t || S.busy) return; const a = t.dataset.act, id = t.dataset.id; if (SND.bgm && !SND.tm) bgmApply(); if (a !== 'snd') sfx('click');
   if ((a==='start' || a==='mstart' || a==='wcstart')) {
     if (a==='mstart' && S.cr.mclub == null) { popup('구단 선택', '먼저 맡을 구단을 골라 주세요.', '⚽'); return; }
+    if (!S.okGo && a==='wcstart') { const nm0 = $('#nm'); const nm1 = (nm0 && nm0.value.trim()) || '양메시', go = (d) => () => { S.cr.wcdraw = d; S.okGo = true; t.click(); };
+      pop({ title: '조 편성 선택', icon: '🏆', msg: `감독: ${nm1}\n어떤 조 편성으로 월드컵을 치를까요?\n\n실제 조 = 2026 월드컵 실제 추첨 결과(A~L조)\n랜덤 조 = 48개국을 무작위로 추첨`, btns: [{ t: '취소', cls: 'sec' }, { t: '랜덤 조', fn: go('rand') }, { t: '실제 조', fn: go('real') }] }); return; }
     if (!S.okGo) { const nm0 = $('#nm'); const nm1 = (nm0 && nm0.value.trim()) || '양메시'; const lbl = a==='start' ? '선수 육성' : a==='mstart' ? '감독' : '월드컵'; ask(lbl + ' 시작', `이름: ${nm1}${a==='wcstart' ? '\n조 편성: ' + ((S.cr.wcdraw || 'real') === 'real' ? '실제 2026 월드컵 조' : '랜덤 조 추첨') : ''}\n이 설정으로 새 게임을 시작할까요?`, '시작하기', () => { S.okGo = true; t.click(); }, '🎮'); return; }
     S.okGo = false; S.welcome = a;
   }
