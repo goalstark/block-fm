@@ -1064,10 +1064,63 @@ function renderMatch() {
   $('#mf').innerHTML = MV.over ? '' : `<div class="spd">${[['full', '풀'], ['hl', '하이라이트']].map(([k, n]) => `<button class="chip ${(S.vm || 'full') === k ? 'on' : ''}" data-act="mvm" data-id="${k}">${n}</button>`).join('')}${SPD.map(v => `<button class="chip ${(S.spd||1)===v?'on':''}" data-act="mspd" data-id="${v}">${v}배속</button>`).join('')}${MV.momentOpen || MV.mgrPanel ? '' : (M.role==='mgr' ? '<button class="btn sec" data-act="mpopen">전술·교체</button>' : '') + '<button class="btn sec" data-act="mskip">끝까지 자동 진행</button>'}</div>`;
   if (MV.mgrPanel) { $('#mb').className = 'mb'; $('#mb').innerHTML = mgrPanelHTML(M); $('#mf').innerHTML = '<button class="btn wide" data-act="mpclose">경기 재개 ▶</button>'; }
 }
+
+// ---------- 월드컵 토너먼트: 연장전 · 승부차기 연출 ----------
+function etBuild(sn, wl, res) {
+  const mine = wl.a === sn.mineId ? 0 : 1, myWin = wl.w === sn.mineId;
+  const et = wl.et ? (mine === 0 ? [wl.et[0], wl.et[1]] : [wl.et[1], wl.et[0]]) : [0, 0];
+  const pick = (arr) => { const f = arr.filter(p => p.sub !== 'GK'); const a = f.length ? f : arr; return a[Math.floor(Math.random() * a.length)].n; };
+  const ev = []; for (let i = 0; i < et[0]; i++) ev.push({ min: 91 + Math.floor(Math.random() * 29), s: 'm', n: pick(sn.mst) }); for (let i = 0; i < et[1]; i++) ev.push({ min: 91 + Math.floor(Math.random() * 29), s: 'o', n: pick(sn.ost) }); ev.sort((a, b) => a.min - b.min);
+  let pk = null;
+  if (wl.pen) {
+    const order = (st) => { const f = st.filter(p => p.sub !== 'GK').sort((a, b) => b.fin - a.fin); const g = st.filter(p => p.sub === 'GK'); return f.concat(g); };
+    const km = order(sn.mst), ko = order(sn.ost);
+    for (let tries = 0; tries < 400; tries++) {
+      const m = [], o = []; let sm = 0, so = 0, done = false, first = Math.random() < 0.5;
+      for (let r = 0; r < 60 && !done; r++) {
+        const turn = first ? ['m', 'o'] : ['o', 'm'];
+        for (const sd of turn) {
+          const k = (sd === 'm' ? km : ko)[r % 11], ok = Math.random() < 0.72 + (k.fin - 60) / 400;
+          (sd === 'm' ? m : o).push({ n: k.n, ok }); if (ok) { sd === 'm' ? sm++ : so++; }
+          if (r < 5) { const lm = 5 - m.length, lo = 5 - o.length; if (sm > so + lo || so > sm + lm) { done = true; break; } }
+          else if (m.length === o.length && sm !== so) { done = true; break; }
+        }
+      }
+      if (done && (sm > so) === myWin) { pk = { m, o, sm, so, first }; break; }
+    }
+    if (!pk) pk = { m: [{ n: km[0].n, ok: myWin }], o: [{ n: ko[0].n, ok: !myWin }], sm: myWin ? 1 : 0, so: myWin ? 0 : 1, first: true };
+  }
+  return { my: sn.my, op: sn.op, et: wl.et ? et : null, ev, pk, myWin };
+}
+function etShow(o) {
+  let el = $('#pop'); if (!el) { el = document.createElement('div'); el.id = 'pop'; ($('#toast') ? $('#toast').parentNode : document.body).appendChild(el); }
+  clearTimeout(pop.t);
+  const steps = []; let gm = 0, go = 0;
+  steps.push({ h: `<div class="dim" style="font-size:12px">90분 종료 · 무승부 → 연장전(30분)</div>` });
+  if (o.ev.length) o.ev.forEach(e => { e.s === 'm' ? gm++ : go++; steps.push({ h: `<div>⚽ 연장 ${e.min}분 <b>${esc(e.n)}</b> <span class="dim">${esc(e.s === 'm' ? o.my : o.op)}</span></div>`, sc: `연장 ${gm} : ${go}` }); });
+  else steps.push({ h: `<div class="dim">연장전 120분 — 득점 없이 끝났습니다</div>`, sc: '연장 0 : 0' });
+  if (o.pk) {
+    steps.push({ h: `<div style="margin-top:6px"><b>승부차기</b> <span class="dim">· ${esc(o.pk.first ? o.my : o.op)} 선축</span></div>`, sc: '승부차기 0 : 0' });
+    let a = 0, b = 0; const seq = [], first = o.pk.first ? 'm' : 'o', second = first === 'm' ? 'o' : 'm', L = Math.max(o.pk.m.length, o.pk.o.length);
+    for (let i = 0; i < L; i++) for (const sd of [first, second]) { const k = o.pk[sd][i]; if (k) seq.push({ sd, k }); }
+    seq.forEach(({ sd, k }) => { if (k.ok) { sd === 'm' ? a++ : b++; } steps.push({ h: `<div>${k.ok ? '✅' : '❌'} <b>${esc(k.n)}</b> <span class="dim">${esc(sd === 'm' ? o.my : o.op)} · ${k.ok ? '성공' : '실축'}</span></div>`, sc: `승부차기 ${a} : ${b}` }); });
+  }
+  steps.push({ h: `<div style="margin-top:8px;font-size:15px"><b>${o.myWin ? '🎉 ' + esc(o.my) + ' 승리 — 다음 라운드 진출!' : '😢 ' + esc(o.op) + ' 승리 — ' + esc(o.my) + ' 탈락'}</b></div>`, end: true });
+  el.innerHTML = `<div class="popbox"><div class="popic">⏱️</div><div class="popt">연장전${o.pk ? ' · 승부차기' : ''}</div><div id="etsc" style="font-size:20px;font-weight:800;margin:4px 0">${esc(o.my)} vs ${esc(o.op)}</div><div id="etlog" class="popm" style="max-height:38vh;overflow:auto;text-align:left;display:flex;flex-direction:column;gap:3px"></div><div class="popb"><button class="btn sec" id="etskip" style="flex:1">건너뛰기</button><button class="btn" id="etok" style="flex:1">확인</button></div></div>`;
+  el.style.display = 'flex';
+  const log = el.querySelector('#etlog'), sc = el.querySelector('#etsc'); let i = 0, tm = null;
+  const close = () => { clearInterval(tm); el.style.display = 'none'; el.innerHTML = ''; };
+  const add = () => { if (i >= steps.length) { clearInterval(tm); return; } const st = steps[i++]; log.insertAdjacentHTML('beforeend', st.h); if (st.sc) sc.textContent = st.sc; log.scrollTop = log.scrollHeight; };
+  tm = setInterval(add, 800); add();
+  el.querySelector('#etskip').onclick = (ev) => { ev.stopPropagation(); while (i < steps.length) add(); clearInterval(tm); };
+  el.querySelector('#etok').onclick = (ev) => { ev.stopPropagation(); if (i < steps.length) { while (i < steps.length) add(); clearInterval(tm); return; } close(); };
+}
 function endMatchUI() {
   if (MV && MV.raf) cancelAnimationFrame(MV.raf);
-  const ctx0 = G0().mm && G0().mm.ctx; G0().wcLast = null; const r = Core.finishMine(); $('#match').classList.remove('on'); lockOrient('portrait'); S.matchOpen = false; MV = null; save(); try { if (G0().mode === 'mgr' && !G0().wc && !G0().mgr.sacked) { const pr = Core.mgrPressGen(); if (pr && (pr.derby || Math.random() < 0.5)) { S.modalKind = 'press'; S.modal = pressModal(); } } } catch (e) {}
-  const rt = r.rating ? ` · 평점 ${f1(r.rating)}` : ''; { const wl = G0().wcLast; toast(wl ? `종료 ${r.res.gh}-${r.res.ga} · ${wl.pen ? '연장 ' + wl.et.join(':') + ' 후 승부차기 ' : '연장전 ' + wl.et.join(':') + ' · '}${Core.clubOf(wl.w).name} 승` : `종료 ${r.res.gh}-${r.res.ga}${rt}`); } render();
+  const ctx0 = G0().mm && G0().mm.ctx; G0().wcLast = null;
+  const mm0 = G0().mm, snap = (MV && mm0 && MV.mst && MV.ost) ? { mineId: mm0.mineHome ? mm0.h.id : mm0.a.id, my: mm0.mine.name, op: mm0.opp.name, mst: MV.mst.map(p => ({ n: p.name, sub: p.sub, fin: PA(p, 'FIN') })), ost: MV.ost.map(p => ({ n: p.name, sub: p.sub, fin: PA(p, 'FIN') })) } : null;
+  const r = Core.finishMine(); $('#match').classList.remove('on'); lockOrient('portrait'); S.matchOpen = false; MV = null; save(); try { if (G0().mode === 'mgr' && !G0().wc && !G0().mgr.sacked) { const pr = Core.mgrPressGen(); if (pr && (pr.derby || Math.random() < 0.5)) { S.modalKind = 'press'; S.modal = pressModal(); } } } catch (e) {}
+  const rt = r.rating ? ` · 평점 ${f1(r.rating)}` : ''; { const wl = G0().wcLast; if (wl && snap) { render(); etShow(etBuild(snap, wl, r.res)); return; } toast(wl ? `종료 ${r.res.gh}-${r.res.ga} · ${wl.pen ? '연장 ' + wl.et.join(':') + ' 후 승부차기 ' : '연장전 ' + wl.et.join(':') + ' · '}${Core.clubOf(wl.w).name} 승` : `종료 ${r.res.gh}-${r.res.ga}${rt}`); } render();
 }
 // ---------- 렌더 ----------
 // ===================== 감독 모드 화면 =====================
