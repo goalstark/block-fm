@@ -3,13 +3,18 @@ on: [workflow_dispatch, push]
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: {node-version: 20}
+        with:
+          node-version: 20
       - uses: actions/setup-java@v4
-        with: {distribution: temurin, java-version: 17}
-      - run: node src/build.js
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: node build.js
       - run: npm install
       - run: npx cap add android
       - name: Keep screen on
@@ -23,5 +28,19 @@ jobs:
           PY
       - run: npx cap sync android
       - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
+      - name: APK 서명 지문 출력
+        run: |
+          echo "== APK 서명 지문 (폰의 앱과 같아야 덮어 설치됨) =="
+          keytool -printcert -jarfile android/app/build/outputs/apk/debug/app-debug.apk | grep -E "Owner|SHA256|Valid"
+          echo "== 고정 키 지문 =="
+          grep -c "androiddebugkey" patch-android.js || true
       - uses: actions/upload-artifact@v4
-        with: {name: football-sim-apk, path: android/app/build/outputs/apk/debug/app-debug.apk}
+        with:
+          name: football-sim-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Block FM APK (latest)
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+          make_latest: true
