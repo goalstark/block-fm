@@ -313,7 +313,7 @@ function sideEvents(PX, PY, tx, ty, pPoss, homeX, side, out) {
   const lam = C.EVENT_RATE * TEMPO[tx.tempo] * (0.5 + 0.5 * TEMPO[ty.tempo]);
   const opp = pPoss * lam;
   const wingS0 = 0.22 + 0.14 * tx.width, dirS0 = 0.06 + 0.10 * tx.build, cenS0 = Math.max(0.1, 1 - wingS0 - dirS0);
-  const ma = MENT_ATK[tx.ment] * (homeX ? C.HOME_ATK : 1) * (FORM_S[tx.formation] || 1), md = MENT_DEF[ty.ment] * (FORM_S[ty.formation] || 1);
+  const ma = MENT_ATK[tx.ment] * (homeX ? C.HOME_ATK : 1) * (FORM_S[tx.formation] || 1) * (1 + ((tx.coach == null ? 60 : tx.coach) - 60) / 1100) * (1 + ((tx.fam == null ? 80 : tx.fam) - 80) / 900), md = MENT_DEF[ty.ment] * (FORM_S[ty.formation] || 1) * (1 + ((ty.coach == null ? 60 : ty.coach) - 60) / 2000) * (1 + ((ty.fam == null ? 80 : ty.fam) - 80) / 1800);
   const finF = clamp(Math.pow(PX.fin / 68, 0.9), 0.6, 1.5), gkF = clamp(1 - (PY.gk - 72) * 0.012, 0.7, 1.3);
   const wy = ty.width - 1, ly = ty.line - 1;
   const dWy = PY.dW * (1 + 0.05 * wy) * (1 + 0.035 * ly) * md;

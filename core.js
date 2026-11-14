@@ -33,7 +33,7 @@ function nameFor(nat) {
 }
 function tacticFor(style) {
   const t = Eng.defaultTactic();
-  if (style==='wide') t.width=2; if (style==='direct') t.build=0; if (style==='tiki') { t.build=2; t.width=0; }
+  if (style==='wide') t.width=2; if (style==='direct') t.build=2; if (style==='tiki') { t.build=0; t.width=0; }
   if (style==='counter') { t.trans=2; t.line=0; } if (style==='press') { t.press=2; t.line=2; }
   return t;
 }
@@ -296,18 +296,29 @@ function aiAdapt(c, opp) {                                                      
   const t = tacticFor(c.style || 'balanced'), mt = opp.tactic || {}, v = c.mem && c.mem.vs && c.mem.vs[opp.id], notes = [];
   const gap = (opp.strength || 0) - (c.strength || 0);
   if (gap >= 5) { t.line = Math.min(t.line, 0); t.trans = 2; notes.push('전력 열세를 인정하고 수비를 두텁게 한 뒤 역습을 노립니다'); }
-  else if (gap <= -5) { t.build = Math.max(t.build, 1); t.tempo = 2; t.line = Math.max(t.line, 1); notes.push('전력 우위를 믿고 주도권을 잡으려 합니다'); }
+  else if (gap <= -5) { t.build = Math.min(t.build, 1); t.tempo = 2; t.line = Math.max(t.line, 1); notes.push('전력 우위를 믿고 주도권을 잡으려 합니다'); }
   if (v && v.last <= -2) { t.line = 0; t.press = 0; t.width = Math.min(t.width, 1); notes.push('지난 맞대결 대패를 분석해 수비 라인을 내렸습니다'); }
   else if (v && v.last >= 2) { t.press = Math.max(t.press, 1); notes.push('지난 맞대결 승리의 자신감으로 압박을 이어갑니다'); }
-  if (mt.press === 2 && t.build > 0) { t.build = 0; notes.push('당신의 강한 압박을 피해 롱볼 위주로 나옵니다'); }
+  if (mt.press === 2 && t.build < 2) { t.build = 2; notes.push('당신의 강한 압박을 피해 롱볼 위주로 나옵니다'); }
   if (mt.line === 2) { t.trans = 2; notes.push('당신의 높은 수비 라인 뒷공간을 노립니다'); }
   if (mt.width === 0 && t.width < 2) { t.width = 2; notes.push('좁게 서는 당신을 상대로 측면 공략을 준비했습니다'); }
   c.tactic = t; return notes.length ? notes[0] : null;
 }
+// ----- 감독 능력: 전술 이해도(tac)·적응력(adp)·전술 숙련도(fam) -----
+function mgrAbil(c) {
+  if (!c) return { tac: 60, adp: 50 };
+  try { if (G.mode === 'mgr' && G.mgr && !G.wc && c.id === me().club) { const g = mgrX(), n = G.mgr.seasons ? G.mgr.seasons.length : 0, tr = g.trophies ? g.trophies.length : 0;
+    return { tac: clamp(Math.round(48 + (g.staff.coach || 0) * 3 + Math.min(12, n * 2) + Math.min(12, tr * 3) + (g.mood - 50) / 10), 40, 92), adp: 55, user: true }; } } catch (e) {}
+  if (!c.coachR) c.coachR = { tac: clamp(Math.round(42 + ((c.strength || 60) - 55) * 0.9 + (rnd() - 0.5) * 22), 35, 92), adp: ri(35, 85) };
+  return c.coachR;
+}
+function coachTac(c) { try { const a = mgrAbil(c); c.tactic.coach = a.tac; if (c.fam == null) c.fam = 80; c.tactic.fam = c.fam; } catch (e) {} }
+function bumpFam(c) { if (c) c.fam = Math.min(100, (c.fam == null ? 80 : c.fam) + 3); }
 function simMatch(ctx, h, a) {
   const ch = clubOf(h), ca = clubOf(a);
   const sqH = availableSquad(ch, true), sqA = availableSquad(ca, true);
   const neutral = ctx.t==='po' || ctx.t==='wc' || (ctx.t==='cont' && ctx.fin);
+  coachTac(ch); coachTac(ca);
   const o = Eng.simulate(rnd, { squad: sqH, tactic: ch.tactic }, { squad: sqA, tactic: ca.tactic }, { homeA: !neutral });
   return finishMatch(ctx, h, a, o.gA, o.gB, sqH, sqA);
 }
@@ -317,7 +328,7 @@ function finishMatch(ctx, h, a, gh, ga, sqH, sqA, mine) {
   const bH = sqH.filter(p=>!stH.includes(p)).sort((x,y)=>y.ovr-x.ovr), bA = sqA.filter(p=>!stA.includes(p)).sort((x,y)=>y.ovr-x.ovr);
   const evH = (mine && mine.evH) || genEvents(ch, gh, stH, bH), evA = (mine && mine.evA) || genEvents(ca, ga, stA, bA);
   applyStats(ch, stH, bH, gh, ga, evH, key); applyStats(ca, stA, bA, ga, gh, evA, key);
-  aiLearn(ch, ca, gh, ga); aiLearn(ca, ch, ga, gh);
+  aiLearn(ch, ca, gh, ga); aiLearn(ca, ch, ga, gh); bumpFam(ch); bumpFam(ca);
   const hn = ch.name, an = ca.name;
   const hat = (evs) => { const c = {}; for (const e of evs) c[e.sc.id] = (c[e.sc.id]||0)+1; for (const id in c) if (c[id]>=3) return G.players[id]; };
   const ht = hat(evH) || hat(evA);
@@ -973,7 +984,9 @@ function prepareMine() {
   const pm = G.pendingMine, m = me();
   if (G.mode==='mgr' && !G.wc && G.mgr) { const g = mgrX(), mc = G.clubs[m.club]; for (const id of mc.pl) { const q = G.players[id]; if (q && !q.mgr) q.cond = clamp(95 + (g.mood - 50)/8, 70, 100); } }
   const h = clubOf(pm.h), a = clubOf(pm.a), mineHome = mineIn(pm.h);
-  const aiNote = G.mode==='mgr' ? aiAdapt(mineHome ? a : h, mineHome ? h : a) : null;
+  coachTac(h); coachTac(a);
+  const aiNote = aiAdapt(mineHome ? a : h, mineHome ? h : a);
+  if (G.mode !== 'mgr') aiAdapt(mineHome ? h : a, mineHome ? a : h);                       // 육성 모드: 내 팀 감독도 AI라서 상대에 맞춰 전술을 바꿈
   const sqH = availableSquad(h, true), sqA = availableSquad(a, true);
   const neutral = pm.ctx.t==='po' || pm.ctx.t==='wc' || (pm.ctx.t==='cont' && pm.ctx.fin);
   const o = Eng.simulate(rnd, { squad: sqH, tactic: h.tactic }, { squad: sqA, tactic: a.tactic }, { homeA: !neutral });
@@ -1481,7 +1494,7 @@ function mgrLineup() {
 }
 function mgrSetXi(i, pid) { const c = G.clubs[me().club], L = mgrLineup(); if (!L.slots.length) return; const ids = L.slots.map(e => e.p.id), roles = (c.tactic.roles || []).slice(), j = ids.indexOf(pid); if (j >= 0) { ids[j] = ids[i]; roles[j] = null; } ids[i] = pid; roles[i] = null; c.tactic.xi = ids; c.tactic.roles = roles; }
 function mgrSetRole(i, rid) { const c = G.clubs[me().club], roles = (c.tactic.roles || []).slice(); roles[i] = rid; c.tactic.roles = roles; }
-function mgrSetFormation(f) { const c = G.clubs[me().club]; c.tactic.formation = f; c.tactic.xi = null; c.tactic.roles = null; }
+function mgrSetFormation(f) { const c = G.clubs[me().club]; if (c.tactic.formation !== f) c.fam = 45; c.tactic.formation = f; c.tactic.xi = null; c.tactic.roles = null; }
 function mgrSetInstr(k, v) { G.clubs[me().club].tactic[k] = v; }
 function mgrAutoXi() { const t = G.clubs[me().club].tactic; t.xi = null; t.roles = null; }
 function mgrMarket(pos) {
@@ -1673,5 +1686,5 @@ function mgrReplan(min) {                                                  // �
 }
 
 const NATFLAG = (c) => DD.FLAG[c] || (WCN[c] && WCN[c][1]) || '';
-const API2 = { wcKO, wcExtra, wcAutoPick, wcSquadCheck, wcSquadSet, mgrK, SP_SLOT, mgrSponsorGen, mgrSponsorSign, mgrPreGen, mgrCerPress, renamePlayer, renameClub, NATFLAG, mgrTrophy, mgrX, STAFF, mgrStaffUp, mgrStaffCost, mgrStaffLv, mgrWage, mgrFanText, mgrPressGen, mgrPressPick, rivalOf, wcStart, wcInfo, wcRank, WCN, Eng, isMgr, mgrWin, createMgr, mgrOffers, mgrJobs, mgrGoal, mgrSquad, mgrLineup, mgrSetXi, mgrSetRole, mgrSetFormation, mgrSetInstr, mgrAutoXi, mgrMarket, mgrBuy, mgrSell, mgrValue, mgrStanding, mgrTakeJob, mgrTalkInfo, mgrTalkPick, mgrSub, mgrReplan, talkInfo, talkPick, posKinds: (sub) => POSK[sub] || POSK.ST, optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
+const API2 = { mgrAbil, wcKO, wcExtra, wcAutoPick, wcSquadCheck, wcSquadSet, mgrK, SP_SLOT, mgrSponsorGen, mgrSponsorSign, mgrPreGen, mgrCerPress, renamePlayer, renameClub, NATFLAG, mgrTrophy, mgrX, STAFF, mgrStaffUp, mgrStaffCost, mgrStaffLv, mgrWage, mgrFanText, mgrPressGen, mgrPressPick, rivalOf, wcStart, wcInfo, wcRank, WCN, Eng, isMgr, mgrWin, createMgr, mgrOffers, mgrJobs, mgrGoal, mgrSquad, mgrLineup, mgrSetXi, mgrSetRole, mgrSetFormation, mgrSetInstr, mgrAutoXi, mgrMarket, mgrBuy, mgrSell, mgrValue, mgrStanding, mgrTakeJob, mgrTalkInfo, mgrTalkPick, mgrSub, mgrReplan, talkInfo, talkPick, posKinds: (sub) => POSK[sub] || POSK.ST, optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
 if (typeof module !== 'undefined') module.exports = API2;

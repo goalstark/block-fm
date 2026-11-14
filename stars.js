@@ -134,9 +134,11 @@ const STARS = {
 // 실존 인물과 겹치지 않도록 이름을 살짝 바꾼 변형 이름으로 만든다(예: 살라 → 샐라). 같은 이름은 항상 같은 변형.
 const _LM = { 0: 15, 15: 0, 2: 3, 3: 2, 6: 7, 7: 6, 9: 12, 12: 9, 11: 18, 18: 11, 14: 12 };
 const _VM = { 0: 1, 1: 0, 4: 5, 5: 4, 8: 13, 13: 8, 18: 20, 20: 18, 2: 0, 6: 4 };
-const _vr = n => { const ch = n.split(' '), t = ch[ch.length - 1].split(''), ix = ch.length > 1 ? 0 : t.length - 1, c = t[ix].charCodeAt(0);
+const _GV = ['준','현','민','우','혁','진','석','훈','호','성','재','빈','규','태','범','수','영','환','욱','찬'];
+const _vr = n => { if (n.indexOf(' ') < 0 && n.length >= 2 && n.length <= 4) { let h = 7; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0; const g = n.slice(1).split(''), k = g.length - 1; let pick = _GV[h % _GV.length]; if (pick === g[k]) pick = _GV[(h + 3) % _GV.length]; g[k] = pick; return n[0] + g.join(''); }   // 한국 이름: 성은 유지하고 이름 끝 글자를 바꿈
+  const ch = n.split(' '), t = ch[ch.length - 1].split(''), ix = 0, c = t[ix].charCodeAt(0);
   if (c < 0xAC00 || c > 0xD7A3) return n; const o = c - 0xAC00, jong = o % 28, vow = Math.floor(o / 28) % 21, L = Math.floor(o / 588);
-  t[ix] = String.fromCharCode(ch.length === 1 && _LM[L] != null ? 0xAC00 + (_LM[L] * 21 + vow) * 28 + jong : _VM[vow] != null ? 0xAC00 + (L * 21 + _VM[vow]) * 28 + jong : (jong === 0 ? c + 4 : c)); ch[ch.length - 1] = t.join(''); return ch.join(' '); };
+  t[ix] = String.fromCharCode(_VM[vow] != null ? 0xAC00 + (L * 21 + _VM[vow]) * 28 + jong : (jong === 0 ? c + 4 : c)); ch[ch.length - 1] = t.join(''); return ch.join(' '); };
 const STARS_X = {
   club: {
     // 잉글랜드
