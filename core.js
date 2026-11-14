@@ -21,7 +21,7 @@ function shuffle(a) { for (let i=a.length-1;i>0;i--) { const j = Math.floor(rnd(
 function jong(n){ const c = String(n).trim().slice(-1); const code = c.charCodeAt(0); if (code>=0xAC00 && code<=0xD7A3) return ((code-0xAC00)%28)!==0; return false; }
 const iga = (n) => n + (jong(n)?'이':'가'), eul = (n) => n + (jong(n)?'을':'를'), eun = (n) => n + (jong(n)?'은':'는');
 const clamp = (x,a,b) => Math.max(a, Math.min(b, x));
-const WCN = { ARG:[0,0,84], FRA:[0,0,84], ESP:[0,0,84], ENG:[0,0,83], BRA:[0,0,83], POR:[0,0,82], NED:[0,0,81], GER:[0,0,81], BEL:[0,0,79], ITA:[0,0,79], CRO:[0,0,78], URU:[0,0,78], COL:[0,0,77], MAR:[0,0,77], JPN:[0,0,76], USA:[0,0,76], MEX:[0,0,75], SUI:[0,0,75], SEN:[0,0,75], DEN:[0,0,75], KOR:[0,0,74], AUT:[0,0,74], TUR:[0,0,74], NOR:['노르웨이','🇳🇴',74,'N'], ECU:['에콰도르','🇪🇨',73,'L'], SRB:[0,0,72], SWE:['스웨덴','🇸🇪',72,'N'], IRN:[0,0,71], NGA:[0,0,71], CIV:[0,0,71], CAN:['캐나다','🇨🇦',71,'N'], AUS:[0,0,70], EGY:[0,0,70], SCO:[0,0,70], ALG:['알제리','🇩🇿',70,'A'], POL:['폴란드','🇵🇱',70,'N'], PAR:['파라과이','🇵🇾',69,'L'], TUN:['튀니지','🇹🇳',69,'A'], CMR:['카메룬','🇨🇲',68,'F'], GHA:[0,0,68], SAU:[0,0,67], QAT:[0,0,66], PAN:['파나마','🇵🇦',66,'L'], UZB:['우즈베키스탄','🇺🇿',66,'A'], CRC:['코스타리카','🇨🇷',65,'L'], JOR:['요르단','🇯🇴',64,'A'], RSA:[0,0,64], NZL:['뉴질랜드','🇳🇿',62,'N'] };
+const WCN = { ARG:[0,0,84], FRA:[0,0,84], ESP:[0,0,84], ENG:[0,0,83], BRA:[0,0,83], POR:[0,0,82], NED:[0,0,81], GER:[0,0,81], BEL:[0,0,79], CRO:[0,0,78], URU:[0,0,78], COL:[0,0,77], MAR:[0,0,77], JPN:[0,0,76], USA:[0,0,76], MEX:[0,0,75], SUI:[0,0,75], SEN:[0,0,75], KOR:[0,0,74], AUT:[0,0,74], TUR:[0,0,74], NOR:['노르웨이','🇳🇴',74,'N'], ECU:['에콰도르','🇪🇨',73,'L'], SWE:['스웨덴','🇸🇪',72,'N'], IRN:[0,0,71], CIV:[0,0,71], CAN:['캐나다','🇨🇦',71,'N'], AUS:[0,0,70], EGY:[0,0,70], SCO:[0,0,70], ALG:['알제리','🇩🇿',70,'A'], PAR:['파라과이','🇵🇾',69,'L'], TUN:['튀니지','🇹🇳',69,'A'], GHA:[0,0,68], SAU:[0,0,67], QAT:[0,0,66], PAN:['파나마','🇵🇦',66,'L'], UZB:['우즈베키스탄','🇺🇿',66,'A'], JOR:['요르단','🇯🇴',64,'A'], RSA:[0,0,64], NZL:['뉴질랜드','🇳🇿',62,'N'], CZE:['체코','🇨🇿',71,'N'], BIH:['보스니아','🇧🇦',69,'N'], HAI:['아이티','🇭🇹',62,'F'], CUW:['퀴라소','🇨🇼',61,'L'], CPV:['카보베르데','🇨🇻',64,'F'], IRQ:['이라크','🇮🇶',65,'A'], COD:['콩고민주공화국','🇨🇩',66,'F'] };
 const WCCOL = { KOR:['#CD2E3A','#FFFFFF'], BRA:['#F7D117','#009739'], ARG:['#75AADB','#FFFFFF'], FRA:['#1F3A93','#FFFFFF'], ESP:['#C60B1E','#F1BF00'], ENG:['#F3F3F3','#1F3A93'], GER:['#F3F3F3','#222222'], ITA:['#1F6FD0','#FFFFFF'], NED:['#F36C21','#FFFFFF'], POR:['#B01E2A','#0B6B3A'], JPN:['#1F3A93','#FFFFFF'], USA:['#1F3A93','#C8102E'], MEX:['#0B6B3A','#C8102E'], BEL:['#C8102E','#111111'], CRO:['#E11B22','#FFFFFF'], URU:['#7EB6E8','#111111'], COL:['#F7D117','#1F3A93'], MAR:['#C1272D','#0B6B3A'], SEN:['#0B8F4D','#F7D117'], NGA:['#0B8F4D','#FFFFFF'], CAN:['#D52B1E','#FFFFFF'], AUS:['#F7D117','#0B6B3A'] };
 const NATK = (c) => (DD.FLAG[c] || (WCN[c] && WCN[c][1]) ? (DD.FLAG[c] || WCN[c][1]) + ' ' : '') + (DD.NAT_KO[c] || (WCN[c] && WCN[c][0]) || c);
 
@@ -80,12 +80,12 @@ function seedStars(c) {
   }
   if (!list) return;
   for (const s of list) {
-    const [nm, sub, ovr, age, nat] = s.split('|'); const T = +ovr;
+    const [nm, sub, ovr, age, nat, mix] = s.split('|'); const T = +ovr;
     const same = c.pl.map(id => G.players[id]).filter(p => p && p.sub===sub && !p.star).sort((a,b) => a.ovr-b.ovr);
     if (same.length) { const w = same[0]; delete G.players[w.id]; c.pl.splice(c.pl.indexOf(w.id), 1); }
     const p = newPlayer(c, sub, T, c.style, +age, nat);
     const d = T - p.ovr; if (d) { for (const k of Object.keys(p.a)) p.a[k] = Math.max(20, Math.min(97, p.a[k] + d)); Eng.finalize(p); }
-    p.name = nm; p.star = 1; p.pot = Math.max(p.ovr, p.pot);
+    p.name = nm; p.star = 1; p.pot = Math.max(p.ovr, p.pot); if (mix) p.mix = mix;
   }
 }
 function ensureSquad(c) {
@@ -1285,6 +1285,7 @@ function startWcKO(comp) {
   comp.stage = 'KO'; comp.round = 0; comp.alive = pairs.flat(); koRound(comp, pairs);
   addNews('cup', `${comp.name} 조별리그 종료 — 32강 대진이 확정됐습니다`, true);
 }
+const WC_REAL = [['MEX','RSA','KOR','CZE'],['CAN','BIH','QAT','SUI'],['BRA','MAR','HAI','SCO'],['USA','PAR','AUS','TUR'],['GER','CUW','CIV','ECU'],['NED','JPN','SWE','TUN'],['BEL','EGY','IRN','NZL'],['ESP','CPV','SAU','URU'],['FRA','SEN','IRQ','NOR'],['ARG','ALG','AUT','JOR'],['POR','COD','UZB','COL'],['ENG','CRO','GHA','PAN']];
 function wcStart(opts) {
   const seed = opts.seed || (Date.now() % 1000000);
   rs = seed | 0;
@@ -1295,7 +1296,10 @@ function wcStart(opts) {
   const comp = mkComp('WC', '월드컵 2026', 'wc', 'WORLD', '2026'); comp.stage = 'G'; comp.groups = [];
   const ids = G.clubs.map(c => c.id).sort((a, b) => G.clubs[b].strength - G.clubs[a].strength);
   for (let g = 0; g < 12; g++) comp.groups.push({ teams: [], table: {} });
-  for (let pot = 0; pot < 4; pot++) { const p = shuffle(ids.slice(pot * 12, pot * 12 + 12)); p.forEach((id, g) => { comp.groups[g].teams.push(id); comp.groups[g].table[id] = { p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 }; }); }
+  const putG = (g, id) => { comp.groups[g].teams.push(id); comp.groups[g].table[id] = { p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 }; };
+  comp.draw = opts.draw === 'rand' ? 'rand' : 'real';
+  if (comp.draw === 'real') WC_REAL.forEach((cs, g) => cs.forEach(cd => putG(g, G.clubs.find(c => c.nat === cd).id)));
+  else for (let pot = 0; pot < 4; pot++) { const p = shuffle(ids.slice(pot * 12, pot * 12 + 12)); p.forEach((id, g) => putG(g, id)); }
   comp.left = 0;
   const md = [dayOf(2026, 6, 11), dayOf(2026, 6, 16), dayOf(2026, 6, 21)];
   comp.groups.forEach((g, gi) => circle(g.teams).forEach((ms, i) => ms.forEach(([h, a]) => { addFx(md[i] + (i < 2 ? gi % 4 : gi % 4), h, a, { t: 'wc', id: 'WC', g: gi }); comp.left++; })));
@@ -1305,6 +1309,7 @@ function wcStart(opts) {
   const club = G.clubs.find(c => c.nat === opts.nat);
   const p = createMe({ name: opts.name, look: opts.look, nat: opts.nat || 'KOR', club: club.id, age: 30, pos: 'CM', h: 178, prefs: [], trait: 'team' });
   club.pl = club.pl.filter(id => id !== p.id);
+  for (const sub of ['GK','CB','CB','CB','FB','FB','DM','CM','CM','AM','W','W','ST','ST']) newFor(club, sub, ri(1, 3), false);   // 선발 후보 14명 추가(총 40명)
   p.mgr = true; p.retired = true; p.ovr = 1; p.pot = 1; p.fame = 0; p.ct = { until: 2300, wage: 0 }; p.offers = []; p.trust = 100; p.inj = 0;
   G.news = G.news.filter(n => !(n.type === 'me' && /계약했습니다/.test(n.text)));
   const rk = ids.indexOf(club.id) + 1;
@@ -1312,6 +1317,29 @@ function wcStart(opts) {
   G.mode = 'mgr'; G.mgr = { name: opts.name, board: 60, cash: 0, target: rk, w: 0, d: 0, l: 0, seasons: [], sacked: false, wcGoal: goal, rank: rk };
   addNews('me', `${opts.name} 감독, ${club.name} 대표팀을 이끌고 월드컵에 나섭니다. 목표: ${goal}`, true, { me: true });
   return p;
+}
+const WC_QUOTA = { GK:3, CB:5, FB:4, DM:2, CM:3, AM:2, W:4, ST:3 };
+function wcAutoPick() {
+  const club = clubOf(me().club), pl = club.pl.map(id => G.players[id]).sort((a, b) => b.ovr - a.ovr), out = [];
+  for (const sub of Object.keys(WC_QUOTA)) out.push(...pl.filter(p => p.sub === sub).slice(0, WC_QUOTA[sub]).map(p => p.id));
+  for (const p of pl) { if (out.length >= 26) break; if (!out.includes(p.id)) out.push(p.id); }
+  return out;
+}
+function wcSquadCheck(ids) {
+  const pl = ids.map(id => G.players[id]).filter(Boolean), n = (...ss) => pl.filter(p => ss.includes(p.sub)).length;
+  if (pl.length !== 26) return `26명을 골라야 합니다 (현재 ${pl.length}명)`;
+  if (n('GK') < 3) return '골키퍼는 최소 3명이 필요합니다';
+  if (n('CB', 'FB') < 8) return '수비수(CB·FB)는 최소 8명이 필요합니다';
+  if (n('DM', 'CM', 'AM') < 5) return '미드필더는 최소 5명이 필요합니다';
+  if (n('W', 'ST') < 5) return '공격수(W·ST)는 최소 5명이 필요합니다';
+  return null;
+}
+function wcSquadSet(ids) {
+  if (wcSquadCheck(ids)) return false;
+  const club = clubOf(me().club), keep = new Set(ids);
+  for (const id of club.pl) if (!keep.has(id)) delete G.players[id];
+  club.pl = ids.slice(); if (club.tactic) { club.tactic.xi = null; club.tactic.roles = null; }
+  return true;
 }
 function wcInfo() {
   const comp = compById('WC'); if (!comp) return null; const mine = me().club;
@@ -1557,5 +1585,5 @@ function mgrReplan(min) {                                                  // �
 }
 
 const NATFLAG = (c) => DD.FLAG[c] || (WCN[c] && WCN[c][1]) || '';
-const API2 = { mgrK, SP_SLOT, mgrSponsorGen, mgrSponsorSign, mgrPreGen, mgrCerPress, renamePlayer, renameClub, NATFLAG, mgrTrophy, mgrX, STAFF, mgrStaffUp, mgrStaffCost, mgrStaffLv, mgrWage, mgrFanText, mgrPressGen, mgrPressPick, rivalOf, wcStart, wcInfo, wcRank, WCN, Eng, isMgr, mgrWin, createMgr, mgrOffers, mgrJobs, mgrGoal, mgrSquad, mgrLineup, mgrSetXi, mgrSetRole, mgrSetFormation, mgrSetInstr, mgrAutoXi, mgrMarket, mgrBuy, mgrSell, mgrValue, mgrStanding, mgrTakeJob, mgrTalkInfo, mgrTalkPick, mgrSub, mgrReplan, talkInfo, talkPick, posKinds: (sub) => POSK[sub] || POSK.ST, optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
+const API2 = { wcAutoPick, wcSquadCheck, wcSquadSet, mgrK, SP_SLOT, mgrSponsorGen, mgrSponsorSign, mgrPreGen, mgrCerPress, renamePlayer, renameClub, NATFLAG, mgrTrophy, mgrX, STAFF, mgrStaffUp, mgrStaffCost, mgrStaffLv, mgrWage, mgrFanText, mgrPressGen, mgrPressPick, rivalOf, wcStart, wcInfo, wcRank, WCN, Eng, isMgr, mgrWin, createMgr, mgrOffers, mgrJobs, mgrGoal, mgrSquad, mgrLineup, mgrSetXi, mgrSetRole, mgrSetFormation, mgrSetInstr, mgrAutoXi, mgrMarket, mgrBuy, mgrSell, mgrValue, mgrStanding, mgrTakeJob, mgrTalkInfo, mgrTalkPick, mgrSub, mgrReplan, talkInfo, talkPick, posKinds: (sub) => POSK[sub] || POSK.ST, optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
 if (typeof module !== 'undefined') module.exports = API2;

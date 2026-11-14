@@ -33,7 +33,32 @@ function sprite(look, kit, num) {
   return spriteCache[key] = cv.toDataURL();
 }
 const LK_S = ['fair','tan','olive','brown','deep'], LK_H = ['black','dark','brown','blond','red','gray','navy'], LK_ST = ['short','sidepart','buzz','curly','long','mohawk'];
-const lookOf = (p) => p.me && p.look ? p.look : { skin: LK_S[p.id % 5], hair: LK_H[p.id % 7], style: LK_ST[p.id % 6] };
+// 국적별 외모: 동아시아(한·일·중 등)는 황색계 피부·검은 머리, 아프리카·카리브는 어두운 피부, 유럽은 밝은 피부 위주(이민 2세대 일부 포함).
+// p.mix === 'W'(백인 혼혈) / 'B'(흑인 혼혈)이면 국적과 상관없이 해당 외모로 표시(예: 독일계 한국 선수).
+const LOOK_R = {
+  EA: { sk: ['tan', 'fair', 'tan', 'fair', 'tan', 'fair', 'tan'], hr: ['black', 'black', 'dark', 'black', 'black', 'dark'], st: ['short', 'sidepart', 'buzz', 'short', 'sidepart', 'mohawk'] },
+  CA: { sk: ['tan', 'fair', 'tan', 'olive', 'fair'], hr: ['black', 'black', 'dark', 'brown'], st: ['short', 'sidepart', 'buzz', 'curly'] },
+  ME: { sk: ['olive', 'tan', 'olive', 'tan', 'fair', 'brown'], hr: ['black', 'dark', 'black', 'dark', 'brown'], st: ['short', 'sidepart', 'buzz', 'curly', 'short'] },
+  AF: { sk: ['deep', 'brown', 'deep', 'brown', 'deep', 'brown', 'deep'], hr: ['black', 'black', 'dark', 'black', 'black'], st: ['buzz', 'short', 'curly', 'mohawk', 'buzz', 'short'] },
+  LA: { sk: ['tan', 'olive', 'fair', 'tan', 'olive', 'brown', 'fair'], hr: ['black', 'dark', 'brown', 'black', 'dark', 'blond'], st: ['short', 'sidepart', 'curly', 'long', 'buzz', 'short'] },
+  BR: { sk: ['fair', 'tan', 'olive', 'brown', 'deep', 'tan', 'brown', 'olive'], hr: ['black', 'dark', 'brown', 'black', 'blond', 'dark'], st: ['short', 'curly', 'buzz', 'sidepart', 'mohawk', 'curly'] },
+  EU: { sk: ['fair', 'fair', 'tan', 'fair', 'olive', 'fair', 'fair', 'tan'], hr: ['brown', 'blond', 'dark', 'black', 'brown', 'red', 'blond', 'dark'], st: ['short', 'sidepart', 'buzz', 'curly', 'long', 'sidepart', 'short'] },
+  EM: { sk: ['fair', 'fair', 'tan', 'brown', 'fair', 'deep', 'olive', 'fair'], hr: ['brown', 'blond', 'dark', 'black', 'brown', 'black', 'dark', 'red'], st: ['short', 'sidepart', 'buzz', 'curly', 'mohawk', 'short', 'sidepart'] },
+  WE: { sk: ['fair', 'tan', 'fair', 'brown', 'olive', 'fair', 'deep', 'tan'], hr: ['brown', 'blond', 'dark', 'black', 'red', 'black', 'dark', 'brown'], st: ['short', 'sidepart', 'buzz', 'curly', 'long', 'short', 'mohawk'] }
+};
+const LOOK_REG = {};
+[['EA', 'KOR JPN CHN PRK TWN HKG VNM THA SGP IDN MYS PHI'], ['CA', 'UZB KAZ KGZ TJK'], ['ME', 'SAU IRN IRQ QAT JOR TUR UAE KUW OMN BHR SYR LBN MAR ALG TUN EGY LBY'], ['AF', 'SEN GHA CIV COD CPV RSA NGA CMR HAI CUW MLI GUI GAB GNB ANG ZAM ZIM KEN UGA TAN'], ['LA', 'ARG URU PAR COL ECU MEX CHI PER VEN BOL CRC PAN HON SLV'], ['BR', 'BRA'], ['EU', 'CRO SRB BIH CZE POL SVK SVN HUN ROU BUL ALB MNE GEO UKR RUS NOR SWE DEN FIN ISL SCO IRL WAL NIR AUT NZL AUS CAN GRE MKD KOS'], ['EM', 'ENG USA FRA BEL NED SUI'], ['WE', 'GER ESP POR ITA']].forEach(([r, cs]) => cs.split(' ').forEach(c => LOOK_REG[c] = r));
+function lookOf(p) {
+  if (p.me && p.look) return p.look;
+  const id = p.id, hs = (id * 2654435761 >>> 0);
+  if (p.mix === 'W') return { skin: 'fair', hair: ['brown', 'blond', 'dark'][id % 3], style: ['sidepart', 'short', 'sidepart'][id % 3] };
+  if (p.mix === 'B') return { skin: ['brown', 'deep'][id % 2], hair: 'black', style: ['curly', 'buzz', 'short'][id % 3] };
+  const R = LOOK_R[LOOK_REG[p.nat]] ;
+  if (!R) return { skin: LK_S[id % 5], hair: LK_H[id % 7], style: LK_ST[id % 6] };
+  const pk = (a, k) => a[(hs >>> k) % a.length];
+  if (LOOK_REG[p.nat] === 'EA' && (hs >>> 9) % 25 === 0) return { skin: 'fair', hair: ['brown', 'blond', 'dark'][id % 3], style: 'sidepart' };   // 소수는 혼혈 외모
+  return { skin: pk(R.sk, 3), hair: pk(R.hr, 7), style: pk(R.st, 11) };
+}
 function sprH(p, club, w, cls) { const c = club || (p.club !== null && p.club !== undefined ? Core.clubOf(p.club) : null); return `<span class="spr ${cls||''}" style="width:${w}px;height:${Math.round(w*34/16)}px;background-image:url(${sprite(lookOf(p), c ? (p.sub === 'GK' ? gkKitFor(c) : [c.col, c.col2]) : null)})"></span>`; }
 function regionOf(c) { const G = G0(); if (c.region) return c.region; if (c.parent !== undefined && c.parent !== null && G.clubs[c.parent]) return regionOf(G.clubs[c.parent]); return String(c.name).replace(/ U18$/, '').split(' ')[0]; }
 const mySprite = (w) => { const m = Core.me(); const c = Core.clubOf(m.club); return `<span class="spr" style="width:${w}px;height:${w*34/16}px;background-image:url(${sprite(m.look,m.sub==='GK'?gkKitFor(c):[c.col,c.col2])})"></span>`; };
@@ -276,7 +301,7 @@ function histTable(p) {
 function xferList(p) { if (!p.xfers||!p.xfers.length) return ''; return `<div class="sec">이적 이력</div><div class="card">${p.xfers.slice().reverse().map(x=>`<div class="li"><span class="dim">${Core.fmtDate(x[0]).slice(0,10)}</span> ${x[1]!==null?esc(Core.clubOf(x[1]).name):'자유계약'} → ${esc(Core.clubOf(x[2]).name)} ${x[3]>0?`<span class="dim">(${x[3]}억)</span>`:''}</div>`).join('')}</div>`; }
 function profileHTML(p) {
   const c = p.club!==null ? Core.clubOf(p.club) : null;
-  const head = p.me ? mySprite(56) : `<span class="spr" style="width:56px;height:119px;background-image:url(${sprite({skin:['fair','tan','olive','brown','deep'][p.id%5],hair:['black','dark','brown','blond','red','gray','navy'][p.id%7],style:['short','sidepart','buzz','curly','long','mohawk'][p.id%6]},c?(p.sub==='GK'?gkKitFor(c):[c.col,c.col2]):null)})"></span>`;
+  const head = p.me ? mySprite(56) : `<span class="spr" style="width:56px;height:119px;background-image:url(${sprite(lookOf(p),c?(p.sub==='GK'?gkKitFor(c):[c.col,c.col2]):null)})"></span>`;
   const nt = p.nst && p.nst.a>0 ? `<span class="tag">대표 ${p.nst.a}경기 ${p.nst.g}골</span>` : '';
   return `<div class="prof">${head}<div><div class="ttl">${esc(p.name)} <button class="btn sm sec" data-act="rnopen" data-id="p:${p.id}" aria-label="이름 변경">✏</button></div><div class="dim">${Core.POS_KO[p.sub]} · ${p.age}세 · ${Core.NATK(p.nat)} · ${c?esc(c.name):'무소속'}</div><div class="row g8" style="flex-wrap:wrap"><span class="tag">종합 ${p.ovr}</span>${p.me?`<span class="tag">잠재 ${p.pot}</span>`:''}<span class="tag">계약 ${p.ct.until}</span>${nt}</div>${p.inj>0?`<div class="dim" style="color:#FFB27A">부상 ${p.inj}일</div>`:''}</div></div><div class="sec">시즌별 기록</div>${histTable(p)}${xferList(p)}<div class="sec">능력치</div>${attrBars(p)}`;
 }
@@ -547,7 +572,7 @@ const FTS = { ST: [89, 7], W: [85, 0], AM: [77, 11], CM: [63, 0], FB: [70, 0], D
 const PA = (p, k) => (p && p.a && p.a[k]) || 50;
 const uOf = (x, d) => d > 0 ? x : 100 - x;
 const dM_ = (M) => M.mineHome ? 1 : -1;
-const tsOf = () => (MV && MV.fast) ? 3 : (S.spd || 1);
+const tsOf = () => (MV && (MV.fast || MV.hlFast)) ? 4 : (S.spd || 1);
 function initPos(M) {
   const dM = dM_(M); MV.pos = { m: [], o: [] }; MV.tgt = { m: [], o: [] }; MV.run = {};
   { const fm = (M.mine && M.mine.tactic && M.mine.tactic.formation) || '4-4-2', fo = (M.opp && M.opp.tactic && M.opp.tactic.formation) || '4-4-2'; MV.fxy = { m: fpos(MV.mst, fm), o: fpos(MV.ost, fo) }; }
@@ -930,6 +955,18 @@ function emitAt(M, min, anim) {
 const SPD = [1, 1.5, 2], BASE_MS = 450;
 function spdGet() { try { const v = +localStorage.getItem('bfm_spd'); if (SPD.includes(v)) return v; } catch (e) {} return 1; }
 function spdMs() { return Math.round(BASE_MS / (S.spd || (S.spd = spdGet()))); }
+// 경기 보기: 풀(전체) / 하이라이트(골·결정적 기회·슈퍼세이브·퇴장·내 장면 앞뒤만 정상 속도, 나머지는 빠르게 지나감)
+function vmGet() { try { const v = localStorage.getItem('bfm_vm'); if (v === 'full' || v === 'hl') return v; } catch (e) {} return 'full'; }
+function hlKeys(M) {
+  const ks = new Set(); M.evMine.concat(M.evOpp).forEach(e => ks.add(e.min)); (M.evx || []).forEach(x => { if (['ch', 'sv', 'pt', 'rc'].includes(x.t)) ks.add(x.min); }); (M.moments || []).forEach(m => ks.add(m.min));
+  return [...ks].sort((a, b) => a - b);
+}
+function hlNear() { if (!MV || !MV.hl) return true; return MV.keys.some(k => MV.min >= k - 3 && MV.min <= k + 1); }
+function hlSync() {
+  if (!MV || MV.over || MV.skipping || MV.fast || !MV.timer) return;
+  const near = hlNear(), sp = near ? spdMs() : 40; MV.hlFast = !!MV.hl && !near;
+  if (sp !== MV.speed) { MV.speed = sp; clearInterval(MV.timer); MV.timer = setInterval(tick, sp); }
+}
 function lockOrient(mode) { try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ScreenOrientation;
   if (P && P.lock) P.lock({ orientation: mode }).catch(() => {});
   else if (screen.orientation && screen.orientation.lock) screen.orientation.lock(mode).catch(() => {}); } catch (e) {} }
@@ -948,7 +985,7 @@ function startMatch() {
   const M = Core.prepareMine(); if (!M) return;
   const PT = pickPitch(M);
   MV = { min: 0, timer: null, paused: false, log: [], over: false, momentOpen: null, speed: spdMs(), ball: { x: 50, y: 32 }, poss: 'm', holder: null, pos: { m: [], o: [] }, ballFree: false, red: {}, pitch: PT, kit: pickKits(M, PT), t: 0, rt: 0, kick: 0, act: null, dec: 1, els: null, raf: 0, last: 0, run: {}, tgt: { m: [], o: [] }, mst: sortSt(M.stMine), ost: sortSt(M.stOpp), fxT: null, st: { m: { pt: 0, sh: 0, sot: 0, xg: 0, pa: 0, pm: 0 }, o: { pt: 0, sh: 0, sot: 0, xg: 0, pa: 0, pm: 0 } }, heat: new Array(60).fill(0), my: { pa: 0, pm: 0 } };
-  placeMe(M);
+  placeMe(M); MV.hl = (S.vm || (S.vm = vmGet())) === 'hl'; MV.keys = hlKeys(M); if (MV.hl && !hlNear() && M.role !== 'bench' && M.role !== 'inj') { MV.speed = 40; MV.hlFast = true; }
   MV.kc = { m: kitClub(M.mine, MV.kit.m), o: kitClub(M.opp, MV.kit.o) }; S.matchOpen = true; sfx('whistle'); if (M.role==='bench' || M.role==='inj') { MV.speed = 60; MV.fast = true; }
   $('#match').innerHTML = `<div class="mh" id="mh"></div><div id="pitchbox">${pitchHTML(M)}</div><div class="mb" id="mb"></div><div class="mf" id="mf"></div>`;
   lockOrient('landscape'); $('#match').classList.add('on'); initPos(M); bringMeTop(); renderMatch(); movePitch(); MV.timer = setInterval(tick, MV.speed);
@@ -963,7 +1000,7 @@ function tick() {
   const M = G0().mm; if (!M || !MV || MV.paused || MV.over) return;
   MV.min++;
   const m = Core.me();
-  emitAt(M, MV.min, true);
+  emitAt(M, MV.min, !MV.hlFast);
   if (M.role==='sub' && MV.min===M.from) MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 투입 — ${esc(m.name)}` })
   if (M.role==='sub' && MV.min===M.from && !MV.mst.some(p => p.me)) { let ix = MV.mst.findIndex(p => p.sub === m.sub && p.sub !== 'GK'); if (ix < 0) ix = MV.mst.findIndex(p => p.sub !== 'GK'); if (ix >= 0) { const outp = MV.mst[ix]; MV.mst[ix] = m; lbl('교체 투입'); const pb = $('#pitchbox'); if (pb) { pb.innerHTML = pitchHTML(M); MV.els = null; bringMeTop(); } fxShow(`<div class="gchar">${sprH(m, MV.kc.m, 40)}</div><div class="gs">교체 투입 · ${esc(m.name)}</div><div class="dim">${esc(outp.name)} ↔ ${MV.min}분</div>`, 'save', 1800, false); } }
   const mo = M.moments[M.mi];
@@ -975,7 +1012,7 @@ function tick() {
     else if (M.role === 'start' || M.role === 'sub') MV.talk = Object.assign(Core.talkInfo(M.mineHome ? hh - ha : ha - hh), { }); 
     else setTimeout(startSecond, 2300); }
   if (MV.min >= 90 && !MV.pg) { MV.min = 90; clearInterval(MV.timer); MV.over = true; sfx('whistle'); finishLog(M); }
-  movePitch(); renderMatch();
+  movePitch(); renderMatch(); hlSync();
 }
 function skipMatch() {
   if (MV.lead) { const M0 = G0().mm; clearInterval(MV.timer); if (MV.talk) { if (G0().mm && G0().mm.role === 'mgr') Core.mgrTalkPick('calm', 0); else Core.talkPick('follow'); MV.talk = null; MV.paused = false; MV.goalRes = 'o'; }
@@ -1018,7 +1055,7 @@ function renderMatch() {
   const roleTxt = M.role==='mgr' ? '감독석' : M.role==='start' ? '선발 출전' : M.role==='sub' ? (MV && MV.min >= M.from ? `${M.from}분 교체 투입` : `벤치 → ${M.from}분 투입 예정`) : M.role==='inj' ? '부상으로 결장' : '벤치 (출전 명단 제외)';
   $('#mh').innerHTML = `<div class="dim">${esc(M.title)} · ${Core.fmtDate(G.day)}</div><div class="sc"><div>${crest(M.h,18)} ${esc(M.h.name)}</div><b>${sh} : ${sa}</b><div>${esc(M.a.name)} ${crest(M.a,18)}</div></div><div class="dim">${MV.min}' · ${roleTxt}</div><div class="bar"><i style="width:${MV.min/90*100}%"></i></div>`;
   $('#mb').className = 'mb' + (MV.momentOpen || MV.talk ? ' hasdec' : MV.over ? ' isover' : ''); $('#mb').innerHTML = `${MV.momentOpen || MV.talk ? dec : mtabs() + ((S.mtab || 'flow') === 'flow' || !MV.over ? dec : '<button class="btn wide" data-act="mend" style="margin:4px 0">결과 확인</button>')}${MV.momentOpen || MV.talk || (S.mtab || 'flow') === 'flow' ? `<div class="sec">경기 흐름</div>${MV.log.map(x => `<div class="li ev ${x.cls||''}"><span class="mn">${x.min}'</span><span class="ico">${x.ic}</span><span class="et">${x.t}</span></div>`).join('') || '<div class="dim">킥오프!</div>'}` : S.mtab === 'stat' ? statView(M) : S.mtab === 'tac' ? tacView(M) : matchMeView(M)}`;
-  $('#mf').innerHTML = MV.over ? '' : `<div class="spd">${SPD.map(v => `<button class="chip ${(S.spd||1)===v?'on':''}" data-act="mspd" data-id="${v}">${v}배속</button>`).join('')}${MV.momentOpen || MV.mgrPanel ? '' : (M.role==='mgr' ? '<button class="btn sec" data-act="mpopen">전술·교체</button>' : '') + '<button class="btn sec" data-act="mskip">끝까지 자동 진행</button>'}</div>`;
+  $('#mf').innerHTML = MV.over ? '' : `<div class="spd">${[['full', '풀'], ['hl', '하이라이트']].map(([k, n]) => `<button class="chip ${(S.vm || 'full') === k ? 'on' : ''}" data-act="mvm" data-id="${k}">${n}</button>`).join('')}${SPD.map(v => `<button class="chip ${(S.spd||1)===v?'on':''}" data-act="mspd" data-id="${v}">${v}배속</button>`).join('')}${MV.momentOpen || MV.mgrPanel ? '' : (M.role==='mgr' ? '<button class="btn sec" data-act="mpopen">전술·교체</button>' : '') + '<button class="btn sec" data-act="mskip">끝까지 자동 진행</button>'}</div>`;
   if (MV.mgrPanel) { $('#mb').className = 'mb'; $('#mb').innerHTML = mgrPanelHTML(M); $('#mf').innerHTML = '<button class="btn wide" data-act="mpclose">경기 재개 ▶</button>'; }
 }
 function endMatchUI() {
@@ -1059,10 +1096,21 @@ function wcselView() {
   const ch = (key, arr, map) => `<div class="chips w">${arr.map(v => `<button class="chip ${c[key] === v ? 'on' : ''}" data-act="cr" data-k="${key}" data-id="${v}">${map ? map[v] : v}</button>`).join('')}</div>`;
   const sw = (key, map) => `<div class="chips">${Object.keys(map).map(v => `<button class="sw ${c[key] === v ? 'on' : ''}" data-act="cr" data-k="${key}" data-id="${v}" style="background:#${map[v]}" aria-label="${v}"></button>`).join('')}</div>`;
   const cards = codes.map((k, i) => `<div class="wcn ${c.wcn === k ? 'on' : ''}" data-act="wcpick" data-id="${k}"><div class="wcf">${(Core.FLAG[k] || W[k][1] || '')}</div><div class="wcnm">${esc(Core.NATK(k).replace(/^\S+\s/, ''))}</div><div class="wcs"><i style="width:${Math.round((W[k][2] - 58) / 28 * 100)}%"></i></div><div class="dim s11">${i < 8 ? '우승 후보' : i < 20 ? '강팀' : i < 34 ? '중위권' : '도전자'} · ${W[k][2]}</div></div>`).join('');
-  return `<div class="top"><div class="ttl">월드컵 모드 <span class="dim">· 2026</span></div></div><div class="body"><div class="card row g8"><span class="spr" style="width:96px;height:204px;background-image:url(${sprite({ skin: c.skin, hair: c.hair, style: c.style }, ['#2B3A55', '#F3F3F3'])})"></span><div class="grow"><div class="dim">감독 이름</div><input id="nm" value="${esc(c.name)}" maxlength="8"><div class="dim" style="margin-top:8px">조 추첨은 시작할 때 자동으로 진행됩니다. 약한 나라일수록 목표가 낮고 이변의 재미가 큽니다.</div></div></div>
+  return `<div class="top"><div class="ttl">월드컵 모드 <span class="dim">· 2026</span></div></div><div class="body"><div class="card row g8"><span class="spr" style="width:96px;height:204px;background-image:url(${sprite({ skin: c.skin, hair: c.hair, style: c.style }, ['#2B3A55', '#F3F3F3'])})"></span><div class="grow"><div class="dim">감독 이름</div><input id="nm" value="${esc(c.name)}" maxlength="8"><div class="dim" style="margin-top:8px">시작하면 먼저 26명 최종 명단을 직접 뽑습니다. 약한 나라일수록 목표가 낮고 이변의 재미가 큽니다.</div></div></div>
   <div class="sec">피부색</div>${sw('skin', SKIN_C)}<div class="sec">머리 모양</div>${ch('style', Object.keys(STYLE_N), STYLE_N)}<div class="sec">머리 색</div>${sw('hair', HAIR_C)}
-  <div class="sec">맡을 나라 <span class="dim">${esc(Core.NATK(c.wcn))}</span></div><div class="wcgrid">${cards}</div>
+  <div class="sec">조 편성 방식</div><div class="row g8"><button class="chip ${(c.wcdraw || 'real') === 'real' ? 'on' : ''}" data-act="cr" data-k="wcdraw" data-id="real" style="flex:1">실제 2026 월드컵 조</button><button class="chip ${c.wcdraw === 'rand' ? 'on' : ''}" data-act="cr" data-k="wcdraw" data-id="rand" style="flex:1">랜덤 조 추첨</button></div><div class="dim">${(c.wcdraw || 'real') === 'real' ? '2025년 12월 실제 추첨 결과(A~L조) 그대로 진행합니다.' : '48개국을 전력순 4개 포트로 나눠 무작위로 조를 추첨합니다.'}</div><div class="sec">맡을 나라 <span class="dim">${esc(Core.NATK(c.wcn))}</span></div><div class="wcgrid">${cards}</div>
   <button class="btn wide" data-act="wcstart">이 나라 감독으로 월드컵 시작</button><button class="btn sec wide" data-act="modeback">← 모드 다시 고르기</button></div>`;
+}
+function wcSquadView() {
+  const G = Core.G, club = Core.clubOf(Core.me().club), pick = S.wcPick || (S.wcPick = new Set()), f = S.wcf || 'ALL';
+  const ORD = ['GK','CB','FB','DM','CM','AM','W','ST'];
+  const all = club.pl.map(id => G.players[id]).filter(Boolean).sort((a, b) => ORD.indexOf(a.sub) - ORD.indexOf(b.sub) || b.ovr - a.ovr);
+  const cnt = (...ss) => all.filter(p => pick.has(p.id) && ss.includes(p.sub)).length, n = pick.size;
+  const info = Core.wcInfo(), gtxt = info && info.gi >= 0 ? String.fromCharCode(65 + info.gi) + '조 · ' + info.groups[info.gi].teams.filter(t => t !== club.id).map(t => Core.clubOf(t).name).join(', ') : '';
+  const list = all.filter(p => f === 'ALL' || p.sub === f);
+  const chips = `<div class="chips">${POSL.map(k => `<button class="chip ${f === k ? 'on' : ''}" data-act="wcsqf" data-id="${k}">${k === 'ALL' ? '전체' : k}</button>`).join('')}</div>`;
+  const rows = list.map(p => `<div class="card sqr ${pick.has(p.id) ? 'on' : ''}" data-act="wcsq" data-id="${p.id}" style="${pick.has(p.id) ? 'border-color:#C6F36B' : 'opacity:.72'}"><span class="tag pos">${p.sub}</span><div class="grow"><b>${esc(p.name)}</b>${p.star ? ' <span class="tag">★스타</span>' : ''}<div class="dim s11">${p.age}세 · 능력 ${p.ovr}</div></div><b style="font-size:18px">${pick.has(p.id) ? '✅' : '⬜'}</b></div>`).join('');
+  return `<div class="top"><div class="ttl">선수 선발 <span class="dim">· ${esc(club.name)}</span></div></div><div class="body"><div class="card"><div class="row"><b>${n} / 26명</b><span class="dim">후보 ${all.length}명</span></div><div class="dim">GK ${cnt('GK')} · DF ${cnt('CB', 'FB')} · MF ${cnt('DM', 'CM', 'AM')} · FW ${cnt('W', 'ST')} <span class="dim">(최소 3 / 8 / 5 / 5)</span></div>${gtxt ? `<div class="dim" style="margin-top:4px">내 조: ${esc(gtxt)}</div>` : ''}<div class="row g8" style="margin-top:8px"><button class="btn sec" data-act="wcsqauto" style="flex:1">추천 명단으로</button><button class="btn" data-act="wcsqok" style="flex:1">선발 확정</button></div></div>${chips}${rows}</div>`;
 }
 const WNAV = [['home', '홈'], ['squad', '선수단'], ['mtac', '전술'], ['wcg', '대진·순위'], ['news', '뉴스']];
 const isW = () => { try { return !!(Core.G && Core.G.wc); } catch (e) { return false; } };
@@ -1144,7 +1192,7 @@ function mgrTacView() {
   if (S.msel != null && L.slots[S.msel]) { const sl = L.slots[S.msel], cand = L.bench.concat(L.slots.filter((e, i) => i !== S.msel).map(e => e.p)).sort((a, b) => ((b.sub === sl.slot) - (a.sub === sl.slot)) || (b.ovr - a.ovr));
     pick = `<div class="card gl"><b>${esc(sl.slot)} 자리에 넣을 선수</b><div class="dim">같은 포지션이 위에 나옵니다. 이미 선발인 선수를 고르면 서로 자리를 바꿉니다.</div>${cand.slice(0, 18).map(p => `<div class="sqr mini" data-act="mpick" data-id="${p.id}"><span class="tag pos">${p.sub}</span><div class="grow">${esc(p.name)}${L.slots.some(e => e.p.id === p.id) ? ' <span class="dim">(선발)</span>' : ''}</div><b>${p.ovr}</b></div>`).join('')}</div>`; }
   const bench = L.bench.slice(0, 10).map(p => `<div class="sqr mini" data-act="pl" data-id="${p.id}"><span class="tag pos">${p.sub}</span><div class="grow">${esc(p.name)}</div><b>${p.ovr}</b></div>`).join('');
-  return mgrTop() + `<div class="body"><div class="sec">포메이션</div>${forms}<div class="sec">팀 지시</div><div class="card">${ins}</div><div class="row"><div class="sec" style="margin:0">선발 11명</div><button class="btn sec sm" data-act="mauto">${L.custom ? '자동 선발로' : '자동 선발 사용 중'}</button></div><div class="dim">선수 이름을 탭하면 교체, 오른쪽에서 역할을 고릅니다.</div>${slots}${pick}<div class="sec">벤치 후보 <span class="dim">상위 ${Math.min(10, L.bench.length)}명</span></div><div class="card">${bench || '<div class="dim">후보가 없습니다.</div>'}</div></div>`;
+  return mgrTop() + `<div class="body"><div class="sec">포메이션</div>${forms}<div class="sec">팀 지시</div><div class="card">${ins}</div><div class="row"><div class="sec" style="margin:0">선발 11명</div>${L.custom ? '<span class="tag">직접 선택한 선발</span>' : '<span class="tag warn">아직 직접 고르지 않음 · 추천 11명</span>'}</div><div class="dim">출전시킬 선수는 직접 고르세요: 선수 이름을 탭 → 아래 목록에서 넣을 선수를 탭하면 교체됩니다. 오른쪽에서 역할도 고를 수 있습니다.${L.custom ? '' : ' 바꾸지 않으면 컴퓨터가 고른 추천 11명이 출전합니다.'}</div>${L.custom ? '<button class="btn sec sm" data-act="mauto" style="margin-top:6px">추천 선발로 되돌리기</button>' : ''}${slots}${pick}<div class="sec">벤치 후보 <span class="dim">상위 ${Math.min(10, L.bench.length)}명</span></div><div class="card">${bench || '<div class="dim">후보가 없습니다.</div>'}</div></div>`;
 }
 function mgrMktView() {
   const g = G0().mgr, w = Core.mgrWin(), f = S.mkf || 'ALL';
@@ -1232,7 +1280,7 @@ function navBadge(id) { try { const m = Core.me(); if (id==='home') return m.mee
 function cerModal() {
   const G = G0(), cr = G.cer, c = Core.clubOf(cr.cid);
   const pl = c.pl.map(x => G.players[x]).filter(p => p && !p.mgr && !p.retired).sort((a, b) => b.ovr - a.ovr).slice(0, 5);
-  const sp = pl.map(p => `<span class="spr" style="width:40px;height:85px;background-image:url(${sprite({ skin: ['fair', 'tan', 'olive', 'brown', 'deep'][p.id % 5], hair: ['black', 'dark', 'brown', 'blond', 'red', 'gray', 'navy'][p.id % 7], style: ['short', 'sidepart', 'buzz', 'curly', 'long', 'mohawk'][p.id % 6] }, p.sub === 'GK' ? gkKitFor(c) : [c.col, c.col2])})"></span>`).join('');
+  const sp = pl.map(p => `<span class="spr" style="width:40px;height:85px;background-image:url(${sprite(lookOf(p), p.sub === 'GK' ? gkKitFor(c) : [c.col, c.col2])})"></span>`).join('');
   const cols = ['#C6F36B', '#FFD54A', '#FF7A6B', '#6BC8FF', '#FFFFFF'];
   const conf = Array.from({ length: 26 }, (_, i) => `<i style="left:${(i * 37) % 100}%;background:${cols[i % 5]};animation-delay:${((i * 13) % 20) / 10}s;animation-duration:${2.2 + (i % 5) * 0.35}s"></i>`).join('');
   const btns = cr.mgr ? `<button class="btn wide" data-act="cerpress">🎙️ 우승 기자회견</button><button class="btn sec wide" data-act="close">닫기</button>` : `<button class="btn wide" data-act="close">확인</button>`;
@@ -1242,9 +1290,9 @@ function render() {
   const app = $('#app');
   try { if (S.welcome && S.step === 'game' && !S.busy && !S.matchOpen) { const w = S.welcome; S.welcome = null; setTimeout(() => popup('게임 시작!', w==='start' ? '선수 육성 모드가 시작되었습니다.\n아래 ‘진행’ 버튼으로 하루씩 보내며 훈련하고, 경기 일정에 맞춰 컨디션을 관리하세요.' : w==='mstart' ? '감독 모드가 시작되었습니다.\n구단 탭에서 스폰서·스태프를, 전술 탭에서 포메이션을 먼저 살펴보세요.' : '월드컵 모드가 시작되었습니다.\n조별리그를 통과해 결승 트로피를 노려보세요!', '🎉'), 250); } } catch (e) {}
   try { const g0 = G0(); if (g0 && g0.cer && !S.modal && !S.matchOpen && !S.busy && S.step === 'game') { S.modalKind = 'cer'; S.modal = cerModal(); sfx('trophy'); } } catch (e) {}
-  if (S.step==='setup' || S.step==='create' || S.step==='mode' || S.step==='mcreate' || S.step==='wcsel') {
+  if (S.step==='setup' || S.step==='create' || S.step==='mode' || S.step==='mcreate' || S.step==='wcsel' || S.step==='wcsquad') {
     const o0 = document.querySelector('.scr'); const k0 = S.step + '|' + (S.step==='setup' ? (S.sel ? 'x' : '') : '') ; const t0 = (o0 && S._sk === k0) ? o0.scrollTop : 0;
-    app.innerHTML = `<div class="scr">${S.step==='mode' ? modeView() : S.step==='mcreate' ? mcreateView() : S.step==='wcsel' ? wcselView() : S.step==='setup' ? setupView() : creatorView()}</div>`;
+    app.innerHTML = `<div class="scr">${S.step==='wcsquad' ? wcSquadView() : S.step==='mode' ? modeView() : S.step==='mcreate' ? mcreateView() : S.step==='wcsel' ? wcselView() : S.step==='setup' ? setupView() : creatorView()}</div>`;
     const n0 = document.querySelector('.scr'); if (n0 && t0) n0.scrollTop = t0; S._sk = k0; S.modal = null; S.modalKind = null; $('#modal').style.display = 'none'; return;
   }
   const oldSc = document.querySelector('.scr'); const keyNow = S.step + '|' + S.tab; const keepTop = (oldSc && S._sk === keyNow) ? oldSc.scrollTop : 0;
@@ -1326,13 +1374,17 @@ document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-act]'); if (!t || S.busy) return; const a = t.dataset.act, id = t.dataset.id; if (SND.bgm && !SND.tm) bgmApply(); if (a !== 'snd') sfx('click');
   if ((a==='start' || a==='mstart' || a==='wcstart')) {
     if (a==='mstart' && S.cr.mclub == null) { popup('구단 선택', '먼저 맡을 구단을 골라 주세요.', '⚽'); return; }
-    if (!S.okGo) { const nm0 = $('#nm'); const nm1 = (nm0 && nm0.value.trim()) || '양메시'; const lbl = a==='start' ? '선수 육성' : a==='mstart' ? '감독' : '월드컵'; ask(lbl + ' 시작', `이름: ${nm1}\n이 설정으로 새 게임을 시작할까요?`, '시작하기', () => { S.okGo = true; t.click(); }, '🎮'); return; }
+    if (!S.okGo) { const nm0 = $('#nm'); const nm1 = (nm0 && nm0.value.trim()) || '양메시'; const lbl = a==='start' ? '선수 육성' : a==='mstart' ? '감독' : '월드컵'; ask(lbl + ' 시작', `이름: ${nm1}${a==='wcstart' ? '\n조 편성: ' + ((S.cr.wcdraw || 'real') === 'real' ? '실제 2026 월드컵 조' : '랜덤 조 추첨') : ''}\n이 설정으로 새 게임을 시작할까요?`, '시작하기', () => { S.okGo = true; t.click(); }, '🎮'); return; }
     S.okGo = false; S.welcome = a;
   }
   if (a==='wcpick') { const nm = $('#nm'); if (nm) S.cr.name = nm.value; S.cr.wcn = id; render(); return; }
+  if (a==='wcsqf') { S.wcf = id; render(); return; }
+  if (a==='wcsq') { const pid = +id; if (S.wcPick.has(pid)) S.wcPick.delete(pid); else if (S.wcPick.size < 26) S.wcPick.add(pid); else popup('선발 인원', '26명이 다 찼습니다.\n다른 선수를 먼저 빼 주세요.', '⚠️', 2200); render(); return; }
+  if (a==='wcsqauto') { S.wcPick = new Set(Core.wcAutoPick()); render(); return; }
+  if (a==='wcsqok') { const ids = [...S.wcPick], msg = Core.wcSquadCheck(ids); if (msg) { popup('선발 불가', msg, '⚠️'); return; } ask('선발 확정', '이 26명으로 월드컵 명단을 확정할까요?\n확정하면 나머지 선수는 명단에서 빠집니다.', '확정', () => { Core.wcSquadSet(ids); S.wcPick = null; S.welcome = null; S.step = 'game'; S.tab = 'mtac'; S.msel = null; S.lc = null; S.ld = null; save(); render(); setTimeout(() => popup('선발 11명 정하기', '명단 확정 완료!\n이제 전술 탭에서 포메이션과 선발 11명을 직접 골라 주세요.', '📋'), 600); }, '📋'); return; }
   if (a==='wct') { S.wct = id; render(); return; }
   if (a==='wcnew') { ask('새 게임', '월드컵 기록을 닫고 처음 화면으로 돌아갈까요?\n(자동 저장이 삭제됩니다)', '새로 시작', () => { idbDel('save'); S.step = 'mode'; S.tab = 'home'; render(); }); return; }
-  if (a==='wcstart') { const nm = $('#nm'); const name = (nm && nm.value.trim()) || '양메시'; S.busy = true; $('#app').innerHTML = loadView(); setTimeout(() => { try { Core.wcStart({ name, nat: S.cr.wcn || 'KOR', look: { skin: S.cr.skin, hair: S.cr.hair, style: S.cr.style } }); S.step = 'game'; S.tab = 'home'; S.wct = null; S.lc = null; S.ld = null; save(); } catch (e) { toast('시작에 실패했습니다: ' + (e && e.message)); S.step = 'wcsel'; } S.busy = false; render(); }, 80); return; }
+  if (a==='wcstart') { const nm = $('#nm'); const name = (nm && nm.value.trim()) || '양메시'; S.busy = true; $('#app').innerHTML = loadView(); setTimeout(() => { try { Core.wcStart({ name, draw: S.cr.wcdraw || 'real', nat: S.cr.wcn || 'KOR', look: { skin: S.cr.skin, hair: S.cr.hair, style: S.cr.style } }); S.step = 'wcsquad'; S.tab = 'home'; S.wct = null; S.lc = null; S.ld = null; S.wcf = 'ALL'; S.wcPick = new Set(Core.wcAutoPick()); } catch (e) { toast('시작에 실패했습니다: ' + (e && e.message)); S.step = 'wcsel'; } S.busy = false; render(); }, 80); return; }
   if (a==='mode') { S.mode = id; S.step = id === 'wc' ? 'wcsel' : 'setup'; render(); return; }
   if (a==='modeback') { S.step = 'mode'; render(); return; }
   if (a==='mclub') { const nm = $('#nm'); if (nm) S.cr.name = nm.value; S.cr.mclub = +id; render(); return; }
@@ -1343,7 +1395,7 @@ document.addEventListener('click', (e) => {
   if (a==='mbuy') { const r = Core.mgrBuy(+id); toast(r.msg); if (r.ok) save(); render(); return; }
   if (a==='mform') { Core.mgrSetFormation(id); S.msel = null; save(); render(); return; }
   if (a==='minstr') { Core.mgrSetInstr(t.dataset.k, +id); save(); render(); return; }
-  if (a==='mauto') { Core.mgrAutoXi(); S.msel = null; save(); render(); return; }
+  if (a==='mauto') { ask('추천 선발로 되돌리기', '직접 고른 선발 11명이 사라지고 컴퓨터 추천 명단으로 바뀝니다.', '되돌리기', () => { Core.mgrAutoXi(); S.msel = null; save(); render(); }, '↩️'); return; }
   if (a==='mslot') { S.msel = (S.msel === +id) ? null : +id; render(); return; }
   if (a==='mpick') { if (S.msel != null) Core.mgrSetXi(S.msel, +id); S.msel = null; save(); render(); return; }
   if (a==='mpre') { mgrPre(); render(); return; }
@@ -1411,7 +1463,8 @@ document.addEventListener('click', (e) => {
   else if (a==='fs') { try { localStorage.setItem('bfm_fs', String(+id)); } catch (e) {} fsApply(); render(); { const f = FS_OPT.find(x => String(x[0]) === String(id)); popup('글자·버튼 크기', `‘${f ? f[1] : id}’ 크기로 바꿨습니다.`, '🔠', 1800); } return; }
   else if (a==='talk') { if (!MV || !MV.talk) return; const r = (G0().mm && G0().mm.role === 'mgr') ? Core.mgrTalkPick(id, MV.talkDiff || 0) : Core.talkPick(id); MV.log.unshift({ min: 45, ic: '💬', cls: '', t: `<b>하프타임</b> ${esc(r.text)}` }); MV.talk = null; setTimeout(startSecond, 600); renderMatch(); return; }
   else if (a==='mtab') { S.mtab = id; renderMatch(); return; }
-  else if (a==='mspd') { S.spd = +id; try { localStorage.setItem('bfm_spd', String(S.spd)); } catch (e) {} if (MV) { MV.speed = spdMs(); if (MV.timer && !MV.skipping && !MV.over) { clearInterval(MV.timer); MV.timer = setInterval(tick, MV.speed); } renderMatch(); } return; }
+  else if (a==='mvm') { S.vm = id; try { localStorage.setItem('bfm_vm', id); } catch (e) {} if (MV) { MV.hl = id === 'hl'; if (!MV.hl) MV.hlFast = false; MV.speed = -1; hlSync(); renderMatch(); } return; }
+  else if (a==='mspd') { S.spd = +id; try { localStorage.setItem('bfm_spd', String(S.spd)); } catch (e) {} if (MV) { MV.speed = spdMs(); if (MV.timer && !MV.skipping && !MV.over) { clearInterval(MV.timer); MV.timer = setInterval(tick, MV.speed); } hlSync(); renderMatch(); } return; }
   else if (a==='mskip') { if (!MV || !G0().mm || MV.over) return; skipMatch(); return; }
   else if (a==='mend') { if (!MV || !G0().mm || MV.ending) return; MV.ending = true; endMatchUI(); return; }
   render();
