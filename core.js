@@ -336,18 +336,37 @@ function compResult(comp, ctx, h, a, gh, ga) {
   if (t.legs.filter(Boolean).length < t.n) return;
   let sa = 0, sb = 0; for (const L of t.legs) { if (L.h===t.a) { sa += L.gh; sb += L.ga; } else { sb += L.gh; sa += L.ga; } }
   t.sa = sa; t.sb = sb;
+  if (sa===sb && comp.kind==='wc') {                                      // 월드컵: 90분 무승부 → 연장전(30분) → 승부차기
+    const dA = clubOf(t.a).strength - clubOf(t.b).strength, poi = (l) => { let L = Math.exp(-l), k = 0, p = 1; do { k++; p *= rnd(); } while (p > L); return k - 1; };
+    const ea = poi(0.36 * Math.exp(dA * 0.012)), eb = poi(0.36 * Math.exp(-dA * 0.012)); t.et = [ea, eb]; sa += ea; sb += eb; t.sa = sa; t.sb = sb;
+  }
   if (sa!==sb) t.w = sa>sb ? t.a : t.b;
   else { t.pen = true; const pa = clamp(0.5 + (clubOf(t.a).strength - clubOf(t.b).strength)*0.004, 0.3, 0.7); t.w = rnd()<pa ? t.a : t.b; }
-  if (t.pen) G.wcLast = { a: t.a, b: t.b, w: t.w, sa, sb };
+  if (t.pen || t.et) G.wcLast = { a: t.a, b: t.b, w: t.w, sa, sb, pen: !!t.pen, et: t.et || null };
   if (comp.ties.every(x => x.w!==null)) advanceRound(comp);
 }
 function advanceRound(comp) {
+  if (comp.kind==='wc' && comp.ties.length===2 && comp.ties[1].third) {      // 결승 + 3·4위전 종료
+    const fin = comp.ties[0], thd = comp.ties[1]; comp.last = comp.ties; comp.khist = comp.khist || [];
+    comp.khist.push({ rl: '결승', ties: [fin] }); comp.khist.push({ rl: '3·4위전', ties: [thd] }); comp.thirdW = thd.w;
+    addNews('cup', `${comp.name} 3·4위전 — ${clubOf(thd.w).name} 3위`, true);
+    return finishComp(comp, fin.w);
+  }
   const winners = comp.ties.map(t => t.w);
   comp.last = comp.ties; if (comp.kind==='wc') (comp.khist = comp.khist || []).push({ rl: comp.rl, ties: comp.ties });
   if (winners.length===1 && comp.ties.length===1) { return finishComp(comp, winners[0]); }
   comp.alive = winners.concat(comp.round===0 && comp.byes && comp.kind==='cup' ? comp.byes : []);
   comp.round++;
-  if (comp.kind==='wc') { const pairs = []; for (let i=0;i+1<winners.length;i+=2) pairs.push([winners[i], winners[i+1]]); koRound(comp, pairs); return; }
+  if (comp.kind==='wc') {
+    const pairs = []; for (let i=0;i+1<winners.length;i+=2) pairs.push([winners[i], winners[i+1]]);
+    const semi = comp.last.length === 2 && pairs.length === 1, los = semi ? comp.last.map(t => t.w===t.a ? t.b : t.a) : null;
+    koRound(comp, pairs);
+    if (semi) {                                                              // 3·4위전: 결승 하루 전
+      const fd = comp.rdays[comp.round] || comp.rdays[comp.rdays.length-1], d0 = Math.max((fd[0] || G.day + 2) - 1, G.day + 1);
+      const tt = { a: los[0], b: los[1], legs: [], w: null, n: 1, third: true }; comp.ties.push(tt); addFx(d0, tt.a, tt.b, { t: comp.kind, id: comp.id, ti: 1, leg: 0, third: true });
+    }
+    return;
+  }
   if (comp.kind==='cont') { // 준결승·결승은 직전 승자끼리 추첨
     const w = shuffle(winners.slice()), pairs = []; for (let i=0;i+1<w.length;i+=2) pairs.push([w[i], w[i+1]]); koRound(comp, pairs);
   } else if (comp.kind==='po') {
@@ -361,7 +380,7 @@ function finishComp(comp, champ) {
   if (comp.kind==='po') { G.flags['pr_'+comp.cc].po = champ; addNews('league', `승격 플레이오프 — ${c.name} 승리, 승격 확정`, true); tryPromo(comp.cc); return; }
   const top = Object.keys(comp.sc).map(id => [G.players[id], comp.sc[id]]).filter(x=>x[0]).sort((a,b)=>b[1]-a[1])[0];
   addNews('cup', `${comp.name} 우승 — ${c.name}${top?` (득점왕 ${top[0].name} ${top[1]}골)`:''}`, true);
-  if (G.mode==='mgr' && G.me!==null && me() && champ===me().club) mgrTrophy(comp.name + ' 우승', comp.season);
+  if (G.me!==null && me() && champ===me().club && comp.kind!=='po') mgrTrophy(comp.name + ' 우승', comp.season);
   for (const id of c.pl) { const p = G.players[id]; if (p && p.me) addNews('me', `${p.name}, ${comp.name} 우승!`, true, { me:true }); }
 }
 function buildComps(cal, year) {
@@ -869,7 +888,7 @@ function meRole(team) {
 }
 function matchTitle(ctx) {
   if (ctx.t==='lg') return leagueOf(ctx.id).name; if (ctx.t==='nt') return '국가대표 경기';
-  const c = compById(ctx.id); return c ? (c.name + (c.rl?` · ${c.rl}`:'')) : '대회';
+  const c = compById(ctx.id); return c ? (c.name + (ctx.third ? ' · 3·4위전' : c.rl?` · ${c.rl}`:'')) : '대회';
 }
 function genExtras(stMine, stOpp, evAll) {
   const ex = [];
@@ -1301,9 +1320,11 @@ function wcInfo() {
 function wcOut(comp, mine) {                                                 // 내 팀이 탈락했는지 / 최종 성적
   if (comp.stage === 'G') return null;
   if (comp.win === mine) return '우승';
+  if (comp.stage !== 'END' && (comp.ties || []).some(t => t.third && (t.a === mine || t.b === mine) && t.w == null)) return null;
   const rounds = (comp.khist || []).concat(comp.stage === 'END' ? [] : [{ rl: comp.rl, ties: comp.ties }]);
   let last = null; for (const r of rounds) for (const t of r.ties) if (t.a === mine || t.b === mine) last = { rl: r.rl, w: t.w };
   if (!last) return '조별리그 탈락';
+  if (last.rl === '3·4위전') return last.w === mine ? '3위' : '4위';
   if (last.w != null && last.w !== mine) return last.rl === '결승' ? '준우승' : last.rl + ' 탈락';
   return null;
 }
@@ -1384,7 +1405,7 @@ function mgrAfterMatch(M, mg, og) {
   let d = res === 1 ? 2.2 - diff * 1.2 : res === -1 ? -2.2 - diff * 1.2 : -diff * 0.6; d = clamp(d * dm, -8, 8);
   g.board = Math.round(clamp(g.board + d * 0.9, 0, 100) * 10) / 10; if (res === 1) g.w++; else if (res === 0) g.d++; else g.l++;
   const fd = (res === 1 ? 1.4 + (mg - og >= 3 ? 0.8 : 0) : res === -1 ? -1.6 : 0.1) * (derby ? 2 : 1); g.fans = Math.round(clamp(g.fans + fd, 5, 100) * 10) / 10;
-  const tk = M.mineHome ? 0.4 * (0.5 + g.fans / 120) * (mine.strength / 70) * (derby ? 1.3 : 1) : 0.1 * (mine.strength / 70);
+  const K = mgrK(), tk = M.mineHome ? K * 0.45 / 19 * (0.6 + g.fans / 150) * (derby ? 1.25 : 1) : 0;
   g.cash = Math.round((g.cash + tk) * 100) / 100; g.fin.tk += tk;
   if (derby) { if (res === 1) g.derby.w++; else if (res === 0) g.derby.d++; else g.derby.l++; addNews('me', `🔥 ${mine.name}, 라이벌 ${opp.name}와(과) ${mg}-${og}${res === 1 ? ' 승리! 팬들이 열광합니다' : res === -1 ? ' 패배… 팬들의 실망이 큽니다' : ' 무승부'}`, true, { me: true }); }
   g.lastRes = { mg, og, opp: opp.name, derby, day: G.day }; g.press = null;
@@ -1398,11 +1419,12 @@ function mgrSeasonEnd(lg, tb) {
   if (rk === 1) mgrTrophy(lg.name + ' 우승', seasonLabel(lg));
   g.fans = clamp(g.fans + (ok ? 3 : -4), 5, 100);
   if (!ok && g.board < 20) g.sacked = true;
-  const pz = 6 + (ok ? 4 : 0); g.fin.pz += pz; g.cash = Math.round((g.cash + pz) * 100) / 100; g.target = mgrGoal(c).target;
+  const K0 = mgrK(), pz = Math.round(K0 * (0.22 + (ok ? 0.05 : 0)) * 100) / 100; g.fin.pz += pz; mgrSponsorYear(rk, ok); g.cash = Math.round((g.cash + pz) * 100) / 100; g.target = mgrGoal(c).target;
 }
 // ===== 감독 모드 확장: 팬·라이벌·스태프·재정·트로피장·기자회견 =====
 const STAFF = { coach: { n: '코치진', ic: '🎓', d: '24세 이하 선수 성장 +6% / 레벨' }, med: { n: '의료팀', ic: '🩺', d: '부상 기간 -8% / 레벨' }, fit: { n: '피지컬팀', ic: '💪', d: '부상 발생 -7% / 레벨' }, scout: { n: '스카우트', ic: '🔭', d: '영입가 -3%, 매각가 +2% / 레벨' } };
-function mgrX() { const g = G.mgr; if (!g) return null; if (g.fans === undefined) { g.fans = 55; g.mood = 50; g.staff = { coach: 0, med: 0, fit: 0, scout: 0 }; g.trophies = []; g.fin = { tk: 0, sp: 0, mc: 0, pz: 0, tr: 0, st: 0, log: [] }; g.derby = { w: 0, d: 0, l: 0 }; } return g; }
+function mgrX() { const g = G.mgr; if (!g) return null; if (g.fans === undefined) { g.fans = 55; g.mood = 50; g.staff = { coach: 0, med: 0, fit: 0, scout: 0 }; g.trophies = []; g.fin = { tk: 0, sp: 0, mc: 0, pz: 0, tr: 0, st: 0, log: [] }; g.derby = { w: 0, d: 0, l: 0 }; }
+  if (g.fin.wg === undefined) g.fin.wg = 0; if (!g.spons) { g.spons = { main: null, sleeve: null, stadium: null }; g.spOff = null; } return g; }
 function mgrStaffLv(k) { if (G.mode !== 'mgr' || G.wc || !G.mgr) return 0; return (mgrX().staff[k]) || 0; }
 function mgrFx(club, k) { if (G.mode !== 'mgr' || G.wc || !G.mgr || G.me === null || !club) return 0; const m = G.players[G.me]; if (!m || club.id !== m.club) return 0; return (mgrX().staff[k]) || 0; }
 const mgrStaffCost = (lv) => (lv + 1) * 4;
@@ -1418,14 +1440,45 @@ function rivalOf(c) {
   for (const x of G.clubs) { if (x.kind !== 'pro' || x.lg !== c.lg || x.id === c.id) continue; let sc = (x.region && x.region === c.region ? 5 : 0) + (x.name.split(' ')[0] === f0 ? 4 : 0) + (Math.abs(x.strength - c.strength) <= 8 ? 1 : 0) + (((x.id * 7 + c.id * 13) % 10) / 10); if (sc > bs) { bs = sc; best = x.id; } }
   c.rival = best; return best;
 }
-function mgrTrophy(name, season) { const g = mgrX(), c = G.clubs[me().club]; g.trophies.push({ name, season: String(season), club: c.name }); g.fans = clamp(g.fans + 6, 5, 100); addNews('me', `🏆 ${c.name}, ${name}! ${g.name} 감독의 트로피장에 새 트로피가 추가됩니다`, true, { me: true }); }
+function mgrTrophy(name, season) {
+  const c = G.clubs[me().club], isM = G.mode === 'mgr';
+  if (isM) { const g = mgrX(); g.trophies.push({ name, season: String(season), club: c.name }); g.fans = clamp(g.fans + 6, 5, 100); }
+  G.cer = { name, season: String(season), club: c.name, cid: c.id, mgr: isM && !G.wc, wc: !!G.wc };
+  addNews('me', `🏆 ${c.name}, ${name}!`, true, { me: true });
+}
+function mgrK() { return Math.max(8, mgrWage() * 52 / 10000 * 1.12); }       // 기준 연 수입(억): 주급 총액 기반
+const SP_BRANDS = ['블록뱅크', '픽셀모터스', '쿼드텔레콤', '큐브에너지', '네모항공', '복셀푸드', '마인라이프', '샌드박스증권', '모듈전자', '큐비스포츠', '타일건설', '브릭생명', '픽토통신', '블로키맥주'];
+const SP_SLOT = { main: ['가슴 메인 스폰서', 0.22], sleeve: ['소매 스폰서', 0.06], stadium: ['구장 네이밍', 0.1] };
+function mgrSponsorGen() {
+  const g = mgrX(), K = mgrK(); g.spOff = g.spOff || {};
+  for (const sl of Object.keys(SP_SLOT)) {
+    if (g.spons[sl] || (g.spOff[sl] && g.spOff[sl].length)) continue;
+    const used = new Set(); g.spOff[sl] = [0, 1, 2].map(() => { let b; do { b = pick(SP_BRANDS); } while (used.has(b)); used.add(b); const y = Math.round(K * SP_SLOT[sl][1] * (0.85 + rnd() * 0.4) * 100) / 100, yrs = ri(1, 3); return { brand: b, slot: sl, yearly: y, years: yrs, bonus: Math.round(y * 0.25 * 100) / 100, rank: g.target }; });
+  }
+}
+function mgrSponsorSign(sl, i) {
+  const g = mgrX(); mgrSponsorGen(); const o = g.spOff && g.spOff[sl] && g.spOff[sl][i]; if (!o || g.spons[sl]) return { ok: false, msg: '체결할 수 없습니다' };
+  g.spons[sl] = Object.assign({ left: o.years }, o); g.spOff[sl] = null; g.fans = clamp(g.fans + 0.5, 5, 100);
+  addNews('me', `💼 ${o.brand}와(과) ${SP_SLOT[sl][0]} 계약 — 연 ${o.yearly}억 · ${o.years}년`, false, { me: true }); return { ok: true, msg: `${o.brand} ${SP_SLOT[sl][0]} 계약 체결 (연 ${o.yearly}억)` };
+}
+function mgrSponsorYear(rk, ok) {                                           // 시즌 종료 정산: 성적 보너스, 계약 만료
+  const g = mgrX(); for (const sl of Object.keys(SP_SLOT)) { const c = g.spons[sl]; if (!c) continue;
+    if (rk > 0 && rk <= c.rank) { g.cash = Math.round((g.cash + c.bonus) * 100) / 100; g.fin.sp += c.bonus; addNews('me', `💼 ${c.brand}, 성적 보너스 ${c.bonus}억 지급`, false, { me: true }); }
+    c.left--; if (c.left <= 0) { g.spons[sl] = null; addNews('me', `💼 ${c.brand} ${SP_SLOT[sl][0]} 계약 만료 — 새 제안이 도착했습니다`, true, { me: true }); } }
+  g.spOff = null; mgrSponsorGen();
+}
 function mgrMonth(t) {
-  const g = mgrX(), c = G.clubs[me().club]; if (!c) return;
-  const sp = Math.round(0.22 * Math.pow(c.strength / 70, 1.5) * (0.7 + g.fans / 200) * 100) / 100, mc = Math.round(0.08 * (g.fans / 60) * 100) / 100;
-  g.cash = Math.round((g.cash + sp + mc) * 100) / 100; g.fin.sp += sp; g.fin.mc += mc;
+  const g = mgrX(), c = G.clubs[me().club]; if (!c) return; mgrSponsorGen();
+  const K = mgrK(), wg = Math.round(mgrWage() * 52 / 12 / 10000 * 100) / 100;
+  let sp = 0; for (const sl of Object.keys(SP_SLOT)) if (g.spons[sl]) sp += g.spons[sl].yearly / 12; sp = Math.round(sp * 100) / 100;
+  const mc = Math.round(K * 0.08 / 12 * (g.fans / 60) * 100) / 100;
+  g.cash = Math.round((g.cash + sp + mc - wg) * 100) / 100; g.fin.sp += sp; g.fin.mc += mc; g.fin.wg -= wg;
+  if (g.cash < 0) { g.board = Math.round(clamp(g.board - 2.5, 0, 100) * 10) / 10; addNews('me', `⚠ ${c.name} 재정 적자! 이사회가 긴축 재정을 요구합니다`, true, { me: true }); }
   g.fin.log.push({ y: t.y, m: t.m, cash: g.cash }); if (g.fin.log.length > 24) g.fin.log.shift();
   g.mood = Math.round(clamp(g.mood + (50 - g.mood) * 0.08, 0, 100) * 10) / 10;
 }
+function renamePlayer(id, nm) { const p = G.players[id], n = String(nm || '').trim().slice(0, 14); if (!p || !n) return false; p.name = n; return true; }
+function renameClub(id, nm) { const c = G.clubs[id], n = String(nm || '').trim().slice(0, 16); if (!c || !n) return false; c.name = n; return true; }
 function mgrWage() { const sq = mgrSquad(); return sq.reduce((s, p) => s + ((p.ct && p.ct.wage) || 0), 0); }
 function mgrFanText() { const f = mgrX().fans; return f >= 85 ? ['"이 팀이 우리의 자부심이다!"', '경기장은 항상 만원입니다'] : f >= 65 ? ['"올 시즌 느낌이 좋다!"', '서포터즈가 응원가를 열창합니다'] : f >= 45 ? ['"결과만 보여 달라"', '팬들이 지켜보는 중입니다'] : f >= 25 ? ['"감독 책임져라"', '관중석에 빈자리가 늘고 있습니다'] : ['"감독 나가!"', '팬들의 분노가 극에 달했습니다']; }
 function mgrPressGen() {
@@ -1438,6 +1491,14 @@ function mgrPressGen() {
   }[k];
   g.press = { q: pre + Q.q, opts: Q.o.map(([id, t]) => ({ id, t })), k, derby: r.derby, done: null }; return g.press;
 }
+function mgrPreGen() {
+  const g = G.mode === 'mgr' && !G.wc ? mgrX() : null, pm = G.pendingMine; if (!g || !pm) return null; const m = me(), op = G.clubs[pm.h === m.club ? pm.a : pm.h], derby = rivalOf(G.clubs[m.club]) === op.id || rivalOf(op) === m.club;
+  g.press = { q: (derby ? '🔥 라이벌전 · ' : '') + `${op.name}전을 앞두고 각오를 말씀해 주세요.`, opts: [{ id: 'conf', t: '자신 있습니다. 승점 3점을 가져오겠습니다' }, { id: 'resp', t: '상대를 존중합니다. 준비한 대로 하겠습니다' }, { id: 'push', t: '압박은 제가 받겠습니다. 선수들은 즐기면 됩니다' }], k: 'pre', derby, done: null, pre: true }; return g.press;
+}
+function mgrCerPress() {
+  const g = mgrX(), cr = G.cer; if (!g || !cr) return null;
+  g.press = { q: `🏆 ${cr.name} — 우승을 축하드립니다! 소감을 부탁드립니다.`, opts: [{ id: 'cfan', t: '팬 여러분 덕분입니다' }, { id: 'cteam', t: '선수단과 스태프가 만든 우승입니다' }, { id: 'cnext', t: '다음 목표는 더 큰 대회입니다' }], k: 'cer', derby: false, done: null }; return g.press;
+}
 function mgrPressPick(id) {
   const g = mgrX(), pr = g.press; if (!pr || pr.done) return null; const dm = pr.derby ? 1.6 : 1; let b = 0, f = 0, mo = 0, text = '';
   if (id === 'humble') { mo = 3; b = 0.5; f = 0.5; text = '"겸손한 감독이네요." 선수단 분위기가 좋아집니다.'; }
@@ -1449,6 +1510,12 @@ function mgrPressPick(id) {
   else if (id === 'no') { mo = 1; f = 1; text = '승리욕이 있는 감독이라는 평가를 받습니다.'; }
   else if (id === 'pt') { b = 0.5; text = '무난한 답변입니다. 이사회는 안정적이라 봅니다.'; }
   else if (id === 'good') { f = 0.5; mo = 2; text = '선수들이 자신감을 얻습니다.'; }
+  else if (id === 'conf') { f = 1.5; mo = 1; b = 0.3; text = '"자신감 넘치는 감독!" 팬들의 기대가 커집니다.'; }
+  else if (id === 'resp') { mo = 1; b = 0.5; text = '차분한 인터뷰입니다. 선수단과 이사회 모두 무난하게 받아들입니다.'; }
+  else if (id === 'push') { mo = 3; f = 0.5; text = '선수들이 부담을 덜고 경기를 즐길 준비를 합니다.'; }
+  else if (id === 'cfan') { f = 4; mo = 1; text = '팬들이 감동합니다. 도시 전체가 축제 분위기입니다.'; }
+  else if (id === 'cteam') { mo = 5; f = 1; text = '선수단이 끈끈하게 뭉칩니다. 라커룸 분위기가 최고조입니다.'; }
+  else if (id === 'cnext') { b = 2; f = 1; text = '이사회가 야망에 감동해 더 큰 지원을 약속합니다.'; }
   else return null;
   g.board = Math.round(clamp(g.board + b * dm, 0, 100) * 10) / 10; g.fans = Math.round(clamp(g.fans + f * dm, 5, 100) * 10) / 10; g.mood = Math.round(clamp(g.mood + mo * dm, 0, 100) * 10) / 10;
   pr.done = { id, text, b: b * dm, f: f * dm, mo: mo * dm }; return pr.done;
@@ -1489,5 +1556,6 @@ function mgrReplan(min) {                                                  // �
   M.evOpp = M.evOpp.filter(e => e.min <= min).concat(retime(genEvents(o, go, M.stOpp, M.benchOpp)));
 }
 
-const API2 = { mgrTrophy, mgrX, STAFF, mgrStaffUp, mgrStaffCost, mgrStaffLv, mgrWage, mgrFanText, mgrPressGen, mgrPressPick, rivalOf, wcStart, wcInfo, wcRank, WCN, Eng, isMgr, mgrWin, createMgr, mgrOffers, mgrJobs, mgrGoal, mgrSquad, mgrLineup, mgrSetXi, mgrSetRole, mgrSetFormation, mgrSetInstr, mgrAutoXi, mgrMarket, mgrBuy, mgrSell, mgrValue, mgrStanding, mgrTakeJob, mgrTalkInfo, mgrTalkPick, mgrSub, mgrReplan, talkInfo, talkPick, posKinds: (sub) => POSK[sub] || POSK.ST, optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
+const NATFLAG = (c) => DD.FLAG[c] || (WCN[c] && WCN[c][1]) || '';
+const API2 = { mgrK, SP_SLOT, mgrSponsorGen, mgrSponsorSign, mgrPreGen, mgrCerPress, renamePlayer, renameClub, NATFLAG, mgrTrophy, mgrX, STAFF, mgrStaffUp, mgrStaffCost, mgrStaffLv, mgrWage, mgrFanText, mgrPressGen, mgrPressPick, rivalOf, wcStart, wcInfo, wcRank, WCN, Eng, isMgr, mgrWin, createMgr, mgrOffers, mgrJobs, mgrGoal, mgrSquad, mgrLineup, mgrSetXi, mgrSetRole, mgrSetFormation, mgrSetInstr, mgrAutoXi, mgrMarket, mgrBuy, mgrSell, mgrValue, mgrStanding, mgrTakeJob, mgrTalkInfo, mgrTalkPick, mgrSub, mgrReplan, talkInfo, talkPick, posKinds: (sub) => POSK[sub] || POSK.ST, optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
 if (typeof module !== 'undefined') module.exports = API2;
