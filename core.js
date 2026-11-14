@@ -927,8 +927,16 @@ const PP = {
 const plansOf = (m) => Object.assign({}, PP[(m || me()).sub] || PP.ST, { custom:{ n:'개인 특훈', k:[] }, rest:{ n:'휴식', k:[] } });
 function normPlan(m) { const P = plansOf(m); if (!P[m.plan]) m.plan = Object.keys(P)[0]; return P; }
 const PLANS = plansOf({ sub:'ST' });
+// 수치 범위 보정 — 어떤 경로로든 0 미만/상한 초과/NaN이 되면 즉시 되돌린다
+function normStats(m) {
+  if (!m || m.mgr) return;
+  const fix = (k, lo, hi, d) => { const v = m[k]; m[k] = (typeof v !== 'number' || !isFinite(v)) ? d : clamp(v, lo, hi); };
+  fix('fat', 0, 100, 10); fix('mor', 0, 100, 70); fix('trust', 0, 100, 50); fix('fame', 0, 100, 5); fix('form', 4, 9, 6.3); fix('push', -50, 50, 0);
+  m.inj = (typeof m.inj === 'number' && isFinite(m.inj)) ? Math.max(0, Math.round(m.inj)) : 0;
+  if (m.a) { let ch = 0; for (const k in m.a) { const v = m.a[k], c = (typeof v !== 'number' || !isFinite(v)) ? 40 : clamp(Math.round(v), 1, 99); if (c !== v) { m.a[k] = c; ch = 1; } } if (ch) Eng.finalize(m); }
+}
 function trainingDay() {
-  const m = me(); const t = dateOf(G.day);
+  const m = me(); normStats(m); const t = dateOf(G.day);
   const hasMatch = G.pendingMine || (G.lastRes[m.club] && G.lastRes[m.club].day===G.day);
   const tr = traitOf(m); m.fatSum = (m.fatSum||0) + m.fat; m.fatN = (m.fatN||0) + 1; m.push = (m.push||0) * 0.992;
   if (m.plan==='rest' || t.dow===0) { m.fat = Math.max(0, m.fat-(m.plan==='rest'?8:5)-GEAR[shopOf(m).gear].rec); return; }
@@ -1723,5 +1731,5 @@ function mgrReplan(min) {                                                  // �
 }
 
 const NATFLAG = (c) => DD.FLAG[c] || (WCN[c] && WCN[c][1]) || '';
-const API2 = { mgrAbil, wcKO, wcExtra, wcAutoPick, wcSquadCheck, wcSquadSet, mgrK, SP_SLOT, mgrSponsorGen, mgrSponsorSign, mgrPreGen, mgrCerPress, renamePlayer, renameClub, NATFLAG, mgrTrophy, mgrX, STAFF, mgrStaffUp, mgrStaffCost, mgrStaffLv, mgrWage, mgrFanText, mgrPressGen, mgrPressPick, rivalOf, wcStart, wcInfo, wcRank, WCN, Eng, isMgr, mgrWin, createMgr, mgrOffers, mgrJobs, mgrGoal, mgrSquad, mgrLineup, mgrSetXi, mgrSetRole, mgrSetFormation, mgrSetInstr, mgrAutoXi, mgrMarket, mgrBuy, mgrSell, mgrValue, mgrStanding, mgrTakeJob, mgrTalkInfo, mgrTalkPick, mgrSub, mgrReplan, talkInfo, talkPick, posKinds: (sub) => POSK[sub] || POSK.ST, optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, BOOTS, GEAR, AGENTS, shopBuy, shopOf, adAccept, adDecline, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
+const API2 = { mgrAbil, wcKO, wcExtra, wcAutoPick, wcSquadCheck, wcSquadSet, mgrK, SP_SLOT, mgrSponsorGen, mgrSponsorSign, mgrPreGen, mgrCerPress, renamePlayer, renameClub, NATFLAG, mgrTrophy, mgrX, STAFF, mgrStaffUp, mgrStaffCost, mgrStaffLv, mgrWage, mgrFanText, mgrPressGen, mgrPressPick, rivalOf, wcStart, wcInfo, wcRank, WCN, Eng, isMgr, mgrWin, createMgr, mgrOffers, mgrJobs, mgrGoal, mgrSquad, mgrLineup, mgrSetXi, mgrSetRole, mgrSetFormation, mgrSetInstr, mgrAutoXi, mgrMarket, mgrBuy, mgrSell, mgrValue, mgrStanding, mgrTakeJob, mgrTalkInfo, mgrTalkPick, mgrSub, mgrReplan, talkInfo, talkPick, posKinds: (sub) => POSK[sub] || POSK.ST, optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, normStats, BOOTS, GEAR, AGENTS, shopBuy, shopOf, adAccept, adDecline, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
 if (typeof module !== 'undefined') module.exports = API2;

@@ -1519,6 +1519,7 @@ function cerModal() {
 }
 function render() {
   const app = $('#app');
+  try { const g = G0(); if (g && S.step === 'game') Core.normStats(Core.me()); } catch (e) {}
   try { if (S.welcome && S.step === 'game' && !S.busy && !S.matchOpen) { const w = S.welcome; S.welcome = null; setTimeout(() => popup('게임 시작!', w==='start' ? '선수 육성 모드가 시작되었습니다.\n아래 ‘진행’ 버튼으로 하루씩 보내며 훈련하고, 경기 일정에 맞춰 컨디션을 관리하세요.' : w==='mstart' ? '감독 모드가 시작되었습니다.\n구단 탭에서 스폰서·스태프를, 전술 탭에서 포메이션을 먼저 살펴보세요.' : '월드컵 모드가 시작되었습니다.\n조별리그를 통과해 결승 트로피를 노려보세요!', '🎉'), 250); } } catch (e) {}
   try { const g0 = G0(); if (g0 && g0.cer && !S.modal && !S.matchOpen && !S.busy && S.step === 'game') { S.modalKind = 'cer'; S.modal = cerModal(); sfx('trophy'); } } catch (e) {}
   if (S.step==='setup' || S.step==='create' || S.step==='mode' || S.step==='mcreate' || S.step==='wcsel' || S.step==='wcsquad') {
@@ -1550,7 +1551,8 @@ function pop(o) {
 }
 function popup(title, msg, icon, auto) { pop({ title, msg, icon, auto }); }
 function ask(title, msg, okText, fn, icon) { pop({ title, msg, icon: icon || '❓', btns: [{ t: '취소', cls: 'sec' }, { t: okText || '확인', fn }] }); }
-function toast(t) { const el = $('#toast'); el.textContent = t; el.style.opacity = 1; setTimeout(() => el.style.opacity = 0, 2200); }
+let toastT = 0;
+function toast(t, ms) { const el = $('#toast'); el.textContent = t; el.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => el.style.opacity = 0, ms || 2200); }
 function actBar() {
   if (isM()) { const G = G0(); let ev = null; try { ev = Core.nextEvent(); } catch (e) {} const mt = ev && ev.match; const dd = (n) => n <= 0 ? '오늘' : n === 1 ? '내일' : n + '일 뒤'; const info = G.pendingMine ? '오늘은 경기일입니다' : mt ? `다음 경기 · ${dd(mt.days)} ${mt.home ? 'vs' : '@'} ${esc(mt.opp)}` : '예정된 경기가 없습니다'; const go = G.pendingMine ? '경기 준비 ⚽' : (mt && mt.days === 1 ? '경기 시작 ⚽' : '계속 ▶');
     const open = S.skipOpen ? `<div class="skiprow"><button class="chip" data-act="skip" data-id="7">일주일</button><button class="chip" data-act="skip" data-id="30">한 달</button><button class="chip" data-act="skip" data-id="200">다음 경기까지</button></div>` : '';
@@ -1745,7 +1747,7 @@ async function boot() {
 }
 boot();
 
-window.addEventListener('error', (e) => { try { toast('오류: ' + (e.message || '알 수 없음') + (e.lineno ? ' (' + e.lineno + ')' : '')); } catch (e2) {} });
+window.addEventListener('error', (e) => { try { const st = String((e.error && e.error.stack) || '').split('\n').slice(0, 3).map(x => x.trim().replace(/^at\s+/, '').slice(0, 70)).join(' ← '); try { (S.errLog = S.errLog || []).push(new Date().toISOString().slice(11, 19) + ' ' + (e.message || '') + ' ' + st); if (S.errLog.length > 20) S.errLog.shift(); } catch (e3) {} toast('오류: ' + (e.message || '알 수 없음') + (e.lineno ? ' (' + e.lineno + ')' : '') + (st ? '\n' + st : ''), 7000); } catch (e2) {} });
 window.addEventListener('unhandledrejection', (e) => { try { toast('오류: ' + String(e.reason && e.reason.message || e.reason)); } catch (e2) {} });
 
 // ---- 화면 꺼짐 방지 (경기·플레이 중 폰 화면 자동 꺼짐 방지) ----
