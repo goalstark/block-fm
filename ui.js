@@ -1284,10 +1284,16 @@ function slotRows(inGame) {
   SLOTS.forEach((k,i) => rows.push(row(k, '저장 칸 ' + (i+1))));
   return rows.join('');
 }
+function splashView() {
+  const L = [[{ skin: 'tan', hair: 'black', style: 'short' }, ['#CD2E3A', '#FFFFFF']], [{ skin: 'fair', hair: 'blond', style: 'sidepart' }, ['#1F3A93', '#FFFFFF']], [{ skin: 'brown', hair: 'dark', style: 'curly' }, ['#F7D117', '#009739']], [{ skin: 'olive', hair: 'brown', style: 'long' }, ['#75AADB', '#FFFFFF']], [{ skin: 'deep', hair: 'black', style: 'buzz' }, ['#0B8F4D', '#F7D117']]];
+  const team = L.map(([lk, kit], i) => `<span class="spr spl-c" style="animation-delay:${i * 0.12}s;width:44px;height:94px;background-image:url(${sprite(lk, kit)})"></span>`).join('');
+  return `<div class="ldg spl"><div class="ldg-grass"></div><div class="spl-top">⚽</div><div class="ldg-logo spl-logo">블록 <b>풋볼매니저</b></div><div class="spl-sub">선수 육성 · 감독 · 월드컵</div><div class="spl-team">${team}</div><div class="ldg-bar"><i class="spl-bar"></i></div><div class="ldg-st">불러오는 중…</div></div>`;
+}
 async function boot() {
-  $('#app').innerHTML = '<div class="load">불러오는 중…</div>';
+  $('#app').innerHTML = splashView(); const t0 = Date.now();
   refreshSlots0();
   const ok = await loadSave();
+  { const w = 1900 - (Date.now() - t0); if (w > 0) await new Promise(r => setTimeout(r, w)); }
   if (ok) { S.step = 'game'; render(); if (G0().pendingMine) setTimeout(startMatch, 50); }
   else { S.step = 'mode'; render(); }
 }
