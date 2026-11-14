@@ -17,16 +17,12 @@ jobs:
       - run: node build.js
       - run: npm install
       - run: npx cap add android
+      - run: npx cap sync android
       - name: Keep screen on
         run: |
-          python3 - <<'PY'
-          import glob
-          f = glob.glob('android/app/src/main/java/**/MainActivity.java', recursive=True)[0]
-          s = open(f).read()
-          s = s.replace('extends BridgeActivity {', 'extends BridgeActivity {\n    @Override\n    public void onCreate(android.os.Bundle b) {\n        super.onCreate(b);\n        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);\n    }\n', 1)
-          open(f, 'w').write(s)
-          PY
-      - run: npx cap sync android
+          f=$(find android/app/src/main/java -name MainActivity.java | head -1)
+          sed -i 's/super.onCreate(b); applyFs();/super.onCreate(b); getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); applyFs();/' "$f"
+          grep -c FLAG_KEEP_SCREEN_ON "$f"
       - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
       - name: APK 서명 지문 출력
         run: |
