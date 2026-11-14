@@ -746,7 +746,7 @@ function pickMentor(m) {
 }
 function mentorOf(m) { const p = m.mentor!=null ? G.players[m.mentor] : null; return p && !p.retired && p.club===m.club ? p : null; }
 const ADVICE = ['"공을 받기 전에 어디로 줄지 먼저 정해 둬."', '"훈련 때 하던 대로만 해. 경기장에서 바꾸려 하지 마."', '"수비 라인을 보고 움직임을 한 박자 빠르게 가져가 봐."', '"체력 관리도 실력이야. 쉬는 날엔 확실히 쉬어."', '"한 번 실수하면 다음 플레이에 바로 집중해."', '"감독이 원하는 역할을 이해하면 출전 시간이 늘어."'];
-const ACH = { debut:['프로 데뷔','첫 공식 경기에 출전했습니다.'], goal1:['첫 골','첫 골을 기록했습니다.'], assist1:['첫 도움','첫 도움을 기록했습니다.'], hat:['해트트릭','한 경기 3골 이상.'], mvp1:['첫 MVP','경기 MVP로 뽑혔습니다.'], rate9:['평점 9점','평점 9.0 이상의 경기.'], goals10:['통산 10골','통산 10골을 넘겼습니다.'], nt1:['대표팀 데뷔','대표팀 경기에 출전했습니다.'], lvl1:['첫 성장','훈련으로 능력치가 올랐습니다.'], mentor1:['멘토의 가르침','멘토에게 조언을 받았습니다.'] };
+const ACH = { debut:['프로 데뷔','첫 공식 경기에 출전했습니다.'], goal1:['첫 골','첫 골을 기록했습니다.'], assist1:['첫 도움','첫 도움을 기록했습니다.'], hat:['해트트릭','한 경기 3골 이상.'], mvp1:['첫 MVP','경기 MVP로 뽑혔습니다.'], rate9:['평점 9점','평점 9.0 이상의 경기.'], goals10:['통산 10골','통산 10골을 넘겼습니다.'], nt1:['대표팀 데뷔','대표팀 경기에 출전했습니다.'], lvl1:['첫 성장','훈련으로 능력치가 올랐습니다.'], mentor1:['멘토의 가르침','멘토에게 조언을 받았습니다.'], ad1:['첫 광고','첫 광고 촬영을 마쳤습니다.'], shop1:['장비 투자','처음으로 장비에 투자했습니다.'] };
 function unlock(m, id) { m.ach = m.ach || {}; if (m.ach[id]) return; m.ach[id] = G.day; m.achNew = (m.achNew || []).concat(id); addNews('me', `🏅 업적 달성 — ${ACH[id][0]}`, false, { me:true }); }
 function setCust(keys) { const m = me(); m.cust = keys.slice(0,2); m.plan = 'custom'; }
 function setRoleTraining() { const m = me(), r = roleOf(m); const ks = r.k.slice().sort((a,b) => (m.a[a]||0) - (m.a[b]||0)).slice(0,2); setCust(ks); return ks; }
@@ -754,7 +754,42 @@ function setRoleTraining() { const m = me(), r = roleOf(m); const ks = r.k.slice
 // ----- 재정 / 스폰서 / 오퍼 설명 -----
 const BRANDS = ['나이키풋','아디다온','푸마스','뉴밸런스풋','언더암스','미즈노프로','스포츠존','에너지드링크 볼트','프로틴바 파워','게임기 플레이엑스','통신사 링크','자동차 모터원','시계 크로노','헤어 스타일 케어'];
 const INV = [{ n:'없음', c:0, g:1 }, { n:'개인 트레이너', c:80, g:1.08 }, { n:'전담 코치 + 영양사', c:250, g:1.15 }];
-function finOf(m) { if (!m.fin) m.fin = { earn:0, sp:0, bonus:0, out:0, tax:0, cost:0, inv:0, log:[], sps:[], spOff:[], bal:0, lm:null }; return m.fin; }
+function finOf(m) { if (!m.fin) m.fin = { earn:0, sp:0, bonus:0, out:0, tax:0, cost:0, inv:0, log:[], sps:[], spOff:[], bal:0, lm:null }; const f = m.fin; if (!f.adOff) { f.adOff = []; f.ad = 0; f.adN = 0; f.adMo = 0; f.shopCost = 0; } return f; }
+// ----- 장비·에이전트·광고 (게임 내 수입으로만 구매) -----
+const BOOTS = [{ n:'기본 운동화', p:0, r:0 }, { n:'프로 축구화', p:150, r:0.12 }, { n:'시그니처 축구화', p:600, r:0.22 }, { n:'스페셜 에디션 축구화', p:2000, r:0.32 }];
+const GEAR = [{ n:'없음', p:0, inj:0, rec:0 }, { n:'회복 장비 (냉온 욕조·마사지건)', p:300, inj:0.25, rec:1 }, { n:'프로 회복 센터 회원권', p:1200, inj:0.45, rec:2 }];
+const AGENTS = [{ n:'기본 대행', fee:0.05, o:1, ad:1, fame:0 }, { n:'전문 에이전시', fee:0.08, o:1.35, ad:1.3, fame:20 }, { n:'슈퍼 에이전트', fee:0.12, o:1.7, ad:1.7, fame:45 }];
+const AD_KINDS = [{ k:'CF 촬영', f:1, d:2, fat:6, fame:1.2 }, { k:'화보 촬영', f:0.6, d:1, fat:3, fame:0.6 }, { k:'예능 출연', f:0.5, d:1, fat:3, fame:2 }, { k:'팬 사인회 행사', f:0.35, d:1, fat:2, fame:0.8 }];
+function shopOf(m) { if (!m.shop) m.shop = { boots:0, bUntil:0, gear:0, ag:0 }; const sh = m.shop; if (sh.boots && G.day > sh.bUntil) { sh.boots = 0; G.inbox.unshift({ d:G.day, text:'축구화가 닳았습니다. 새 축구화를 구입하세요.' }); } return sh; }
+const bootsR = (m) => BOOTS[shopOf(m).boots].r, agOf = (m) => AGENTS[shopOf(m).ag] || AGENTS[0];
+function shopBuy(kind, i) {
+  const m = me(), f = finOf(m), sh = shopOf(m); i = +i;
+  if (kind==='boots') { const b = BOOTS[i]; if (!b || i<=sh.boots && G.day <= sh.bUntil) return { ok:false, msg:'이미 더 좋거나 같은 축구화를 신고 있습니다.' }; if (f.bal < b.p) return { ok:false, msg:'잔고가 부족합니다.' }; f.bal -= b.p; f.shopCost += b.p; sh.boots = i; sh.bUntil = G.day + 365; }
+  else if (kind==='gear') { const g = GEAR[i]; if (!g || i<=sh.gear) return { ok:false, msg:'이미 보유한 장비입니다.' }; if (f.bal < g.p) return { ok:false, msg:'잔고가 부족합니다.' }; f.bal -= g.p; f.shopCost += g.p; sh.gear = i; }
+  else if (kind==='agent') { const a = AGENTS[i]; if (!a) return { ok:false, msg:'잘못된 선택' }; if (m.fame < a.fame) return { ok:false, msg:`인지도 ${a.fame} 이상이어야 계약할 수 있습니다.` }; sh.ag = i; }
+  else return { ok:false, msg:'?' };
+  unlock(m, 'shop1'); return { ok:true, msg:'완료' };
+}
+function adAccept(i) {
+  const m = me(), f = finOf(m), o = f.adOff[i]; if (!o) return { ok:false, msg:'제안이 만료되었습니다.' };
+  if (f.adMo >= 1) return { ok:false, msg:'이번 달에는 이미 광고를 촬영했습니다. 다음 달에 가능합니다.' };
+  if (m.inj > 0 && o.fat >= 5) return { ok:false, msg:'부상 중에는 촬영할 수 없습니다.' };
+  f.adOff.splice(i,1); f.adMo++; f.adN++; f.ad += o.fee; f.pend = (f.pend||0) + o.fee;
+  m.fat = clamp((m.fat||0) + o.fat, 0, 100); m.fame = clamp(m.fame + o.fm, 0, 100); m.mor = clamp((m.mor||70) + 3, 0, 100);
+  let msg = `${o.b} ${o.k} 완료 (+${o.fee}만 원, 세전)`;
+  if ((m.benchStreak||0) >= 3 || (m.form||6.3) < 5.6) { m.trust = clamp(m.trust - 3, 0, 100); msg += ' — 부진한 시기의 광고 활동에 감독이 불편해합니다.'; }
+  addNews('me', `${m.name}, ${o.b} ${o.k} 출연`, false, { me:true }); unlock(m, 'ad1'); return { ok:true, msg };
+}
+function adDecline(i) { const f = finOf(me()); f.adOff.splice(i,1); }
+function adGen(m, f, c) {
+  f.adMo = 0; f.adOff = f.adOff.filter(x => x.until >= G.day);
+  if (!c || c.kind!=='pro' || m.fame < 20 || f.adOff.length >= 2) return;
+  const ag = agOf(m); if (rnd() > (0.14 + m.fame/260) * Math.min(1.4, ag.o)) return;
+  const kd = pick(AD_KINDS), spb = f.sps.map(x=>x.b), b = pick(BRANDS.filter(x => !f.adOff.some(y=>y.b===x))); if (!b) return;
+  const fee = Math.max(20, Math.round((25 + Math.pow(m.fame,1.5)*1.8) * (m.ovr/60) * (0.8 + rnd()*0.5) * ag.ad * kd.f * (spb.includes(b)?1.2:1) / 5) * 5);
+  const o = { b, k:kd.k, fee, d:kd.d, fat:kd.fat, fm:kd.fame, until: G.day + 14 }; f.adOff.push(o);
+  G.inbox.unshift({ d:G.day, text:`광고 제안: ${b} ${kd.k} (출연료 ${fee}만 원)` });
+}
 function pitchOf(o) {
   const m = me(), c = G.clubs[o.club]; if (!c) return null;
   const g = GROUP[m.sub]; const same = c.pl.map(id=>G.players[id]).filter(p=>p && !p.me && !p.retired && GROUP[p.sub]===g && p.sub===m.sub).sort((a,b)=>b.ovr-a.ovr);
@@ -776,12 +811,13 @@ function finMonth(t) {
   const sp = f.sps.filter(x => x.until >= G.day).reduce((a,x)=>a + x.m, 0);
   f.sps = f.sps.filter(x => x.until >= G.day);
   const bonus = f.pend || 0; f.pend = 0;
-  const gross = wage + sp + bonus, tax = gross * 0.18, agent = wage * 0.05, live = Math.min(120 + Math.min(600, gross*0.07), 40 + gross*0.4, gross*0.5), inv = INV[m.inv||0].c;
+  const gross = wage + sp + bonus, tax = gross * 0.18, agent = wage * agOf(m).fee, live = Math.min(120 + Math.min(600, gross*0.07), 40 + gross*0.4, gross*0.5), inv = INV[m.inv||0].c;
   const cost = tax + agent + live + inv, net = gross - cost;
   f.earn += wage; f.sp += sp; f.bonus += bonus; f.tax += tax; f.cost += agent + live; f.inv += inv; f.bal += net;
   f.log.unshift({ y:t.y, m:t.m, wage:Math.round(wage), sp:Math.round(sp), bonus:Math.round(bonus), tax:Math.round(tax), live:Math.round(agent+live), inv, net:Math.round(net) }); if (f.log.length>12) f.log.length = 12;
   if (f.bal < 0 && m.inv) { m.inv = 0; G.inbox.unshift({ d:G.day, text:'잔고 부족으로 개인 지원 서비스가 중단되었습니다.' }); }
   { const tgt = clamp((m.ovr-52)*1.7 + ((c&&c.strength)||50-50)*0.4, 0, 100); m.fame = clamp(m.fame + ((m.benchStreak||0) >= 4 ? -0.8 : (tgt - m.fame)*0.06), 0, 100); }
+  adGen(m, f, c);
   // 스폰서 제안
   if (c && c.kind==='pro' && f.spOff.length < 2 && f.sps.length < 3 && m.fame >= 15 && rnd() < 0.12 + m.fame/400) {
     const used = f.sps.map(x=>x.b).concat(f.spOff.map(x=>x.b)); const b = pick(BRANDS.filter(x=>!used.includes(x))); if (b) {
@@ -895,7 +931,7 @@ function trainingDay() {
   const m = me(); const t = dateOf(G.day);
   const hasMatch = G.pendingMine || (G.lastRes[m.club] && G.lastRes[m.club].day===G.day);
   const tr = traitOf(m); m.fatSum = (m.fatSum||0) + m.fat; m.fatN = (m.fatN||0) + 1; m.push = (m.push||0) * 0.992;
-  if (m.plan==='rest' || t.dow===0) { m.fat = Math.max(0, m.fat-(m.plan==='rest'?8:5)); return; }
+  if (m.plan==='rest' || t.dow===0) { m.fat = Math.max(0, m.fat-(m.plan==='rest'?8:5)-GEAR[shopOf(m).gear].rec); return; }
   const PL = normPlan(m); const pl = PL[m.plan]; const age = m.age;
   const keys = m.plan==='custom' ? (m.cust && m.cust.length ? m.cust : [m.sub==='GK'?'REF':'FIN']) : pl.k;
   let gain = (age<=17?0.03: age<=21?0.026: age<=24?0.016: 0.008) * (m.fat>75?0.5:1) * (1+(m.trust-50)/300) * tr.gain;
@@ -915,7 +951,7 @@ function trainingDay() {
     const msg = `${mt.name} 선배: ${pick(ADVICE)}`; m.tutorLog = [{ d: G.day, t: msg }].concat(m.tutorLog || []).slice(0, 4); G.inbox.unshift({ d: G.day, text: `멘토 ${msg}` }); unlock(m, 'mentor1');
   }
   m.fat = clamp(m.fat + (3.2 - 2.2) * tr.fat + (hasMatch?8:0), 0, 100);
-  if (m.fat > 85 && rnd() < 0.01) m.inj = ri(3,14);
+  if (m.fat > 85 && rnd() < 0.01 * (1 - GEAR[shopOf(m).gear].inj)) m.inj = ri(3,14);
   m.mor = clamp(m.mor + (rnd()-0.5)*1.2, 20, 100);
 }
 function meRole(team) {
@@ -1166,7 +1202,7 @@ function finishMine() {
   let rating = null;
   if (M.role==='start' || M.role==='sub') {
     const mins = M.role==='start' ? 90 : 90 - M.from; const win = (mineGoals-oppGoals);
-    rating = clamp(M.myRate + win*0.15 + gauss()*0.2, 4.5, 10);
+    rating = clamp(M.myRate + win*0.15 + gauss()*0.2 + bootsR(m), 4.5, 10);
     const s = m[key]; s.a++; if (M.role==='start') s.s++; s.m += mins; s.rs += rating;
     m.form = clamp(m.form*0.7 + rating*0.3, 4, 9);
     if (M.ctx.t!=='nt') { const dt = (rating-6.3)*2.2, rf = clamp(roleOf(m).fit/8, -1, 1.2); m.trust = clamp(m.trust + (dt > 0 ? dt * traitOf(m).trust : dt) + rf, 0, 100); }
@@ -1212,7 +1248,7 @@ function meOffers(t, outside) {
   if (outside && !pre) return;
   if (m.st.a < 6 && m.hist.length===0) return;
   const wo = m.wantOut && G.day - m.wantOut < 90 ? 3 : 1;
-  if (rnd() > (0.06 + (m.fame/100)*0.08) * wo) return;
+  if (rnd() > (0.06 + (m.fame/100)*0.08) * wo * agOf(m).o) return;
   const good = clamp(m.form,4,9) >= 6.3 || m.fame > 30 || wo > 1;
   if (!good) return;
   const maxL = lvl(cur) + (m.ovr>=72 ? 2 : 1);
@@ -1687,5 +1723,5 @@ function mgrReplan(min) {                                                  // �
 }
 
 const NATFLAG = (c) => DD.FLAG[c] || (WCN[c] && WCN[c][1]) || '';
-const API2 = { mgrAbil, wcKO, wcExtra, wcAutoPick, wcSquadCheck, wcSquadSet, mgrK, SP_SLOT, mgrSponsorGen, mgrSponsorSign, mgrPreGen, mgrCerPress, renamePlayer, renameClub, NATFLAG, mgrTrophy, mgrX, STAFF, mgrStaffUp, mgrStaffCost, mgrStaffLv, mgrWage, mgrFanText, mgrPressGen, mgrPressPick, rivalOf, wcStart, wcInfo, wcRank, WCN, Eng, isMgr, mgrWin, createMgr, mgrOffers, mgrJobs, mgrGoal, mgrSquad, mgrLineup, mgrSetXi, mgrSetRole, mgrSetFormation, mgrSetInstr, mgrAutoXi, mgrMarket, mgrBuy, mgrSell, mgrValue, mgrStanding, mgrTakeJob, mgrTalkInfo, mgrTalkPick, mgrSub, mgrReplan, talkInfo, talkPick, posKinds: (sub) => POSK[sub] || POSK.ST, optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
+const API2 = { mgrAbil, wcKO, wcExtra, wcAutoPick, wcSquadCheck, wcSquadSet, mgrK, SP_SLOT, mgrSponsorGen, mgrSponsorSign, mgrPreGen, mgrCerPress, renamePlayer, renameClub, NATFLAG, mgrTrophy, mgrX, STAFF, mgrStaffUp, mgrStaffCost, mgrStaffLv, mgrWage, mgrFanText, mgrPressGen, mgrPressPick, rivalOf, wcStart, wcInfo, wcRank, WCN, Eng, isMgr, mgrWin, createMgr, mgrOffers, mgrJobs, mgrGoal, mgrSquad, mgrLineup, mgrSetXi, mgrSetRole, mgrSetFormation, mgrSetInstr, mgrAutoXi, mgrMarket, mgrBuy, mgrSell, mgrValue, mgrStanding, mgrTakeJob, mgrTalkInfo, mgrTalkPick, mgrSub, mgrReplan, talkInfo, talkPick, posKinds: (sub) => POSK[sub] || POSK.ST, optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, BOOTS, GEAR, AGENTS, shopBuy, shopOf, adAccept, adDecline, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
 if (typeof module !== 'undefined') module.exports = API2;

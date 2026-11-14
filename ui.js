@@ -185,13 +185,19 @@ function mentorCard(m) {
   const adv = (m.tutorLog||[]).map(x=>`<div class="li"><span class="dim">${Core.fmtDate(x.d).slice(5,10)}</span> ${esc(x.t)}</div>`).join('');
   return `<div class="card"><div class="row"><b>팀 내 멘토</b><span class="tag">${tr.n}</span></div>${t?`<div>${pLink(t)} <span class="dim">${Core.POS_KO[t.sub]} · ${t.age}세 · 종합 ${t.ovr}</span></div><div class="dim">같은 계열 선배의 조언으로 훈련 성장이 빨라집니다.</div>${adv}`:'<div class="dim">아직 멘토가 없습니다. 같은 포지션 계열의 3살 이상 선배가 있으면 자동으로 배정됩니다.</div>'}</div>`;
 }
+function shopCard(m) {
+  const sh = Core.shopOf(m), now = Core.G.day, B = Core.BOOTS.map((x,i)=>i? `<button class="opt ${sh.boots===i&&now<=sh.bUntil?'on':''}" data-act="shop" data-id="boots:${i}"><b>${x.n}</b><span class="dim">${won(x.p)} · 평점 +${x.r} · 1년</span></button>`:'').join(''),
+  G = Core.GEAR.map((x,i)=>i? `<button class="opt ${sh.gear===i?'on':''}" data-act="shop" data-id="gear:${i}"><b>${x.n}</b><span class="dim">${won(x.p)} · 부상 -${Math.round(x.inj*100)}% · 회복 +${x.rec}</span></button>`:'').join(''),
+  A = Core.AGENTS.map((x,i)=>`<button class="opt ${sh.ag===i?'on':''}" data-act="shop" data-id="agent:${i}"><b>${x.n}</b><span class="dim">수수료 ${Math.round(x.fee*100)}% · 이적제안 ×${x.o} · 광고 ×${x.ad}${x.fame?' · 인지도 '+x.fame+'↑':''}</span></button>`).join('');
+  return `<div class="card"><div class="dim">축구화 (현재: ${Core.BOOTS[now<=sh.bUntil?sh.boots:0].n})</div><div class="opts">${B}</div><div class="dim">회복 장비</div><div class="opts">${G}</div><div class="dim">에이전트</div><div class="opts">${A}</div></div>`;
+}
 function finCard(m) {
   const f = Core.finOf(m), c = Core.clubOf(m.club), pro = c.kind==='pro';
   const spOn = f.sps.map(x=>`<div class="li"><b>${esc(x.b)}</b> <span class="dim">월 ${won(x.m)} · ${Core.fmtDate(x.until).slice(0,7)}까지</span></div>`).join('') || '<div class="dim">진행 중인 스폰서가 없습니다. 인지도가 오르면 제안이 옵니다.</div>';
   const spOf = f.spOff.map((o,i)=>`<div class="card gl"><b>${esc(o.b)}</b> <span class="dim">월 ${won(o.m)} · ${o.years}년</span><div class="row g8"><button class="btn" data-act="spa" data-id="${i}">수락</button><button class="btn sec" data-act="spd" data-id="${i}">거절</button></div></div>`).join('');
   const out = f.tax + f.cost + f.inv, inv = Core.INV.map((x,i)=>`<button class="opt ${(m.inv||0)===i?'on':''}" data-act="inv" data-id="${i}"><b>${x.n}</b><span class="dim">${x.c?'월 '+won(x.c)+' · 성장 +'+Math.round((x.g-1)*100)+'%':'비용 없음'}</span></button>`).join('');
   const led = f.log.slice(0,6).map(l=>`<tr><td>${l.y%100}.${String(l.m).padStart(2,'0')}</td><td>${l.wage}</td><td>${l.sp+l.bonus}</td><td>${l.tax+l.live+l.inv}</td><td><b style="color:${l.net>=0?'#C6F36B':'#FFB27A'}">${l.net}</b></td></tr>`).join('');
-  return `<div class="sec">재정</div><div class="tiles">${tile('주급', pro?won(m.ct.wage):'—', pro?'연봉 약 '+won(m.ct.wage*52):'프로 계약 전')}${tile('잔고', won(f.bal), '누적 순이익')}${tile('누적 수입', won(f.earn+f.sp+f.bonus), '급여 '+won(f.earn))}${tile('누적 지출', won(out), '세금 '+won(f.tax))}</div><div class="card"><div class="dim">수입 내역 — 급여 ${won(f.earn)} · 스폰서 ${won(f.sp)} · 보너스(골·도움·MVP·계약) ${won(f.bonus)}</div><div class="dim">지출 내역 — 세금 ${won(f.tax)} · 생활·에이전트 ${won(f.cost)} · 자기 투자 ${won(f.inv)}</div></div><div class="sec">스폰서</div>${spOf}<div class="card">${spOn}</div><div class="sec">자기 투자 <span class="dim">매달 비용</span></div><div class="opts">${inv}</div>${led?`<div class="sec">월별 수지 <span class="dim">(만 원)</span></div><div class="card"><table class="tb"><tr><th>월</th><th>급여</th><th>스폰·보너스</th><th>지출</th><th>순이익</th></tr>${led}</table></div>`:''}`;
+  return `<div class="sec">재정</div><div class="tiles">${tile('주급', pro?won(m.ct.wage):'—', pro?'연봉 약 '+won(m.ct.wage*52):'프로 계약 전')}${tile('잔고', won(f.bal), '누적 순이익')}${tile('누적 수입', won(f.earn+f.sp+f.bonus), '급여 '+won(f.earn))}${tile('누적 지출', won(out), '세금 '+won(f.tax))}</div><div class="card"><div class="dim">수입 내역 — 급여 ${won(f.earn)} · 스폰서 ${won(f.sp)} · 보너스(골·도움·MVP·계약) ${won(f.bonus)}</div><div class="dim">지출 내역 — 세금 ${won(f.tax)} · 생활·에이전트 ${won(f.cost)} · 자기 투자 ${won(f.inv)}</div></div><div class="sec">스폰서</div>${spOf}<div class="card">${spOn}</div><div class="sec">광고 <span class="dim">월 1회 · 누적 ${won(f.ad)} (${f.adN}회)</span></div>${f.adOff.map((o,i)=>`<div class="card gl"><b>${esc(o.b)}</b> <span class="tag">${o.k}</span> <span class="dim">출연료 ${won(o.fee)} · 피로 +${o.fat} · ${o.d}일</span><div class="row g8"><button class="btn" data-act="ada" data-id="${i}">촬영</button><button class="btn sec" data-act="add" data-id="${i}">거절</button></div></div>`).join('') || '<div class="card dim">들어온 광고 제안이 없습니다. 인지도 20 이상이면 제안이 옵니다. 부진할 때 찍으면 감독 신뢰가 깎입니다.</div>'}<div class="sec">장비·에이전트 <span class="dim">게임 내 수입으로 구매</span></div>${shopCard(m)}<div class="sec">자기 투자 <span class="dim">매달 비용</span></div><div class="opts">${inv}</div>${led?`<div class="sec">월별 수지 <span class="dim">(만 원)</span></div><div class="card"><table class="tb"><tr><th>월</th><th>급여</th><th>스폰·보너스</th><th>지출</th><th>순이익</th></tr>${led}</table></div>`:''}`;
 }
 function potCard(m) {
   const l = (m.potLog||[]).slice().reverse().map(x=>`<div class="li"><span class="dim">${x[0]}</span> 잠재 ${x[1]} → <b style="color:${x[2]>x[1]?'#C6F36B':x[2]<x[1]?'#FFB27A':'#9DB0A4'}">${x[2]}</b></div>`).join('');
@@ -1645,6 +1651,9 @@ document.addEventListener('click', (e) => {
   else if (a==='spa') { Core.sponsorAccept(+id); toast('스폰서 계약 완료'); }
   else if (a==='spd') Core.sponsorDecline(+id);
   else if (a==='inv') { Core.setInv(+id); }
+  else if (a==='ada') { const r = Core.adAccept(+id); toast(r.msg); if (r.ok) sfx('coin'); }
+  else if (a==='add') Core.adDecline(+id);
+  else if (a==='shop') { const [k, i] = id.split(':'); const r = Core.shopBuy(k, i); toast(r.ok ? '구매·계약 완료' : r.msg); if (r.ok) sfx('coin'); }
   else if (a==='ofd') S.modal = offerModal(+id);
   else if (a==='nf') S.nf = id; else if (a==='lc') { S.lc = id; S.ld = null; } else if (a==='ld') S.ld = id; else if (a==='lt') S.lt = id; else if (a==='cv') S.cv = id;
   else if (a==='pl') S.modal = profileHTML(G0().players[id]);
