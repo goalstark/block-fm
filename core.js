@@ -776,11 +776,12 @@ function finMonth(t) {
   const sp = f.sps.filter(x => x.until >= G.day).reduce((a,x)=>a + x.m, 0);
   f.sps = f.sps.filter(x => x.until >= G.day);
   const bonus = f.pend || 0; f.pend = 0;
-  const gross = wage + sp + bonus, tax = gross * 0.18, agent = wage * 0.05, live = Math.min(120 + Math.min(600, gross*0.07), 40 + gross*0.4), inv = INV[m.inv||0].c;
+  const gross = wage + sp + bonus, tax = gross * 0.18, agent = wage * 0.05, live = Math.min(120 + Math.min(600, gross*0.07), 40 + gross*0.4, gross*0.5), inv = INV[m.inv||0].c;
   const cost = tax + agent + live + inv, net = gross - cost;
   f.earn += wage; f.sp += sp; f.bonus += bonus; f.tax += tax; f.cost += agent + live; f.inv += inv; f.bal += net;
   f.log.unshift({ y:t.y, m:t.m, wage:Math.round(wage), sp:Math.round(sp), bonus:Math.round(bonus), tax:Math.round(tax), live:Math.round(agent+live), inv, net:Math.round(net) }); if (f.log.length>12) f.log.length = 12;
   if (f.bal < 0 && m.inv) { m.inv = 0; G.inbox.unshift({ d:G.day, text:'잔고 부족으로 개인 지원 서비스가 중단되었습니다.' }); }
+  { const tgt = clamp((m.ovr-52)*1.7 + ((c&&c.strength)||50-50)*0.4, 0, 100); m.fame = clamp(m.fame + ((m.benchStreak||0) >= 4 ? -0.8 : (tgt - m.fame)*0.06), 0, 100); }
   // 스폰서 제안
   if (c && c.kind==='pro' && f.spOff.length < 2 && f.sps.length < 3 && m.fame >= 15 && rnd() < 0.12 + m.fame/400) {
     const used = f.sps.map(x=>x.b).concat(f.spOff.map(x=>x.b)); const b = pick(BRANDS.filter(x=>!used.includes(x))); if (b) {
@@ -1170,7 +1171,7 @@ function finishMine() {
     m.form = clamp(m.form*0.7 + rating*0.3, 4, 9);
     if (M.ctx.t!=='nt') { const dt = (rating-6.3)*2.2, rf = clamp(roleOf(m).fit/8, -1, 1.2); m.trust = clamp(m.trust + (dt > 0 ? dt * traitOf(m).trust : dt) + rf, 0, 100); }
     m.gTot = (m.gTot||0) + M.myGoals; { const f = finOf(m); f.pend = (f.pend||0) + M.myGoals*Math.max(1, Math.round(m.ct.wage*0.25)) + M.myAssists*Math.max(1, Math.round(m.ct.wage*0.12)) + (M.mvp && M.mvp.me ? Math.round(m.ct.wage*0.5) : 0); } unlock(m, 'debut'); if (M.myGoals) unlock(m, 'goal1'); if (M.myAssists) unlock(m, 'assist1'); if (M.myGoals>=3) unlock(m, 'hat'); if (rating>=9) unlock(m, 'rate9'); if (m.gTot>=10) unlock(m, 'goals10'); if (M.ctx.t==='nt') unlock(m, 'nt1');
-    m.fame = clamp(m.fame + (M.myGoals*2 + M.myAssists)*(M.ctx.t==='nt'||M.ctx.t==='cont'?1.5:1), 0, 100);
+    m.fame = clamp(m.fame + ((M.myGoals*2 + M.myAssists) + clamp((rating-6.6)*0.45, -0.25, 1.1) + (M.mvp && M.mvp.me ? 1.5 : 0))*(M.ctx.t==='nt'||M.ctx.t==='cont'?1.5:1), 0, 100);
     m.mor = clamp(m.mor + (win>0?3: win<0?-3:0) + (M.myGoals?4:0), 0, 100);
   } else if (M.ctx.t!=='nt') { m.trust = clamp(m.trust - 0.4, 0, 100); }
   m.lastMatch = { day: G.day, h: M.h.id, a: M.a.id, gh, ga, role: M.role, rating, g: M.myGoals, as: M.myAssists, title: M.title };

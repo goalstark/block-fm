@@ -723,7 +723,7 @@ function decide(M) {
     const t = pickBy(mates.filter(m => m.i), m => long ? (m.sub === 'ST' || m.sub === 'W' || m.sub === 'AM' ? 1 + m.open : 0.2) : (m.sub === 'CB' || m.sub === 'FB' || m.sub === 'DM' ? Math.exp(-m.dist / 20) * m.open : 0.15));
     if (t) { passTo(s, t.i, long ? 55 : 38); if (long) { MV.act.hi = true; lbl('롱킥'); } } else MV.dec = 0.5; return; }
   const Bd = TK(s).build - 1, R = who.sub, pm = c01(0.5 + (M.mine.strength - M.opp.strength) / 160, 0.3, 0.7), press = nd < 6 ? 1 : nd < 12 ? 0.5 : 0.15, foe = ni >= 0 ? sideOf(os)[ni] : null;
-  const lose = clampN(0.05 + press * 0.14 + (s === 'm' ? -(pm - 0.5) * 0.2 : (pm - 0.5) * 0.2) - (PA(who, 'DRI') - 50) / 700 + (PA(foe, 'TAK') - 50) / 500 + (PA(foe, 'AGG') - 50) / 900 + (TK(os).press - 1) * 0.035, 0.03, 0.42);
+  const lose = clampN(0.032 + press * 0.115 + (s === 'm' ? -(pm - 0.5) * 0.2 : (pm - 0.5) * 0.2) - (PA(who, 'DRI') - 50) / 700 + (PA(foe, 'TAK') - 50) / 500 + (PA(foe, 'AGG') - 50) / 900 + (TK(os).press - 1) * 0.035, 0.03, 0.42);
   const pass = (t, sp, lead, tag) => { const err = clampN((55 - PA(who, 'PAS')) / 220 + press * 0.08 + (t.dist > 30 ? 0.05 : 0) + (lead ? 0.04 : 0), 0, 0.3);   // 패스 정확도: 능력치/압박/거리
     if (Math.random() < err && ni >= 0) { let bi = -1, bd = 1e9; oarr.forEach((q, i) => { if (i && q && !MV.red[os + i]) { const dd = Math.hypot(q.x - t.q.x, q.y - t.q.y); if (dd < bd) { bd = dd; bi = i; } } }); if (bi >= 0) { passTo(os, bi, sp); return; } }
     passTo(s, t.i, sp); if (lead) MV.act.lead = d * lead; if (tag) { MV.act.tag = tag; lbl(tag); } if (tag === '크로스' || tag === '롱패스' || tag === '걷어내기') MV.act.hi = true; };
@@ -779,6 +779,9 @@ function flushPg() { const pg = MV && MV.pg; if (!pg) return; MV.pg = null; cons
 function frame(ts) {
   if (!MV) return; MV.raf = requestAnimationFrame(frame);
   const M = G0().mm; if (!M || !MV.pos) return;
+  if (MV.pzUntil && MV.paused && !MV.over && !MV.talk && !MV.momentOpen && !MV.pen && !MV.so && !MV.lead && !MV.pg && !MV.sp && !MV.mgrPanel && !MV.wantPanel && MV.min > 0) {       // 창을 닫은 직후 12초 동안: 이유 없이 멈춘 경기를 자동으로 재개(안전장치)
+    const nw = performance.now(); if (nw > (MV.fxUntil || 0) + 1200) { MV.paused = false; MV.pzUntil = 0; } else if (nw > MV.pzUntil) MV.pzUntil = 0; }
+  if (MV.wantPanel && !MV.over && !MV.pg && !MV.lead && !MV.sp && !MV.momentOpen && !MV.pen && !MV.so && !MV.cele && !MV.mgrPanel) { MV.wantPanel = false; mgrPanelOpen(); }
   if (MV.over) {                                                                          // 경기 종료: 선수·공 정지 + 가운데 종료 표시
     if (!MV.endShown) { MV.endShown = true; MV.lbl = null; { const lb0 = document.getElementById('blbl'); if (lb0) lb0.textContent = ''; } MV.act = null; MV.rs = null; MV.pg = null; MV.ln = null; MV.bz = 0; for (const pre of ['m', 'o']) (MV.pos[pre] || []).forEach(c => { if (c) c.vx = c.vy = 0; });
       const [eh, ea] = scoreAt(MV.etOn ? 120 : 90), pks = MV.so ? `<div class="endt" style="font-size:14px">승부차기 ${M.mineHome ? MV.so.sm : MV.so.so} : ${M.mineHome ? MV.so.so : MV.so.sm}</div>` : ''; fxShow(`<div class="endt">경기 종료</div><div class="ends">${eh} : ${ea}</div>${pks}`, 'end', 3600000, false); movePitch(); }
@@ -961,7 +964,7 @@ function playOutcome(M, mo, r) {                                                
 function bringMeTop() { const e = document.querySelector('#pitch .dot.me'); if (e && e.parentNode) { e.parentNode.appendChild(e); const b = document.getElementById('ball'); if (b) e.parentNode.appendChild(b); } }
 function fxShow(html, cls, ms, pause) {
   const el = $('#fx'); if (!el) return; el.innerHTML = `<div class="fxb ${cls}">${html}</div>`;
-  if (pause) { MV.paused = true; }
+  if (pause) { MV.paused = true; MV.fxUntil = performance.now() + ms; }
   if (pause) { clearTimeout(MV.fxP); MV.fxP = setTimeout(() => { if (MV && !MV.momentOpen && !MV.pg && !MV.lead && !MV.talk && !MV.mgrPanel && !MV.pen && !MV.so) MV.paused = false; }, ms); }   // 일시정지 해제는 배너가 덮어써져도 반드시 실행
   clearTimeout(MV.fxT); MV.fxT = setTimeout(() => { const e = $('#fx'); if (e) e.innerHTML = ''; }, ms);
 }
@@ -1469,19 +1472,26 @@ function matchTitleUI(ctx) { try { return compLabel(ctx); } catch (e) { return '
 function mgrPanelHTML(M) {
   const t = M.mine.tactic, left = 5 - (M.mgrSubs || 0), chg = Math.max(0, 3 - (M.mgrChanges || 0));
   const ins = Object.keys(INSTR_L).map(k => `<div class="inrow"><span class="dim">${INSTR_L[k][0]}</span><div class="seg">${INSTR_L[k][1].map((n, v) => `<button class="${(t[k] == null ? 1 : t[k]) === v ? 'on' : ''}" data-act="mpinstr" data-k="${k}" data-id="${v}">${n}</button>`).join('')}</div></div>`).join('');
-  const st = MV.mst.map(p => `<div class="sqr mini ${S.mpout === p.id ? 'on' : ''}" data-act="mpout" data-id="${p.id}"><span class="tag pos">${p.sub}</span><div class="grow">${esc(p.name)}</div><b>${p.ovr}</b></div>`).join('');
+  const yc = new Set(), rc = new Set(); (M.evx || []).forEach(x => { if (x.shown && x.p) { if (x.t === 'yc') yc.add(x.p.id); if (x.t === 'rc') rc.add(x.p.id); } });
+  const tir = p => MV.min >= 55 && PA(p, 'STA') < 58 ? ' <span class="dim">⚡피로</span>' : '', yel = p => yc.has(p.id) ? ' 🟨' : '';
+  const st = MV.mst.filter(p => !rc.has(p.id)).map(p => `<div class="sqr mini ${S.mpout === p.id ? 'on' : ''}" data-act="mpout" data-id="${p.id}"><span class="tag pos">${p.sub}</span><div class="grow">${esc(p.name)}${yel(p)}${tir(p)}</div><b>${p.ovr}</b></div>`).join('');
   const bn = (M.benchMine || []).slice().sort((a, b) => b.ovr - a.ovr).map(p => `<div class="sqr mini" data-act="mpin" data-id="${p.id}"><span class="tag pos">${p.sub}</span><div class="grow">${esc(p.name)}</div><b>${p.ovr}</b></div>`).join('');
   return `<div class="card gl"><b>전술·교체</b><div class="dim">경기 일시정지 중 · 교체 ${left}회 남음 · 전술 반영 ${chg}회 남음${MV.min >= 88 ? ' · 종료 직전이라 효과가 거의 없습니다' : ''}</div></div><div class="sec">팀 지시</div><div class="card">${ins}</div>
   <div class="sec">교체 <span class="dim">나갈 선수 → 들어올 선수 순서로 탭</span></div><div class="card"><div class="dim">그라운드</div>${st}</div><div class="card"><div class="dim">벤치</div>${bn || '<div class="dim">벤치 선수가 없습니다.</div>'}</div>`;
 }
 function mgrPanelOpen() {
-  if (!MV || MV.over || !G0().mm || MV.pg || MV.lead || MV.sp || MV.momentOpen || MV.mgrPanel) { if (MV && !MV.over) toast('잠시 후에 열 수 있습니다'); return; }
+  if (!MV || MV.over || !G0().mm || MV.mgrPanel) return;
+  if (MV.pg || MV.lead || MV.sp || MV.momentOpen || MV.pen || MV.so || MV.cele) { MV.wantPanel = true; toast('장면이 끝나면 바로 열립니다'); return; }      // 연출 중이면 예약해 두었다가 끝나는 즉시 연다
+  MV.wantPanel = false;
   MV.mgrPanel = true; MV.mgrPrev = MV.paused; MV.paused = true; MV.mgrDirty = false; S.mpout = null; renderMatch();
 }
 function mgrPanelClose() {
   if (!MV || !MV.mgrPanel) return; const M = G0().mm;
   if (MV.mgrDirty && M) { if ((M.mgrChanges || 0) < 3) { Core.mgrReplan(MV.min); if (MV.fxy) MV.fxy.m = fpos(MV.mst, (M.mine.tactic && M.mine.tactic.formation) || '4-4-2'); MV.tk.m = tkOf(M.mine); M.mgrChanges = (M.mgrChanges || 0) + 1; MV.log.unshift({ min: MV.min, ic: '📋', cls: '', t: '<b>감독 지시</b> 전술을 조정했습니다' }); } else MV.log.unshift({ min: MV.min, ic: '📋', cls: '', t: '전술 변경 한도를 넘어 효과가 반영되지 않습니다' }); }
-  MV.mgrPanel = false; MV.mgrDirty = false; MV.paused = (MV.mgrPrev === true) || !!MV.talk; renderMatch();
+  MV.mgrPanel = false; MV.mgrDirty = false;
+  // 창을 열기 전에 멈춰 있던 이유가 '하프타임 휴식'이거나 장면 선택·연출(득점·세트피스 등)이면 그 흐름을 이어 가고, 배너 연출용 일시정지였다면 풀어 준다(예전엔 그대로 멈춰 버렸음)
+  { const hold = !!MV.talk || !!MV.momentOpen || !!MV.pen || !!MV.so || !!MV.lead || !!MV.pg || !!MV.sp; MV.paused = hold; if (!hold) { clearTimeout(MV.fxP); } MV.pzUntil = performance.now() + 12000; }
+  renderMatch();
 }
 function mgrSubUI(outId, inId) {
   const M = G0().mm, r = Core.mgrSub(outId, inId, MV.min); if (!r) { toast('교체할 수 없습니다 (5회 한도)'); return; }
