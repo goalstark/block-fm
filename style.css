@@ -199,3 +199,9 @@ nav{grid-auto-flow:column;grid-template-columns:none;grid-auto-columns:1fr}
 .cerbox{position:relative;text-align:center;overflow:hidden;padding:6px 0 4px}.cername{font-size:18px;font-weight:900;color:#FFD54A}.cerrow{display:flex;justify-content:center;gap:4px;margin:10px 0 12px}
 .confetti{position:absolute;inset:0;pointer-events:none}.confetti i{position:absolute;top:-12px;width:8px;height:8px;animation:cf 2.8s linear infinite}@keyframes cf{to{transform:translateY(460px) rotate(300deg)}}
 .spc{padding:8px 0;border-top:1px solid rgba(255,255,255,.06)}.spc:first-child{border-top:0}.inp{background:#0F1713;border:1px solid #2A3A31;border-radius:10px;color:#fff;padding:10px;font-size:15px;font-family:inherit;box-sizing:border-box}
+
+#pop{display:none;position:absolute;inset:0;background:rgba(0,0,0,.62);z-index:40;align-items:center;justify-content:center;padding:24px}
+.popbox{width:100%;max-width:340px;background:#16221B;border:2px solid #C6F36B;border-radius:18px;padding:18px 16px 14px;text-align:center;box-shadow:0 10px 34px rgba(0,0,0,.6);animation:popin .16s ease-out}
+.popic{font-size:34px;line-height:1.1}.popt{font-weight:900;font-size:1.1em;margin:6px 0 4px;color:#C6F36B}.popm{color:#EAF1EC;font-size:.95em;line-height:1.5;margin-bottom:14px;word-break:keep-all}
+.popb{display:flex;gap:8px}
+@keyframes popin{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}

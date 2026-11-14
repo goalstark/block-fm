@@ -34,9 +34,9 @@ function sprite(look, kit, num) {
 }
 const LK_S = ['fair','tan','olive','brown','deep'], LK_H = ['black','dark','brown','blond','red','gray','navy'], LK_ST = ['short','sidepart','buzz','curly','long','mohawk'];
 const lookOf = (p) => p.me && p.look ? p.look : { skin: LK_S[p.id % 5], hair: LK_H[p.id % 7], style: LK_ST[p.id % 6] };
-function sprH(p, club, w, cls) { const c = club || (p.club !== null && p.club !== undefined ? Core.clubOf(p.club) : null); return `<span class="spr ${cls||''}" style="width:${w}px;height:${Math.round(w*34/16)}px;background-image:url(${sprite(lookOf(p), c ? [c.col, c.col2] : null)})"></span>`; }
+function sprH(p, club, w, cls) { const c = club || (p.club !== null && p.club !== undefined ? Core.clubOf(p.club) : null); return `<span class="spr ${cls||''}" style="width:${w}px;height:${Math.round(w*34/16)}px;background-image:url(${sprite(lookOf(p), c ? (p.sub === 'GK' ? gkKitFor(c) : [c.col, c.col2]) : null)})"></span>`; }
 function regionOf(c) { const G = G0(); if (c.region) return c.region; if (c.parent !== undefined && c.parent !== null && G.clubs[c.parent]) return regionOf(G.clubs[c.parent]); return String(c.name).replace(/ U18$/, '').split(' ')[0]; }
-const mySprite = (w) => { const m = Core.me(); const c = Core.clubOf(m.club); return `<span class="spr" style="width:${w}px;height:${w*34/16}px;background-image:url(${sprite(m.look,[c.col,c.col2])})"></span>`; };
+const mySprite = (w) => { const m = Core.me(); const c = Core.clubOf(m.club); return `<span class="spr" style="width:${w}px;height:${w*34/16}px;background-image:url(${sprite(m.look,m.sub==='GK'?gkKitFor(c):[c.col,c.col2])})"></span>`; };
 const S = { step:'boot', tab:'home', lc:null, ld:null, lt:'table', cv:null, modal:null, nf:'all', sel:['KOR','ENG','ESP','ITA','GER'], cr:{ h:178, prefs:[], trait:'grinder', name:'양메시', skin:'tan', hair:'brown', style:'sidepart', pos:'ST', nat:'KOR', stage:'youth', cc:'KOR', club:null }, resetArm:false, busy:false, mt:'prof', ct:'offer' };
 const G0 = () => Core.G;
 const f1 = (x) => (Math.round(x*10)/10).toFixed(1);
@@ -276,7 +276,7 @@ function histTable(p) {
 function xferList(p) { if (!p.xfers||!p.xfers.length) return ''; return `<div class="sec">이적 이력</div><div class="card">${p.xfers.slice().reverse().map(x=>`<div class="li"><span class="dim">${Core.fmtDate(x[0]).slice(0,10)}</span> ${x[1]!==null?esc(Core.clubOf(x[1]).name):'자유계약'} → ${esc(Core.clubOf(x[2]).name)} ${x[3]>0?`<span class="dim">(${x[3]}억)</span>`:''}</div>`).join('')}</div>`; }
 function profileHTML(p) {
   const c = p.club!==null ? Core.clubOf(p.club) : null;
-  const head = p.me ? mySprite(56) : `<span class="spr" style="width:56px;height:119px;background-image:url(${sprite({skin:['fair','tan','olive','brown','deep'][p.id%5],hair:['black','dark','brown','blond','red','gray','navy'][p.id%7],style:['short','sidepart','buzz','curly','long','mohawk'][p.id%6]},c?[c.col,c.col2]:null)})"></span>`;
+  const head = p.me ? mySprite(56) : `<span class="spr" style="width:56px;height:119px;background-image:url(${sprite({skin:['fair','tan','olive','brown','deep'][p.id%5],hair:['black','dark','brown','blond','red','gray','navy'][p.id%7],style:['short','sidepart','buzz','curly','long','mohawk'][p.id%6]},c?(p.sub==='GK'?gkKitFor(c):[c.col,c.col2]):null)})"></span>`;
   const nt = p.nst && p.nst.a>0 ? `<span class="tag">대표 ${p.nst.a}경기 ${p.nst.g}골</span>` : '';
   return `<div class="prof">${head}<div><div class="ttl">${esc(p.name)} <button class="btn sm sec" data-act="rnopen" data-id="p:${p.id}" aria-label="이름 변경">✏</button></div><div class="dim">${Core.POS_KO[p.sub]} · ${p.age}세 · ${Core.NATK(p.nat)} · ${c?esc(c.name):'무소속'}</div><div class="row g8" style="flex-wrap:wrap"><span class="tag">종합 ${p.ovr}</span>${p.me?`<span class="tag">잠재 ${p.pot}</span>`:''}<span class="tag">계약 ${p.ct.until}</span>${nt}</div>${p.inj>0?`<div class="dim" style="color:#FFB27A">부상 ${p.inj}일</div>`:''}</div></div><div class="sec">시즌별 기록</div>${histTable(p)}${xferList(p)}<div class="sec">능력치</div>${attrBars(p)}`;
 }
@@ -390,7 +390,7 @@ function bgmApply() {
 }
 function sndSet(k, on) { SND[k] = on; try { localStorage.setItem('bfm_' + k, on ? '1' : '0'); } catch (e) {} if (k === 'bgm') bgmApply(); }
 function settingsModal() {
-  return `<div class="ttl">설정</div><div class="sec">저장·불러오기</div><div class="dim">자동 저장은 매 진행마다 이뤄집니다. 칸에 따로 저장해 두면 되돌릴 수 있어요.</div>${slotRows(true)}<div class="sec">백업 코드</div><div class="dim">앱을 지우고 다시 설치할 때를 대비해 코드를 복사해 두세요(메모 앱 등에 붙여넣기). 새로 설치한 뒤 아래 칸에 붙여넣고 복원하면 이어서 할 수 있습니다.</div><textarea id="bkbox" rows="3" style="width:100%;background:#101814;color:#EAF1EC;border:1px solid #2A3A30;border-radius:10px;padding:8px;font-size:11px" placeholder="백업 코드"></textarea><div class="row g8"><button class="btn sec" data-act="bkcopy" style="flex:1">백업 코드 복사</button><button class="btn sec" data-act="bkrestore" style="flex:1">코드로 복원</button></div><div class="sec">글자·버튼 크기</div><div class="row g8">${FS_OPT.map(([v,n])=>`<button class="btn ${fsGet()===v?'':'sec'}" data-act="fs" data-id="${v}" style="flex:1">${n}</button>`).join('')}</div><div class="dim">경기 화면 필드는 그대로, 메뉴·목록·버튼 크기만 바뀝니다.</div><div class="sec">소리</div><div class="row g8"><button class="btn ${SND.sfx?'':'sec'}" data-act="snd" data-id="sfx" style="flex:1">효과음 ${SND.sfx?'ON':'OFF'}</button><button class="btn ${SND.bgm?'':'sec'}" data-act="snd" data-id="bgm" style="flex:1">배경음악 ${SND.bgm?'ON':'OFF'}</button></div><div class="dim">경기 중에는 배경음악이 잠시 멈추고 경기 소리만 나옵니다.</div><div class="sec">게임</div><button class="btn sec wide" data-act="reset">${S.resetArm?'정말 지우고 새 게임 시작 (다시 누르면 삭제)':'새 게임 시작'}</button>`;
+  return `<div class="ttl">설정</div><div class="sec">저장·불러오기</div><div class="dim">자동 저장은 매 진행마다 이뤄집니다. 칸에 따로 저장해 두면 되돌릴 수 있어요.</div>${slotRows(true)}<div class="sec">백업 코드</div><div class="dim">앱을 지우고 다시 설치할 때를 대비해 코드를 복사해 두세요(메모 앱 등에 붙여넣기). 새로 설치한 뒤 아래 칸에 붙여넣고 복원하면 이어서 할 수 있습니다.</div><textarea id="bkbox" rows="3" style="width:100%;background:#101814;color:#EAF1EC;border:1px solid #2A3A30;border-radius:10px;padding:8px;font-size:11px" placeholder="백업 코드"></textarea><div class="row g8"><button class="btn sec" data-act="bkcopy" style="flex:1">백업 코드 복사</button><button class="btn sec" data-act="bkrestore" style="flex:1">코드로 복원</button></div><div class="sec">글자·버튼 크기</div><div class="row g8">${FS_OPT.map(([v,n])=>`<button class="btn ${fsGet()===v?'':'sec'}" data-act="fs" data-id="${v}" style="flex:1">${n}</button>`).join('')}</div><div class="dim">경기 화면 필드는 그대로, 메뉴·목록·버튼 크기만 바뀝니다.</div><div class="sec">소리</div><div class="row g8"><button class="btn ${SND.sfx?'':'sec'}" data-act="snd" data-id="sfx" style="flex:1">효과음 ${SND.sfx?'ON':'OFF'}</button><button class="btn ${SND.bgm?'':'sec'}" data-act="snd" data-id="bgm" style="flex:1">배경음악 ${SND.bgm?'ON':'OFF'}</button></div><div class="dim">경기 중에는 배경음악이 잠시 멈추고 경기 소리만 나옵니다.</div><div class="sec">게임</div><button class="btn sec wide" data-act="reset">새 게임 시작</button>`;
 }
 function teamView(lg) {
   const G = G0(), me = Core.me();
@@ -512,6 +512,12 @@ function pitchBg(pt) { const st = pt.pat, rect = (x, y, w, h, c) => `<rect x="${
   else if (st === 'c') for (let i = 0; i < 8; i++) for (let j = 0; j < 4; j++) o += rect(i * 12.5, j * 16, 12.5, 16, (i + j) % 2 ? pt.b : pt.a);
   else o = rect(0, 0, 100, 64, pt.a) + `<g fill="${pt.b}" fill-opacity=".5">${[[12, 10], [40, 50], [70, 20], [85, 48], [25, 36], [58, 8]].map(q => `<ellipse cx="${q[0]}" cy="${q[1]}" rx="7" ry="3"/>`).join('')}</g>`;
   return `<rect width="100" height="64" fill="${pt.base}"/>` + o; }
+// 명단·카드용 골키퍼 유니폼: 구단 색과 겹치지 않는 색을 고정 선택
+function gkKitFor(c) {
+  const GKC = ['#F2C230', '#2BD9C5', '#C77DFF', '#FF8A3D', '#E94F9E', '#1A1A1A'];
+  const av = [c.col, c.col2].filter(Boolean); const pick = GKC.slice().sort((x, y) => Math.min(...av.map(a => cdist(y, a))) - Math.min(...av.map(a => cdist(x, a))))[0];
+  return [pick, '#1A1A1A'];
+}
 // ---- 유니폼: 홈/원정 색이 비슷하면 원정팀이 대체 유니폼을 입고, 골키퍼는 별도 색 ----
 const rgbOf = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 function cdist(a, b) { const [r1, g1, b1] = rgbOf(a), [r2, g2, b2] = rgbOf(b), rm = (r1 + r2) / 2; return Math.sqrt((2 + rm / 256) * (r1 - r2) ** 2 + 4 * (g1 - g2) ** 2 + (2 + (255 - rm) / 256) * (b1 - b2) ** 2); }
@@ -1226,7 +1232,7 @@ function navBadge(id) { try { const m = Core.me(); if (id==='home') return m.mee
 function cerModal() {
   const G = G0(), cr = G.cer, c = Core.clubOf(cr.cid);
   const pl = c.pl.map(x => G.players[x]).filter(p => p && !p.mgr && !p.retired).sort((a, b) => b.ovr - a.ovr).slice(0, 5);
-  const sp = pl.map(p => `<span class="spr" style="width:40px;height:85px;background-image:url(${sprite({ skin: ['fair', 'tan', 'olive', 'brown', 'deep'][p.id % 5], hair: ['black', 'dark', 'brown', 'blond', 'red', 'gray', 'navy'][p.id % 7], style: ['short', 'sidepart', 'buzz', 'curly', 'long', 'mohawk'][p.id % 6] }, [c.col, c.col2])})"></span>`).join('');
+  const sp = pl.map(p => `<span class="spr" style="width:40px;height:85px;background-image:url(${sprite({ skin: ['fair', 'tan', 'olive', 'brown', 'deep'][p.id % 5], hair: ['black', 'dark', 'brown', 'blond', 'red', 'gray', 'navy'][p.id % 7], style: ['short', 'sidepart', 'buzz', 'curly', 'long', 'mohawk'][p.id % 6] }, p.sub === 'GK' ? gkKitFor(c) : [c.col, c.col2])})"></span>`).join('');
   const cols = ['#C6F36B', '#FFD54A', '#FF7A6B', '#6BC8FF', '#FFFFFF'];
   const conf = Array.from({ length: 26 }, (_, i) => `<i style="left:${(i * 37) % 100}%;background:${cols[i % 5]};animation-delay:${((i * 13) % 20) / 10}s;animation-duration:${2.2 + (i % 5) * 0.35}s"></i>`).join('');
   const btns = cr.mgr ? `<button class="btn wide" data-act="cerpress">🎙️ 우승 기자회견</button><button class="btn sec wide" data-act="close">닫기</button>` : `<button class="btn wide" data-act="close">확인</button>`;
@@ -1234,11 +1240,12 @@ function cerModal() {
 }
 function render() {
   const app = $('#app');
+  try { if (S.welcome && S.step === 'game' && !S.busy && !S.matchOpen) { const w = S.welcome; S.welcome = null; setTimeout(() => popup('게임 시작!', w==='start' ? '선수 육성 모드가 시작되었습니다.\n아래 ‘진행’ 버튼으로 하루씩 보내며 훈련하고, 경기 일정에 맞춰 컨디션을 관리하세요.' : w==='mstart' ? '감독 모드가 시작되었습니다.\n구단 탭에서 스폰서·스태프를, 전술 탭에서 포메이션을 먼저 살펴보세요.' : '월드컵 모드가 시작되었습니다.\n조별리그를 통과해 결승 트로피를 노려보세요!', '🎉'), 250); } } catch (e) {}
   try { const g0 = G0(); if (g0 && g0.cer && !S.modal && !S.matchOpen && !S.busy && S.step === 'game') { S.modalKind = 'cer'; S.modal = cerModal(); sfx('trophy'); } } catch (e) {}
   if (S.step==='setup' || S.step==='create' || S.step==='mode' || S.step==='mcreate' || S.step==='wcsel') {
     const o0 = document.querySelector('.scr'); const k0 = S.step + '|' + (S.step==='setup' ? (S.sel ? 'x' : '') : '') ; const t0 = (o0 && S._sk === k0) ? o0.scrollTop : 0;
     app.innerHTML = `<div class="scr">${S.step==='mode' ? modeView() : S.step==='mcreate' ? mcreateView() : S.step==='wcsel' ? wcselView() : S.step==='setup' ? setupView() : creatorView()}</div>`;
-    const n0 = document.querySelector('.scr'); if (n0 && t0) n0.scrollTop = t0; S._sk = k0; return;
+    const n0 = document.querySelector('.scr'); if (n0 && t0) n0.scrollTop = t0; S._sk = k0; S.modal = null; S.modalKind = null; $('#modal').style.display = 'none'; return;
   }
   const oldSc = document.querySelector('.scr'); const keyNow = S.step + '|' + S.tab; const keepTop = (oldSc && S._sk === keyNow) ? oldSc.scrollTop : 0;
   const MG = isM();
@@ -1253,6 +1260,17 @@ function render() {
   S._mk = S.modalKind || 'm';
   if (S.modal) { $('#modal').innerHTML = `<div class="sheet"><button class="x" data-act="close">닫기</button>${S.modal}</div>`; $('#modal').style.display = 'block'; const nsh = document.querySelector('#modal .sheet'); if (nsh && shTop) nsh.scrollTop = shTop; } else $('#modal').style.display = 'none';
 }
+function pop(o) {
+  let el = $('#pop'); if (!el) { el = document.createElement('div'); el.id = 'pop'; ($('#toast') ? $('#toast').parentNode : document.body).appendChild(el); }
+  clearTimeout(pop.t); const btns = o.btns && o.btns.length ? o.btns : [{ t: '확인' }];
+  el.innerHTML = `<div class="popbox"><div class="popic">${o.icon || 'ℹ️'}</div><div class="popt">${esc(o.title || '')}</div><div class="popm">${esc(o.msg || '').replace(/\n/g, '<br>')}</div><div class="popb">${btns.map((b, i) => `<button class="btn ${b.cls || ''}" data-pi="${i}" style="flex:1">${esc(b.t)}</button>`).join('')}</div></div>`;
+  el.style.display = 'flex';
+  const close = () => { clearTimeout(pop.t); el.style.display = 'none'; el.innerHTML = ''; };
+  el.querySelectorAll('button').forEach(b => b.addEventListener('click', (ev) => { ev.stopPropagation(); const f = btns[+b.dataset.pi].fn; close(); if (f) f(); }));
+  if (o.auto) pop.t = setTimeout(close, o.auto);
+}
+function popup(title, msg, icon, auto) { pop({ title, msg, icon, auto }); }
+function ask(title, msg, okText, fn, icon) { pop({ title, msg, icon: icon || '❓', btns: [{ t: '취소', cls: 'sec' }, { t: okText || '확인', fn }] }); }
 function toast(t) { const el = $('#toast'); el.textContent = t; el.style.opacity = 1; setTimeout(() => el.style.opacity = 0, 2200); }
 function actBar() {
   if (isM()) { const G = G0(); let ev = null; try { ev = Core.nextEvent(); } catch (e) {} const mt = ev && ev.match; const dd = (n) => n <= 0 ? '오늘' : n === 1 ? '내일' : n + '일 뒤'; const info = G.pendingMine ? '오늘은 경기일입니다' : mt ? `다음 경기 · ${dd(mt.days)} ${mt.home ? 'vs' : '@'} ${esc(mt.opp)}` : '예정된 경기가 없습니다'; const go = G.pendingMine ? '경기 준비 ⚽' : (mt && mt.days === 1 ? '경기 시작 ⚽' : '계속 ▶');
@@ -1306,9 +1324,14 @@ function makeWorld() {
 }
 document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-act]'); if (!t || S.busy) return; const a = t.dataset.act, id = t.dataset.id; if (SND.bgm && !SND.tm) bgmApply(); if (a !== 'snd') sfx('click');
+  if ((a==='start' || a==='mstart' || a==='wcstart')) {
+    if (a==='mstart' && S.cr.mclub == null) { popup('구단 선택', '먼저 맡을 구단을 골라 주세요.', '⚽'); return; }
+    if (!S.okGo) { const nm0 = $('#nm'); const nm1 = (nm0 && nm0.value.trim()) || '양메시'; const lbl = a==='start' ? '선수 육성' : a==='mstart' ? '감독' : '월드컵'; ask(lbl + ' 시작', `이름: ${nm1}\n이 설정으로 새 게임을 시작할까요?`, '시작하기', () => { S.okGo = true; t.click(); }, '🎮'); return; }
+    S.okGo = false; S.welcome = a;
+  }
   if (a==='wcpick') { const nm = $('#nm'); if (nm) S.cr.name = nm.value; S.cr.wcn = id; render(); return; }
   if (a==='wct') { S.wct = id; render(); return; }
-  if (a==='wcnew') { idbDel('save'); S.step = 'mode'; S.tab = 'home'; render(); return; }
+  if (a==='wcnew') { ask('새 게임', '월드컵 기록을 닫고 처음 화면으로 돌아갈까요?\n(자동 저장이 삭제됩니다)', '새로 시작', () => { idbDel('save'); S.step = 'mode'; S.tab = 'home'; render(); }); return; }
   if (a==='wcstart') { const nm = $('#nm'); const name = (nm && nm.value.trim()) || '양메시'; S.busy = true; $('#app').innerHTML = loadView(); setTimeout(() => { try { Core.wcStart({ name, nat: S.cr.wcn || 'KOR', look: { skin: S.cr.skin, hair: S.cr.hair, style: S.cr.style } }); S.step = 'game'; S.tab = 'home'; S.wct = null; S.lc = null; S.ld = null; save(); } catch (e) { toast('시작에 실패했습니다: ' + (e && e.message)); S.step = 'wcsel'; } S.busy = false; render(); }, 80); return; }
   if (a==='mode') { S.mode = id; S.step = id === 'wc' ? 'wcsel' : 'setup'; render(); return; }
   if (a==='modeback') { S.step = 'mode'; render(); return; }
@@ -1353,10 +1376,10 @@ document.addEventListener('click', (e) => {
   else if (a==='mprepress') { const g0 = G0(); Core.mgrPreGen(); Core.mgrX().preDay = g0.day; S.modalKind = 'press'; S.modal = pressModal(); }
   else if (a==='msponsor') { const [sl, ix] = id.split(':'); const r = Core.mgrSponsorSign(sl, +ix); toast(r.msg); if (r.ok) sfx('coin'); save(); }
   else if (a==='rnopen') { const [k, i] = id.split(':'); S.rn = { k, i: +i, back: S.modal, bk: S.modalKind }; const cur = k === 'p' ? G0().players[+i].name : Core.clubOf(+i).name; S.modalKind = 'rename'; S.modal = `<div class="ttl">이름 변경</div><div class="dim">${k === 'p' ? '선수' : '구단'} 이름을 직접 바꿀 수 있습니다 (최대 ${k === 'p' ? 14 : 16}자).</div><input id="rnv" class="inp" maxlength="16" value="${esc(cur)}" style="width:100%;margin:10px 0"><div class="row g8"><button class="btn grow" data-act="rnsave">저장</button><button class="btn sec grow" data-act="rncancel">취소</button></div>`; }
-  else if (a==='rnsave') { const v = $('#rnv') && $('#rnv').value, r = S.rn; if (r) { const ok = r.k === 'p' ? Core.renamePlayer(r.i, v) : Core.renameClub(r.i, v); toast(ok ? '이름을 바꿨습니다' : '이름을 입력해 주세요'); if (ok) { S.modal = r.k === 'p' ? profileHTML(G0().players[r.i]) : clubModal(r.i); S.modalKind = r.k === 'p' ? null : 'club'; S.rn = null; save(); } } }
+  else if (a==='rnsave') { const v = $('#rnv') && $('#rnv').value, r = S.rn; if (r) { const ok = r.k === 'p' ? Core.renamePlayer(r.i, v) : Core.renameClub(r.i, v); if (ok) popup('이름 변경', '이름을 바꿨습니다.', '✏️', 1800); else popup('이름 변경', '이름을 입력해 주세요.', '✏️'); if (ok) { S.modal = r.k === 'p' ? profileHTML(G0().players[r.i]) : clubModal(r.i); S.modalKind = r.k === 'p' ? null : 'club'; S.rn = null; save(); } } }
   else if (a==='rncancel') { const r = S.rn; S.modal = r ? r.back : null; S.modalKind = r ? r.bk : null; S.rn = null; }
   else if (a==='mstaff') { const r = Core.mgrStaffUp(id); toast(r.msg); if (r.ok) sfx('coin'); save(); }
-  else if (a==='snd') { sndSet(id, !SND[id]); render(); return; }
+  else if (a==='snd') { sndSet(id, !SND[id]); render(); popup('소리 설정', (id==='sfx' ? '효과음 ' : '배경음악 ') + (SND[id] ? 'ON' : 'OFF') + ' 으로 바꿨습니다.', SND[id] ? '🔊' : '🔇', 1800); return; }
   else if (a==='mpress') { Core.mgrPressPick(id); S.modalKind = 'press'; S.modal = pressModal(); save(); }
   else if (a==='news') { const n = G0().news[+id]; if (n) S.modal = articleOf(n); }
   else if (a==='acc') { S.modal = null; const k = (Core.me().offers[+id]||{}).kind; const r = Core.acceptOffer(+id); save(); toast(k ? (r||'합의') : '계약이 완료되었습니다'); }
@@ -1367,17 +1390,17 @@ document.addEventListener('click', (e) => {
   else if (a==='mt') { S.mt = id; }
   else if (a==='ct') { S.ct = id; }
   else if (a==='gogrow') { S.tab = 'me'; S.mt = 'grow'; }
-  else if (a==='bkcopy') { gzEnc(Core.serialize()).then(c => { const ta = $('#bkbox'); if (ta) ta.value = c; return navigator.clipboard.writeText(c).then(() => toast('백업 코드를 복사했습니다'), () => toast('아래 코드를 직접 복사해 주세요')); }).catch(() => toast('백업에 실패했습니다')); return; }
-  else if (a==='bkrestore') { const v = (($('#bkbox') || {}).value || '').trim(); gzDec(v).then(str => { Core.load(str); S.step = 'game'; S.tab = 'home'; S.lc = null; S.ld = null; S.modal = null; save(); render(); toast('복원했습니다'); }).catch(() => toast('백업 코드가 올바르지 않습니다')); return; }
+  else if (a==='bkcopy') { gzEnc(Core.serialize()).then(c => { const ta = $('#bkbox'); if (ta) ta.value = c; return navigator.clipboard.writeText(c).then(() => popup('백업 코드', '백업 코드를 복사했습니다.\n메모 앱 등에 붙여넣어 보관하세요.', '📋'), () => popup('백업 코드', '아래 칸의 코드를 직접 길게 눌러 복사해 주세요.', '📋')); }).catch(() => popup('백업 실패', '백업 코드를 만들지 못했습니다.', '⚠️')); return; }
+  else if (a==='bkrestore') { const v = (($('#bkbox') || {}).value || '').trim(); gzDec(v).then(str => { Core.load(str); S.step = 'game'; S.tab = 'home'; S.lc = null; S.ld = null; S.modal = null; save(); render(); popup('복원 완료', '백업에서 복원했습니다.', '✅'); }).catch(() => popup('복원 실패', '백업 코드가 올바르지 않습니다.', '⚠️')); return; }
   else if (a==='settings') { S.modalKind = 'settings'; S.modal = settingsModal(); refreshSlots0().then(() => { if (S.modal) { S.modal = settingsModal(); render(); } }); }
   else if (a==='meet') { S.modal = meetModal(); }
   else if (a==='ma') { const r = Core.answerMeeting(+id); if (r) { S.modal = `<div class="ttl">면담 결과</div><div class="card gl"><div>“${esc(r.resp)}”</div><div class="dim">${r.fx}</div></div><button class="btn wide" data-act="close">확인</button>`; save(); } }
-  else if (a==='ssave') { slotSave(id); return; }
-  else if (a==='sload') { slotLoad(id); return; }
-  else if (a==='sdel') { slotDel(id); return; }
+  else if (a==='ssave') { const exists = (S.slots || {})[id]; const n = SLOTS.indexOf(id) + 1; if (exists) ask('덮어쓰기', `저장 칸 ${n}의 기존 데이터를 덮어쓸까요?`, '덮어쓰기', () => slotSave(id), '💾'); else slotSave(id); return; }
+  else if (a==='sload') { ask('불러오기', '현재 진행 상황이 선택한 저장 데이터로 바뀝니다.\n불러올까요?', '불러오기', () => slotLoad(id), '📂'); return; }
+  else if (a==='sdel') { ask('저장 삭제', '이 저장 데이터를 삭제할까요?\n되돌릴 수 없습니다.', '삭제', () => slotDel(id).then(() => popup('삭제 완료', '저장 데이터를 삭제했습니다.', '🗑️', 1800)), '⚠️'); return; }
   else if (a==='dec') { S.modal = null; Core.declineOffer(+id); }
   else if (a==='ren') { Core.acceptRenewal(); save(); }
-  else if (a==='reset') { if (!S.resetArm) { S.resetArm = true; } else { S.resetArm = false; idbDel('save'); S.step = 'mode'; S.tab = 'home'; refreshSlots0().then(render); } }
+  else if (a==='reset') { ask('새 게임 시작', '현재 진행(자동 저장)이 삭제됩니다.\n저장 칸 1~3에 넣어 둔 데이터는 그대로 남습니다.\n계속할까요?', '지우고 새로 시작', () => { S.resetArm = false; S.modal = null; S.modalKind = null; idbDel('save'); S.step = 'mode'; S.tab = 'home'; refreshSlots0().then(render); }, '⚠️'); return; }
   else if (a==='go') { S.skipOpen = false; if (isM() && G0().pendingMine) { mgrPre(); render(); return; } advance(1); return; }
   else if (a==='skipm') { S.skipOpen = !S.skipOpen; render(); return; }
   else if (a==='skip') { S.skipOpen = false; if (isM() && G0().pendingMine) { mgrPre(); render(); return; } advance(+id); return; }
@@ -1385,7 +1408,7 @@ document.addEventListener('click', (e) => {
   else if (a==='week') { advance(7); return; }
   else if (a==='match') { advance(120); return; }
   else if (a==='mv') { if (!MV || !G0().mm || !MV.momentOpen) return; const M = G0().mm, mo = MV.momentOpen; const r = Core.resolveMoment(id); if (r.goal || r.assist) { MV.ballFree = false; } MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: esc(r.text) }); MV.momentOpen = null; MV.paused = false; try { playOutcome(M, mo, r); } catch (e) { MV.holder = MV.holder || null; } stepBall(M); emitAt(M, mo ? mo.min : MV.min, true); movePitch(); renderMatch(); return; }
-  else if (a==='fs') { try { localStorage.setItem('bfm_fs', String(+id)); } catch (e) {} fsApply(); render(); return; }
+  else if (a==='fs') { try { localStorage.setItem('bfm_fs', String(+id)); } catch (e) {} fsApply(); render(); { const f = FS_OPT.find(x => String(x[0]) === String(id)); popup('글자·버튼 크기', `‘${f ? f[1] : id}’ 크기로 바꿨습니다.`, '🔠', 1800); } return; }
   else if (a==='talk') { if (!MV || !MV.talk) return; const r = (G0().mm && G0().mm.role === 'mgr') ? Core.mgrTalkPick(id, MV.talkDiff || 0) : Core.talkPick(id); MV.log.unshift({ min: 45, ic: '💬', cls: '', t: `<b>하프타임</b> ${esc(r.text)}` }); MV.talk = null; setTimeout(startSecond, 600); renderMatch(); return; }
   else if (a==='mtab') { S.mtab = id; renderMatch(); return; }
   else if (a==='mspd') { S.spd = +id; try { localStorage.setItem('bfm_spd', String(S.spd)); } catch (e) {} if (MV) { MV.speed = spdMs(); if (MV.timer && !MV.skipping && !MV.over) { clearInterval(MV.timer); MV.timer = setInterval(tick, MV.speed); } renderMatch(); } return; }
@@ -1404,8 +1427,8 @@ document.addEventListener('change', (e) => {
 const SLOTS = ['slot1','slot2','slot3'];
 function slotMeta() { try { const m = Core.me(), c = Core.clubOf(m.club); if (isM()) return { name: G0().mgr.name + ' 감독', club: c.name, age: '-', ovr: '-', mgr: true, date: Core.fmtDate(G0().day), at: Date.now() }; return { name: m.name, club: c.name, age: m.age, ovr: m.ovr, date: Core.fmtDate(G0().day), at: Date.now() }; } catch (e) { return null; } }
 async function refreshSlots() { await refreshSlots0(); render(); }
-async function slotSave(k) { const meta = slotMeta(); if (!meta) return; await idbSet(k, { meta, d: Core.serialize() }); toast('저장했습니다'); await refreshSlots(); }
-async function slotLoad(k) { try { const o = await idbGet(k); const d = typeof o === 'string' ? o : (o && o.d); if (!d) return; Core.load(d); S.step = 'game'; S.tab = 'home'; S.lc = null; S.ld = null; S.modal = null; save(); render(); toast('불러왔습니다'); if (G0().pendingMine) setTimeout(startMatch, 50); } catch (e) { toast('불러오기에 실패했습니다'); } }
+async function slotSave(k) { const meta = slotMeta(); if (!meta) return; await idbSet(k, { meta, d: Core.serialize() }); popup('저장 완료', `${k === 'save' ? '자동 저장' : '저장 칸 ' + (SLOTS.indexOf(k) + 1)}에 저장했습니다.\n${meta.name} · ${meta.club} · ${meta.date}`, '💾'); await refreshSlots(); }
+async function slotLoad(k) { try { const o = await idbGet(k); const d = typeof o === 'string' ? o : (o && o.d); if (!d) return; Core.load(d); S.step = 'game'; S.tab = 'home'; S.lc = null; S.ld = null; S.modal = null; save(); render(); popup('불러오기 완료', '저장 데이터를 불러왔습니다.', '📂', 2000); if (G0().pendingMine) setTimeout(startMatch, 50); } catch (e) { popup('불러오기 실패', '저장 데이터를 읽지 못했습니다.', '⚠️'); } }
 async function slotDel(k) { await idbDel(k); await refreshSlots(); }
 async function refreshSlots0() { const out = {}; for (const k of ['save'].concat(SLOTS)) { try { const v = await idbGet(k); if (v) out[k] = (typeof v === 'string') ? { meta: null, d: v } : v; } catch (e) {} } S.slots = out; }
 function slotRows(inGame) {
