@@ -279,6 +279,31 @@ function applyStats(club, starters, bench, gF, gA, evs, key) {
   return rs;
 }
 const KEYOF = { lg:'st', cup:'cst', cont:'cst', po:'cst', nt:'nst', wc:'nst' };
+// ----- 상대 감독 AI: 맞대결 기억·전술 적응·부진 시 전술 교체 -----
+function aiLearn(c, o, gf, ga) {
+  if (!c || !o || c.kind==='nt' && !G.wc) return;
+  try { if (G.mode==='mgr' && G.mgr && c.id === me().club) return; } catch (e) {}
+  const mem = c.mem || (c.mem = { form: [], vs: {}, sw: 0 }), r = gf > ga ? 'W' : gf < ga ? 'L' : 'D';
+  mem.form.push(r); if (mem.form.length > 6) mem.form.shift();
+  const v = mem.vs[o.id] || (mem.vs[o.id] = { w: 0, d: 0, l: 0, gf: 0, ga: 0, last: 0 }); v[r.toLowerCase()]++; v.gf += gf; v.ga += ga; v.last = gf - ga;
+  const f = mem.form;
+  if (f.length >= 3 && f.slice(-3).every(x => x === 'L') && c.kind !== 'nt') {                    // 3연패 → 감독이 스타일을 바꿈
+    const st = ['balanced', 'tiki', 'counter', 'press', 'direct', 'wide'].filter(x => x !== c.style); c.style = pick(st); c.tactic = tacticFor(c.style); mem.form = []; mem.sw++;
+  }
+}
+function aiAdapt(c, opp) {                                                                         // 이번 상대(나)와의 과거 전적·내 전술·전력차에 맞춰 상대 전술 조정
+  if (!c || !opp) return null;
+  const t = tacticFor(c.style || 'balanced'), mt = opp.tactic || {}, v = c.mem && c.mem.vs && c.mem.vs[opp.id], notes = [];
+  const gap = (opp.strength || 0) - (c.strength || 0);
+  if (gap >= 5) { t.line = Math.min(t.line, 0); t.trans = 2; notes.push('전력 열세를 인정하고 수비를 두텁게 한 뒤 역습을 노립니다'); }
+  else if (gap <= -5) { t.build = Math.max(t.build, 1); t.tempo = 2; t.line = Math.max(t.line, 1); notes.push('전력 우위를 믿고 주도권을 잡으려 합니다'); }
+  if (v && v.last <= -2) { t.line = 0; t.press = 0; t.width = Math.min(t.width, 1); notes.push('지난 맞대결 대패를 분석해 수비 라인을 내렸습니다'); }
+  else if (v && v.last >= 2) { t.press = Math.max(t.press, 1); notes.push('지난 맞대결 승리의 자신감으로 압박을 이어갑니다'); }
+  if (mt.press === 2 && t.build > 0) { t.build = 0; notes.push('당신의 강한 압박을 피해 롱볼 위주로 나옵니다'); }
+  if (mt.line === 2) { t.trans = 2; notes.push('당신의 높은 수비 라인 뒷공간을 노립니다'); }
+  if (mt.width === 0 && t.width < 2) { t.width = 2; notes.push('좁게 서는 당신을 상대로 측면 공략을 준비했습니다'); }
+  c.tactic = t; return notes.length ? notes[0] : null;
+}
 function simMatch(ctx, h, a) {
   const ch = clubOf(h), ca = clubOf(a);
   const sqH = availableSquad(ch, true), sqA = availableSquad(ca, true);
@@ -292,6 +317,7 @@ function finishMatch(ctx, h, a, gh, ga, sqH, sqA, mine) {
   const bH = sqH.filter(p=>!stH.includes(p)).sort((x,y)=>y.ovr-x.ovr), bA = sqA.filter(p=>!stA.includes(p)).sort((x,y)=>y.ovr-x.ovr);
   const evH = (mine && mine.evH) || genEvents(ch, gh, stH, bH), evA = (mine && mine.evA) || genEvents(ca, ga, stA, bA);
   applyStats(ch, stH, bH, gh, ga, evH, key); applyStats(ca, stA, bA, ga, gh, evA, key);
+  aiLearn(ch, ca, gh, ga); aiLearn(ca, ch, ga, gh);
   const hn = ch.name, an = ca.name;
   const hat = (evs) => { const c = {}; for (const e of evs) c[e.sc.id] = (c[e.sc.id]||0)+1; for (const id in c) if (c[id]>=3) return G.players[id]; };
   const ht = hat(evH) || hat(evA);
@@ -947,6 +973,7 @@ function prepareMine() {
   const pm = G.pendingMine, m = me();
   if (G.mode==='mgr' && !G.wc && G.mgr) { const g = mgrX(), mc = G.clubs[m.club]; for (const id of mc.pl) { const q = G.players[id]; if (q && !q.mgr) q.cond = clamp(95 + (g.mood - 50)/8, 70, 100); } }
   const h = clubOf(pm.h), a = clubOf(pm.a), mineHome = mineIn(pm.h);
+  const aiNote = G.mode==='mgr' ? aiAdapt(mineHome ? a : h, mineHome ? h : a) : null;
   const sqH = availableSquad(h, true), sqA = availableSquad(a, true);
   const neutral = pm.ctx.t==='po' || pm.ctx.t==='wc' || (pm.ctx.t==='cont' && pm.ctx.fin);
   const o = Eng.simulate(rnd, { squad: sqH, tactic: h.tactic }, { squad: sqA, tactic: a.tactic }, { homeA: !neutral });
@@ -966,7 +993,7 @@ function prepareMine() {
     for (let tries = 0; tries < 60 && moments.length < nChance; tries++) { const mn = ri(lo, hi); if (moments.every(o => Math.abs(o.min - mn) >= gap)) moments.push({ min: mn, kind: null, done:false }); if (tries === 30) gap = 4; }
     moments.sort((x,y)=>x.min-y.min); let prev = null;
     moments.forEach(o => { const pool = kinds.filter(k => k !== prev); o.kind = pick(pool.length ? pool : kinds); prev = o.kind; }); }
-  G.mm = { pm, ctx: pm.ctx, title: matchTitle(pm.ctx), h, a, mineHome, mine, opp, evMine, evOpp, evx, stMine: mineHome?stH:stA, stOpp: mineHome?stA:stH, role, moments, mi: 0, oppStr: opp.strength, mg: mineHome? sqH:sqA, myGoals: 0, myAssists: 0, myRate: 6.0, sh: 0, from, state: 'ready', sqH, sqA };
+  G.mm = { pm, ctx: pm.ctx, title: matchTitle(pm.ctx), h, a, mineHome, mine, opp, evMine, evOpp, evx, stMine: mineHome?stH:stA, stOpp: mineHome?stA:stH, role, moments, aiNote, mi: 0, oppStr: opp.strength, mg: mineHome? sqH:sqA, myGoals: 0, myAssists: 0, myRate: 6.0, sh: 0, from, state: 'ready', sqH, sqA };
   if (G.mode === 'mgr') { const mq = mineHome ? sqH : sqA, oq = mineHome ? sqA : sqH; Object.assign(G.mm, { neutral, mgrXi: Eng.buildLineup(mq, mine.tactic).map(e => e.p.id), benchMine: mineHome ? bH : bA, benchOpp: mineHome ? bA : bH, mgrSubs: 0, mgrChanges: 0, talk: 0 }); }
   return G.mm;
 }

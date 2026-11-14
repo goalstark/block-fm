@@ -130,6 +130,13 @@ const STARS = {
 };
 
 // ── 확장 데이터: 나머지 구단(스페인·이탈리아·독일·잉글랜드)과 월드컵 본선국 대표 선수 ──
+
+// 실존 인물과 겹치지 않도록 이름을 살짝 바꾼 변형 이름으로 만든다(예: 살라 → 샐라). 같은 이름은 항상 같은 변형.
+const _LM = { 0: 15, 15: 0, 2: 3, 3: 2, 6: 7, 7: 6, 9: 12, 12: 9, 11: 18, 18: 11, 14: 12 };
+const _VM = { 0: 1, 1: 0, 4: 5, 5: 4, 8: 13, 13: 8, 18: 20, 20: 18, 2: 0, 6: 4 };
+const _vr = n => { const ch = n.split(' '), t = ch[ch.length - 1].split(''), ix = ch.length > 1 ? 0 : t.length - 1, c = t[ix].charCodeAt(0);
+  if (c < 0xAC00 || c > 0xD7A3) return n; const o = c - 0xAC00, jong = o % 28, vow = Math.floor(o / 28) % 21, L = Math.floor(o / 588);
+  t[ix] = String.fromCharCode(ch.length === 1 && _LM[L] != null ? 0xAC00 + (_LM[L] * 21 + vow) * 28 + jong : _VM[vow] != null ? 0xAC00 + (L * 21 + _VM[vow]) * 28 + jong : (jong === 0 ? c + 4 : c)); ch[ch.length - 1] = t.join(''); return ch.join(' '); };
 const STARS_X = {
   club: {
     // 잉글랜드
@@ -217,5 +224,28 @@ const STARS_X = {
 for (const sec of ['club', 'nat']) for (const k in STARS_X[sec]) {
   const have = new Set((STARS[sec][k] || []).map(s => s.split('|')[0]));
   const add = STARS_X[sec][k].filter(s => { const f = s.split('|'); return f.length >= 5 && +f[2] > 40 && +f[3] > 15 && !have.has(f[0]) && (have.add(f[0]), true); });
-  STARS[sec][k] = (STARS[sec][k] || []).concat(add);
+  STARS[sec][k] = (STARS[sec][k] || []).concat(add.map(x => { const f = x.split('|'); f[0] = _vr(f[0]); return f.join('|'); }));
+}
+
+// ── K리그2 구단별 실명 선수(2부 리그 주축·베테랑·외국인) ──
+const STARS_K2 = {
+  '한양 적흑FC': ['조현우|GK|72|34|KOR','김호남|W|70|33|KOR','이상민|CB|71|31|KOR','장시영|CM|70|30|KOR','히카르도 바르디|ST|72|29|BRA'],
+  '동래 FC': ['박진섭|CB|71|30|KOR','윤석영|FB|70|35|KOR','한찬희|CM|71|28|KOR','루이스 페르난데스|ST|72|31|BRA'],
+  '남한산 FC': ['김동진|FB|70|28|KOR','정혁|CM|71|32|KOR','이규성|DM|71|30|KOR','마테우스 로드리게스|W|72|27|BRA'],
+  '광교 FC': ['박지수|CB|71|30|KOR','이명주|CM|72|35|KOR','김태현|FB|70|29|KOR','에반드로 소아레스|ST|73|30|BRA'],
+  '남도 해룡FC': ['이종호|ST|72|33|KOR','김진야|FB|70|27|KOR','최성근|DM|70|31|KOR','다닐로 페레이라|W|72|28|BRA'],
+  '합포 FC': ['김영욱|CM|70|32|KOR','정우재|FB|70|32|KOR','이주용|FB|69|33|KOR','발레리 보지노프|ST|71|29|UZB'],
+  '온양 FC': ['서진수|W|70|28|KOR','한승규|AM|71|30|KOR','안일주|DM|69|34|KOR','뚜아 알바레스|ST|71|27|COL'],
+  '상당 FC': ['박종우|CM|70|36|KOR','주민규|ST|73|36|KOR','이정빈|W|70|26|KOR','야고 칼리|CB|71|30|BRA'],
+  '삼거리 FC': ['김경중|W|70|34|KOR','이준석|CM|69|31|KOR','백동규|CB|70|34|KOR','가브리엘 소우자|ST|71|28|BRA'],
+  '통진 FC': ['정원진|W|69|29|KOR','민상기|CB|70|35|KOR','이창훈|GK|70|31|KOR','마르코 두리치|ST|72|30|SRB'],
+  '융건 FC': ['김대원|AM|72|31|KOR','신진호|CM|71|33|KOR','권한진|CB|69|36|KOR','호세 마르티네스|ST|71|29|ESP'],
+  '단원 FC': ['안병준|ST|72|35|KOR','이동준|W|71|28|KOR','홍철|FB|71|36|KOR','리마 카르발류|CM|71|30|BRA'],
+  '금관 FC': ['김경민|GK|69|34|KOR','이한도|CB|70|31|KOR','임상협|W|70|37|KOR','알렉스 모타|W|72|27|BRA'],
+  '처인 FC': ['조영욱|ST|72|27|KOR','오현규|ST|71|25|KOR','김봉수|DM|69|31|KOR','다비드 아라우호|CB|71|30|BRA'],
+  '임진 FC': ['고승범|CM|72|32|KOR','박동진|ST|71|30|KOR','김민규|FB|69|29|KOR','이르판 자카리야|W|71|26|IDN']
+};
+for (const k in STARS_K2) {
+  const have = new Set((STARS.club[k] || []).map(s => s.split('|')[0]));
+  STARS.club[k] = (STARS.club[k] || []).concat(STARS_K2[k].filter(s => !have.has(s.split('|')[0])).map(x => { const f = x.split('|'); f[0] = _vr(f[0]); return f.join('|'); }));
 }

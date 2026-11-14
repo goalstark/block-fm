@@ -725,16 +725,31 @@ function decide(M) {
 }
 function stepBall() { if (MV) MV.dec = Math.min(MV.dec == null ? 0.2 : MV.dec, 0.2); }
 function varSeq(steps) { let t = 0; steps.forEach(([html, cls, ms]) => { setTimeout(() => { if (MV && !MV.over && !MV.skipping) fxShow(html, cls, ms, true); }, t); t += ms; }); return t; }
+const pick3 = a => a[Math.floor(Math.random() * a.length)];
+const VAR_WHY = { off: '오프사이드', foul: '공격자 반칙', hand: '핸드볼' };
+function varOverturn(M, e, ms, out, min) {                                                  // 이미 기록된 골을 VAR로 실제 번복: 점수·득점/도움 기록에서 제거
+  const arr = ms ? M.evMine : M.evOpp, ix = arr.indexOf(e); if (ix >= 0) arr.splice(ix, 1);
+  const team = ms ? M.mine : M.opp;
+  out.push({ min, ic: '📺', cls: '', t: '<b>VAR 판독</b> — 골 취소' });
+  out.push({ min, ic: '🚫', cls: 'c', t: `<b>골 취소</b> ${esc(e.sc.name)} <span class="dim">${esc(team.name)} · ${VAR_WHY[e.varOff]}</span>` });
+}
 function goalFx(M) {
   const pg = MV.pg; if (!pg) return;
+  if (!pg.varDone && pg.off && !MV.skipping) {                                       // 번복될 골: 일단 골 세리머니 없이 VAR 판독 → 취소
+    pg.varDone = true; MV.paused = true; fxShow(`<div class="gb">⚽</div><div class="gs">골인?!</div>`, 'save', 900, true);
+    setTimeout(() => { if (!MV || MV.pg !== pg) return; fxShow('<div class="gb">📺</div><div class="gs">VAR 판독 중…</div>', 'save', 1600, true);
+      setTimeout(() => { if (!MV || MV.pg !== pg) return; const lg = []; varOverturn(M, pg.ev, pg.ms, lg, MV.min); MV.pg = null; lg.slice().reverse().forEach(o => MV.log.unshift(o));
+        const os = pg.s === 'm' ? 'o' : 'm'; MV.act = null; MV.rs = null; MV.holder = { s: os, i: 0 }; MV.poss = os; MV.dec = 1.0; MV.cele = null; MV.regroup = 0.6;
+        fxShow(`<div class="gb">🚫</div><div class="gs">골 취소 · ${VAR_WHY[pg.ev.varOff]}</div>`, 'card', 1800, true); renderMatch(); }, 1600); }, 900); return; }
   if (!pg.varDone) { pg.varDone = true; if (Math.random() < 0.22 && !MV.skipping) { MV.paused = true; fxShow('<div class="gb">📺</div><div class="gs">VAR 판독 중…</div>', 'save', 1500, true); pg.logs.unshift({ min: MV.min, ic: '📺', cls: '', t: '<b>VAR 판독</b> — 득점 인정' }); setTimeout(() => { if (MV && MV.pg === pg) goalFx(M); }, 1500); return; } }
+  if (pg.off && MV.skipping) { const lg = pg.logs.slice(); varOverturn(M, pg.ev, pg.ms, lg, MV.min); MV.pg = null; lg.slice().reverse().forEach(o => MV.log.unshift(o)); return; }
   MV.pg = null;
   pg.logs.slice().reverse().forEach(o => MV.log.unshift(o)); MV.goalRes = pg.ms ? 'o' : 'm';
   { const stt = sideOf(pg.s), outf = stt.map((_, i) => i).filter(i => i > 0 && MV.pos[pg.s][i]); const si = pg.si > 0 && MV.pos[pg.s][pg.si] ? pg.si : outf[outf.length - 1], c = MV.pos[pg.s][si], dd = pg.s === 'm' ? dM_(M) : -dM_(M);
     MV.cele = { s: pg.s, si, t: 0, cx: dd > 0 ? 91 : 9, cy: c && c.y < 32 ? 6 : 58 }; MV.regroup = 0; }
   sfx(pg.ms ? 'goal' : 'goalopp'); fxShow(pg.html, pg.ms ? 'goal' : 'goal opp', 3100, true); renderMatch();
 }
-function flushPg() { const pg = MV && MV.pg; if (!pg) return; MV.pg = null; pg.logs.slice().reverse().forEach(o => MV.log.unshift(o)); }
+function flushPg() { const pg = MV && MV.pg; if (!pg) return; MV.pg = null; const lg = pg.logs.slice(); if (pg.off) { try { varOverturn(G0().mm, pg.ev, pg.ms, lg, MV.min); } catch (e) {} } lg.slice().reverse().forEach(o => MV.log.unshift(o)); }
 function frame(ts) {
   if (!MV) return; MV.raf = requestAnimationFrame(frame);
   const M = G0().mm; if (!M || !MV.pos) return;
@@ -1027,13 +1042,14 @@ function emitAt(M, min, anim) {
   const out = []; const dM = M.mineHome ? 1 : -1;
   for (const e of M.evMine.concat(M.evOpp)) if (e.min === min && !e.shown) {
     e.shown = true; const ms = M.evMine.includes(e), team = ms ? M.mine : M.opp;
+    if (!e.mine && !e.pen && min <= 90 && !MV.etOn && !MV.so && Math.random() < 0.06) e.varOff = pick3(['off', 'off', 'off', 'foul', 'foul', 'hand']);
     const lg = [{ min, ic: IC.ball, cls: 'g ' + (ms ? 'mine' : 'opp'), t: `<b>골! ${esc(e.sc.name)}</b>${e.pen ? ' <span class="tag">PK</span>' : ''} <span class="dim">${esc(team.name)}</span>` }];
     if (e.as) lg.push({ min, ic: IC.boot, cls: 'a ' + (ms ? 'mine' : 'opp'), t: `도움 ${esc(e.as.name)}` });
     if (anim && MV.pos && MV.pos.m.length) { const sd = ms ? 'm' : 'o', si = (ms ? MV.mst : MV.ost).indexOf(e.sc), html = `<div class="gchar">${sprH(e.sc, MV.kc[ms ? 'm' : 'o'], 40)}</div><div class="gb">${IC.ball.replace('width="16" height="16"','width="44" height="44"')}</div><div class="gt">GOAL!</div><div class="gs">${e.pen ? 'PK · ' : ''}${esc(e.sc.name)}${e.as ? `<br><span class="gsa">${IC.boot} ${esc(e.as.name)}</span>` : ''}</div>`;
-      MV.pg = { s: sd, ms, si, html, logs: lg, t: 0, pen: !!e.pen }; MV.paused = true; MV.dec = Math.min(MV.dec, 0.3);
+      MV.pg = { s: sd, ms, si, html, logs: lg, t: 0, pen: !!e.pen, ev: e, off: e.varOff, ms2: ms }; MV.paused = true; MV.dec = Math.min(MV.dec, 0.3);
       if (e.pen && !MV.pen && !MV.so) { const ki = si >= 0 ? si : bestKicker(ms ? MV.mst : MV.ost), kn = esc((ms ? MV.mst : MV.ost)[ki].name);
         penScene(M, { s: sd, ki, res: 'goal', intro: [[`<div class="gb">🅿️</div><div class="gs">페널티킥! · ${kn}</div>`, 'card', 1100], [`<div class="gb">📺</div><div class="gs">VAR 확인 · 파울 인정</div>`, 'save', 1200]] }); } }
-    else lg.forEach(o => out.push(o));
+    else { lg.forEach(o => out.push(o)); if (e.varOff) { varOverturn(M, e, ms, out, min); } }
   }
   for (const x of M.evx || []) if (x.min === min && !x.shown) {
     x.shown = true; const team = x.ms ? M.mine : M.opp, nmx = esc(x.p.name);
@@ -1102,6 +1118,7 @@ function tick() {
   MV.min++;
   const m = Core.me();
   emitAt(M, MV.min, !MV.hlFast);
+  if (MV.min === 1 && M.aiNote) MV.log.unshift({ min: 1, ic: '🧠', cls: '', t: `<b>상대 감독</b> <span class="dim">${esc(M.aiNote)}</span>` });
   if (M.role==='sub' && MV.min===M.from) MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 투입 — ${esc(m.name)}` })
   if (M.role==='sub' && MV.min===M.from && !MV.mst.some(p => p.me)) { let ix = MV.mst.findIndex(p => p.sub === m.sub && p.sub !== 'GK'); if (ix < 0) ix = MV.mst.findIndex(p => p.sub !== 'GK'); if (ix >= 0) { const outp = MV.mst[ix]; MV.mst[ix] = m; lbl('교체 투입'); const pb = $('#pitchbox'); if (pb) { pb.innerHTML = pitchHTML(M); MV.els = null; bringMeTop(); } fxShow(`<div class="gchar">${sprH(m, MV.kc.m, 40)}</div><div class="gs">교체 투입 · ${esc(m.name)}</div><div class="dim">${esc(outp.name)} ↔ ${MV.min}분</div>`, 'save', 1800, false); } }
   const mo = M.moments[M.mi];
