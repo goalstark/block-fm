@@ -283,9 +283,9 @@ const KEYOF = { lg:'st', cup:'cst', cont:'cst', po:'cst', nt:'nst', wc:'nst' };
 function aiLearn(c, o, gf, ga) {
   if (!c || !o || c.kind==='nt' && !G.wc) return;
   try { if (G.mode==='mgr' && G.mgr && c.id === me().club) return; } catch (e) {}
-  const mem = c.mem || (c.mem = { form: [], vs: {}, sw: 0 }), r = gf > ga ? 'W' : gf < ga ? 'L' : 'D';
+  const mem = (c.mem && typeof c.mem === 'object') ? c.mem : (c.mem = { form: [], vs: {}, sw: 0 }); if (!Array.isArray(mem.form)) mem.form = []; if (!mem.vs || typeof mem.vs !== 'object') mem.vs = {}; if (typeof mem.sw !== 'number') mem.sw = 0; const r = gf > ga ? 'W' : gf < ga ? 'L' : 'D';
   mem.form.push(r); if (mem.form.length > 6) mem.form.shift();
-  const v = mem.vs[o.id] || (mem.vs[o.id] = { w: 0, d: 0, l: 0, gf: 0, ga: 0, last: 0 }); v[r.toLowerCase()]++; v.gf += gf; v.ga += ga; v.last = gf - ga;
+  const v = (mem.vs[o.id] && typeof mem.vs[o.id] === 'object') ? mem.vs[o.id] : (mem.vs[o.id] = { w: 0, d: 0, l: 0, gf: 0, ga: 0, last: 0 }); for (const k of ['w','d','l','gf','ga','last']) if (typeof v[k] !== 'number' || !isFinite(v[k])) v[k] = 0; v[r.toLowerCase()]++; v.gf += gf; v.ga += ga; v.last = gf - ga;
   const f = mem.form;
   if (f.length >= 3 && f.slice(-3).every(x => x === 'L') && c.kind !== 'nt') {                    // 3연패 → 감독이 스타일을 바꿈
     const st = ['balanced', 'tiki', 'counter', 'press', 'direct', 'wide'].filter(x => x !== c.style); c.style = pick(st); c.tactic = tacticFor(c.style); mem.form = []; mem.sw++;
@@ -1359,7 +1359,7 @@ function dailyNews(t) {
   }
 }
 // ----- 저장 -----
-function serialize() { return JSON.stringify(G, (k,v) => { if (k==='ab'||k==='mm') return undefined; if ((k==='st'||k==='cst'||k==='nst') && v && v.a===0 && v.g===0 && v.as===0 && v.m===0 && v.y===0) return undefined; if (k==='form' || k==='rs') return Math.round(v*100)/100; return v; }); }
+function serialize() { return JSON.stringify(G, (k,v) => { if (k==='ab'||k==='mm') return undefined; if ((k==='st'||k==='cst'||k==='nst') && v && v.a===0 && v.g===0 && v.as===0 && v.m===0 && v.y===0) return undefined; if ((k==='form' || k==='rs') && typeof v === 'number') return Math.round(v*100)/100; return v; }); }
 function load(str) { const g = JSON.parse(str); if (g.v !== 2) throw new Error('old save'); G = g; for (const id in G.players) { const p = G.players[id]; if (!p.st) p.st = blankSt(); if (!p.cst) p.cst = blankSt(); if (!p.nst) p.nst = blankSt(); Eng.finalize(p); } G.mm = null; return G; }
 // ----- 하프타임 팀토크: 감독 말 + 내 반응 -----
 function talkInfo(diff) {
