@@ -1026,7 +1026,7 @@ function wcExtra(M) {
   M.ctx.xt = M.xt; return M.xt;
 }
 function prepareMine() {
-  const pm = G.pendingMine, m = me();
+  const pm = G.pendingMine, m = me(); if (!pm) return null;
   if (G.mode==='mgr' && !G.wc && G.mgr) { const g = mgrX(), mc = G.clubs[m.club]; for (const id of mc.pl) { const q = G.players[id]; if (q && !q.mgr) q.cond = clamp(95 + (g.mood - 50)/8, 70, 100); } }
   const h = clubOf(pm.h), a = clubOf(pm.a), mineHome = mineIn(pm.h);
   coachTac(h); coachTac(a);
@@ -1202,6 +1202,7 @@ function nextEvent() {
   return out;
 }
 function finishMine() {
+  if (!G.mm) return null;
   const M = G.mm, m = me(); m.benchStreak = (M.role==='start') ? 0 : (M.role==='sub' ? 1 : (m.benchStreak||0) + 1); const mineGoals = M.evMine.length, oppGoals = M.evOpp.length;
   const gh = M.mineHome ? mineGoals : oppGoals, ga = M.mineHome ? oppGoals : mineGoals;
   const evH = M.mineHome ? M.evMine : M.evOpp, evA = M.mineHome ? M.evOpp : M.evMine;
@@ -1231,7 +1232,7 @@ function finishMine() {
   return { mvp: M.mvp ? { name: M.mvp.p.name, me: M.mvp.me } : null, res, rating, role: M.role, myGoals: M.myGoals, myAssists: M.myAssists, mineGoals, oppGoals, title: M.title };
 }
 function autoMine() {
-  const M = G.mm; while (M.mi < M.moments.length) {
+  const M = G.mm; if (!M) return; while (M.mi < M.moments.length) {
     const opts = momentOptions(M.moments[M.mi]);
     const sc = (o) => { const d = OPT[o.id]; return o.p * (d.def ? 1 : 1 + (d.g===1 ? 1.4 : (d.g||0)*1.2 + (d.a||0)*1.2)) + (o.fav ? 0.08 : 0) + rnd()*0.1; };
     opts.sort((a,b) => sc(b) - sc(a)); resolveMoment(opts[0].id);

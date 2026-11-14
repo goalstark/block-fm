@@ -1140,6 +1140,7 @@ function placeMe(M) {
 }
 function startMatch() {
   if (S.matchOpen) return;
+  try { if (!G0() || !G0().pendingMine) return; } catch (e) { return; }
   if (isM() && !S.mgrGo) { if (G0().pendingMine) { mgrPre(); render(); } return; } S.mgrGo = false;
   const M = Core.prepareMine(); if (!M) return;
   const PT = pickPitch(M);
