@@ -895,7 +895,8 @@ function genExtras(stMine, stOpp, evAll) {
   const ex = [];
   const nm = (l) => { const a = l.filter(p => !p.me); return a.length ? pick(a) : null; };
   const add = (min, t, ms, p) => { if (p) ex.push({ min, t, ms, p, shown: false }); };
-  for (let i = ri(1,4); i > 0; i--) { const ms = rnd() < 0.5; add(ri(8,89), 'yc', ms, nm(ms ? stMine : stOpp)); }
+  for (let i = ri(1,4); i > 0; i--) { const ms = rnd() < 0.5; const p = nm(ms ? stMine : stOpp); if (p && !ex.some(e => e.t === 'yc' && e.p === p)) add(ri(8,89), 'yc', ms, p); }
+  if (rnd() < 0.12) { const c0 = ex.filter(e => e.t === 'yc' && e.min <= 80 && !evAll.some(g => g.sc === e.p || g.as === e.p)); if (c0.length) { const e0 = pick(c0); ex.push({ min: ri(e0.min + 4, 89), t: 'rc', ms: e0.ms, p: e0.p, second: true, shown: false }); } }   // 경고 2회 = 퇴장
   if (rnd() < 0.07) { const ms = rnd() < 0.5, min = ri(30,88); const l = (ms ? stMine : stOpp).filter(p => !p.me && p.sub !== 'GK' && !evAll.some(e => e.min >= min && (e.sc === p || e.as === p))); add(min, 'rc', ms, l.length ? pick(l) : null); }
   for (let i = ri(1,3); i > 0; i--) { const ms = rnd() < 0.5; const gk = (ms ? stMine : stOpp).find(p => p.sub === 'GK' && !p.me); add(ri(5,89), 'sv', ms, gk); }
   for (let i = ri(0,2); i > 0; i--) { const ms = rnd() < 0.5; add(ri(5,89), 'pt', ms, nm((ms ? stMine : stOpp).filter(p => ['ST','W','AM','CM'].includes(p.sub)))); }
@@ -903,7 +904,13 @@ function genExtras(stMine, stOpp, evAll) {
   for (let i = ri(2,5); i > 0; i--) { const ms = rnd() < 0.5; add(ri(4,89), 'cn', ms, nm((ms ? stMine : stOpp).filter(p => ['W','FB','CM','AM'].includes(p.sub)))); }
   for (let i = ri(1,3); i > 0; i--) { const ms = rnd() < 0.5; add(ri(6,89), 'fl', ms, nm((ms ? stMine : stOpp).filter(p => p.sub !== 'GK'))); }
   if (rnd() < 0.3) { const ms = rnd() < 0.5; add(ri(15,85), 'ij', ms, nm((ms ? stMine : stOpp).filter(p => p.sub !== 'GK'))); }
-  return ex.sort((a, b) => a.min - b.min);
+  for (let i = ri(1,3); i > 0; i--) { const ms = rnd() < 0.5; add(ri(6,88), 'of', ms, nm((ms ? stMine : stOpp).filter(p => ['ST','W','AM'].includes(p.sub)))); }              // 오프사이드 깃발
+  if (rnd() < 0.3) { const ms = rnd() < 0.5, min = ri(10,88); if (!evAll.some(e => Math.abs(e.min - min) <= 2)) { add(min, 'dg', ms, nm((ms ? stMine : stOpp).filter(p => ['ST','W','AM'].includes(p.sub)))); const e = ex[ex.length - 1]; if (e && e.t === 'dg') e.why = pick(['off','off','off','foul','hand']); } }   // VAR로 취소된 골(점수 불변)
+  if (rnd() < 0.15) { const ms = rnd() < 0.5, min = ri(12,86); if (!evAll.some(e => Math.abs(e.min - min) <= 2)) { add(min, 'pk', ms, nm((ms ? stMine : stOpp).filter(p => ['ST','W','AM','CM'].includes(p.sub)))); const e = ex[ex.length - 1]; if (e && e.t === 'pk') { e.gk = (ms ? stOpp : stMine).find(p => p.sub === 'GK' && !p.me) || null; e.res = rnd() < 0.6 ? 'sv' : 'miss'; } } }   // 페널티킥 선언(VAR 확인) 후 실축/선방(점수 불변)
+  for (const e of ex) if (e.t === 'rc' && !e.second && rnd() < 0.5) e.var = true;                                                                   // 직접 퇴장 일부는 VAR 확인
+  const off = new Map(); ex.forEach(e => { if (e.t === 'rc' && e.p) off.set(e.p, Math.min(off.get(e.p) || 99, e.min)); });                          // 퇴장 선수는 이후 경기 이벤트 없음
+  const out = ex.filter(e => !(e.p && off.has(e.p) && e.min > off.get(e.p)) && !(e.t === 'rc' && e.p && off.get(e.p) < e.min));
+  return out.sort((a, b) => a.min - b.min);
 }
 function mvpOf(M) {
   if (M.mvp) return M.mvp;
