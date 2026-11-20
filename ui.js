@@ -1319,7 +1319,7 @@ function emitAt(M, min, anim) {
   }
   for (const o of out.reverse()) MV.log.unshift(o);
 }
-const SPD = [1, 1.5, 2], BASE_MS = 450;
+const SPD = [1, 1.5, 2], BASE_MS = 1600;
 function spdGet() { try { const v = +localStorage.getItem('bfm_spd'); if (SPD.includes(v)) return v; } catch (e) {} return 1; }
 function spdMs() { return Math.round(BASE_MS / (S.spd || (S.spd = spdGet()))); }
 // 경기 보기: 풀(전체) / 하이라이트(골·결정적 기회·슈퍼세이브·퇴장·내 장면 앞뒤만 정상 속도, 나머지는 빠르게 지나감)
