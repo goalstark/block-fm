@@ -116,6 +116,11 @@ function circle(ids) {
 function buildSchedule(lg, startDay) {
   const base = circle(lg.clubs), rd = [];
   for (let k=0;k<lg.rounds;k++) for (const r of base) rd.push(k%2 ? r.map(([h,a])=>[a,h]) : r.map(m=>m.slice()));
+  if (lg.games) { // 목표 경기 수에 맞춰 다음 회전의 앞 라운드를 이어 붙임 (스플릿 라운드는 제외하고 계산)
+    const np = lg.clubs.length + (lg.clubs.length % 2), sp = lg.split ? Math.ceil(lg.clubs.length/2) - 1 : 0, per = lg.clubs.length % 2 ? 1 : 0;
+    const want = lg.games - sp + per; let k = lg.rounds, i = 0;
+    while (rd.length < want && base.length) { const r = base[i % base.length]; rd.push(k%2 ? r.map(([h,a])=>[a,h]) : r.map(m=>m.slice())); i++; if (i % base.length === 0) k++; }
+  }
   lg.gap = clamp(Math.floor((lg.cal==='E'?280:250)/(rd.length+(lg.split?7:0))),4,7);
   lg.rd = rd.map((ms,i) => ({ day: startDay + lg.gap*i, ms }));
   lg.ptr = 0; lg.half = 0; lg.sp = false; lg.spl = null; lg.table = {}; for (const id of lg.clubs) lg.table[id] = { p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0 };
@@ -137,7 +142,7 @@ function genNames(key, n, used) {
   while (out.length < n && i < 2000) { const nm = regs[i%regs.length] + ' ' + pick(DD.SYM); if (!used.has(nm)) { used.add(nm); out.push(nm); } i++; }
   return out;
 }
-function mkLeague(id, name, cc, tier, rounds, cal, split) { const lg = { id, name, cc, tier, rounds, cal, split: !!split, clubs: [], hist: [] }; G.leagues.push(lg); return lg; }
+function mkLeague(id, name, cc, tier, rounds, cal, split, games) { const lg = { id, name, cc, tier, rounds, cal, split: !!split, games: games || 0, clubs: [], hist: [] }; G.leagues.push(lg); return lg; }
 function buildCountry(code, used) {
   const C = DD.COUNTRIES[code];
   const gen = {};
@@ -147,7 +152,7 @@ function buildCountry(code, used) {
   const tiers = [[1, C.l1], [2, C.l2]];
   for (const [tier, cfg] of tiers) {
     if (!cfg) continue;
-    const lg = mkLeague(cfg.id, cfg.name, code, tier, cfg.rounds, C.cal, cfg.split);
+    const lg = mkLeague(cfg.id, cfg.name, code, tier, cfg.rounds, C.cal, cfg.split, cfg.games);
     if (code==='KOR') {
       for (const d of DD.DATA_CLUBS) if (d[0]===cfg.id) { const c = addClub({ name:d[1], lg:cfg.id, col:d[2], col2:d[3], strength:d[4], region:d[5], nat:'KOR', cc:code, tier }); lg.clubs.push(c.id); }
     } else {
@@ -590,7 +595,9 @@ function pushHist(p, lg) {
 function finishSeason(lg) {
   const tb = sortedTable(lg), champ = G.clubs[tb[0]]; if (G.mode === 'mgr') mgrSeasonEnd(lg, tb);
   const ts = topList(lg,'g',1)[0], mvp = ratingList(lg,1,Math.max(8,Math.floor(lg.rd.length/3)))[0];
-  lg.hist.push({ season: seasonLabel(lg), champ: tb[0], top: ts ? [ts.name, ts.st.g, ts.club] : null, mvp: mvp ? [mvp.name, mvp.club] : null, table: tb.map(id => [id, lg.table[id].pts]) });
+  lg.hist.push({ season: seasonLabel(lg), champ: tb[0], top: ts ? [ts.name, ts.st.g, ts.club] : null, mvp: mvp ? [mvp.name, mvp.club] : null, table: tb.map(id => { const t = lg.table[id]; return [id, t.pts, t.w, t.d, t.l, t.gf, t.ga]; }), n: lg.table[tb[0]].p,
+    sc: topList(lg,'g',20).map(p => [p.name, p.club, p.st.g, p.st.a]), as: topList(lg,'as',20).map(p => [p.name, p.club, p.st.as, p.st.a]),
+    rt: ratingList(lg,20,Math.max(8,Math.floor(lg.rd.length/3))).map(p => [p.name, p.club, Math.round(p.st.rs/p.st.a*10)/10, p.st.a]) });
   const big = lg.tier===1 || lg.tier===2;
   addNews('season', `${lg.name} ${seasonLabel(lg)} 종료 — 우승 ${champ.name}${ts?`, 득점왕 ${ts.name}(${ts.st.g}골)`:''}${mvp?`, MVP ${mvp.name}`:''}`, lg.tier===1);
   for (const id of lg.clubs) for (const pid of G.clubs[id].pl) pushHist(G.players[pid], lg);

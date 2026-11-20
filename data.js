@@ -19,7 +19,7 @@ const EU = {
 // 나라 설정. cal: E=8월~5월, S=3월~11월 / cont: 대륙 / slots: 대륙대회 출전 수
 // l1/l2: id, 이름, 팀 수, 회전 수, 평균 전력, 전력 폭
 const COUNTRIES = {
- KOR:{ name:'한국', cont:'AS', cal:'S', cup:'코리아컵', slots:3, swap:{auto:1,po:true}, l1:{id:'K1',name:'K리그1',n:14,rounds:2,mean:66,spread:10,split:true}, l2:{id:'K2',name:'K리그2',n:15,rounds:2,mean:57,spread:6} },
+ KOR:{ name:'한국', cont:'AS', cal:'S', cup:'코리아컵', slots:3, swap:{auto:1,po:true}, l1:{id:'K1',name:'K리그1',n:14,rounds:2,games:38,mean:66,spread:10,split:true}, l2:{id:'K2',name:'K리그2',n:15,rounds:2,games:36,mean:57,spread:6} },
  ENG:{ name:'잉글랜드', cont:'EU', cal:'E', cup:'잉글랜드 컵', slots:4, swap:{auto:2,po:true}, l1:{id:'ENG',name:'잉글랜드 1부',n:20,rounds:2,mean:73,spread:12}, l2:{id:'ENG2',name:'잉글랜드 2부',n:24,rounds:2,mean:62,spread:8} },
  ESP:{ name:'스페인', cont:'EU', cal:'E', cup:'스페인 컵', slots:4, swap:{auto:2,po:true}, l1:{id:'ESP',name:'스페인 1부',n:20,rounds:2,mean:71,spread:12}, l2:{id:'ESP2',name:'스페인 2부',n:22,rounds:2,mean:60,spread:8} },
  ITA:{ name:'이탈리아', cont:'EU', cal:'E', cup:'이탈리아 컵', slots:4, swap:{auto:2,po:true}, l1:{id:'ITA',name:'이탈리아 1부',n:20,rounds:2,mean:70,spread:12}, l2:{id:'ITA2',name:'이탈리아 2부',n:20,rounds:2,mean:59,spread:8} },
@@ -30,7 +30,7 @@ const COUNTRIES = {
  JPN:{ name:'일본', cont:'AS', cal:'E', cup:'일본 컵', slots:3, swap:{auto:2,po:true}, l1:{id:'JPN',name:'J리그1',n:20,rounds:2,mean:62,spread:9}, l2:{id:'JPN2',name:'J리그2',n:20,rounds:2,mean:53,spread:7} },
  SAU:{ name:'사우디', cont:'AS', cal:'E', cup:'사우디 컵', slots:2, swap:{auto:2,po:true}, l1:{id:'SAU',name:'사우디 1부',n:18,rounds:2,mean:62,spread:10}, l2:{id:'SAU2',name:'사우디 2부',n:18,rounds:2,mean:51,spread:7} },
  BRA:{ name:'브라질', cont:'SA', cal:'S', cup:'브라질 컵', slots:6, swap:{auto:4,po:false}, l1:{id:'BRA',name:'브라질 1부',n:20,rounds:2,mean:63,spread:10}, l2:{id:'BRA2',name:'브라질 2부',n:20,rounds:2,mean:52,spread:7} },
- USA:{ name:'미국', cont:'NA', cal:'S', cup:'미국 컵', slots:4, swap:{auto:0,po:false}, l1:{id:'USA',name:'미국 MLS',n:30,rounds:1,mean:59,spread:8}, l2:null },
+ USA:{ name:'미국', cont:'NA', cal:'S', cup:'미국 컵', slots:4, swap:{auto:0,po:false}, l1:{id:'USA',name:'미국 MLS',n:30,rounds:1,games:34,mean:59,spread:8}, l2:null },
  DEN:{ name:'덴마크', cont:'EU', cal:'E', cup:'덴마크 컵', slots:2, swap:{auto:2,po:false}, l1:{id:'DEN',name:'덴마크 1부',n:12,rounds:2,mean:58,spread:9}, l2:{id:'DEN2',name:'덴마크 2부',n:12,rounds:2,mean:49,spread:6} },
  SCO:{ name:'스코틀랜드', cont:'EU', cal:'E', cup:'스코틀랜드 컵', slots:2, swap:{auto:1,po:true}, l1:{id:'SCO',name:'스코틀랜드 1부',n:12,rounds:3,mean:58,spread:10}, l2:{id:'SCO2',name:'스코틀랜드 2부',n:10,rounds:3,mean:48,spread:6} },
  BEL:{ name:'벨기에', cont:'EU', cal:'E', cup:'벨기에 컵', slots:2, swap:{auto:1,po:true}, l1:{id:'BEL',name:'벨기에 1부',n:16,rounds:2,mean:61,spread:10}, l2:{id:'BEL2',name:'벨기에 2부',n:8,rounds:4,mean:50,spread:6} },

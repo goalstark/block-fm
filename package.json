@@ -1,17 +1,16 @@
 {
-  "name": "football-sim",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "sync": "cap sync android",
-    "capacitor:sync:after": "node patch-android.js && mkdir -p assets && cp icon-only.png icon-foreground.png icon-background.png assets/ && npx --yes @capacitor/assets generate --android"
-  },
-  "dependencies": {
-    "@capacitor/android": "^6.1.2",
-    "@capacitor/core": "^6.1.2",
-    "@capacitor/screen-orientation": "^6.0.0"
-  },
-  "devDependencies": {
-    "@capacitor/cli": "^6.1.2"
-  }
+ "name": "football-sim",
+ "version": "0.1.0",
+ "private": true,
+ "scripts": {
+  "sync": "cap sync android",
+  "capacitor:sync:after": "node -e \"const fs=require('fs'),d='android/app/src/main/res/values-ko';fs.mkdirSync(d,{recursive:true});fs.writeFileSync(d+'/strings.xml','<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?>\\n<resources>\\n    <string name=\\\"app_name\\\">블록 풋볼 매니저</string>\\n    <string name=\\\"title_activity_main\\\">블록 풋볼 매니저</string>\\n</resources>\\n')\""
+ },
+ "dependencies": {
+  "@capacitor/android": "^6.1.2",
+  "@capacitor/core": "^6.1.2"
+ },
+ "devDependencies": {
+  "@capacitor/cli": "^6.1.2"
+ }
 }

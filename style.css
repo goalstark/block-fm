@@ -205,3 +205,47 @@ nav{grid-auto-flow:column;grid-template-columns:none;grid-auto-columns:1fr}
 .popic{font-size:34px;line-height:1.1}.popt{font-weight:900;font-size:1.1em;margin:6px 0 4px;color:#C6F36B}.popm{color:#EAF1EC;font-size:.95em;line-height:1.5;margin-bottom:14px;word-break:keep-all}
 .popb{display:flex;gap:8px}
 @keyframes popin{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* --- 입체 버튼(양각) + 눌리면 음각 --- */
+button{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.btn,.seg button,.mtb,.chip,.opt{position:relative;transition:transform .07s ease,box-shadow .07s ease,filter .07s ease,background .07s ease}
+/* 주 버튼: 위는 밝고 아래는 짙은 그라데이션 + 윗면 하이라이트 + 아래 두께 */
+.btn{background:linear-gradient(180deg,#E4FF9A 0%,#C6F36B 45%,#9BCB3C 100%);border:1px solid #7FA52F;border-top-color:#F2FFC8;
+ box-shadow:inset 0 2px 0 rgba(255,255,255,.75),inset 0 -3px 0 rgba(60,90,10,.35),0 5px 0 #5F7F1F,0 8px 10px rgba(0,0,0,.45);text-shadow:0 1px 0 rgba(255,255,255,.5)}
+.btn.sec{background:linear-gradient(180deg,#34493D 0%,#25362D 50%,#1A2820 100%);border:1px solid #11190F;border-top-color:#557462;color:#EAF1EC;text-shadow:0 -1px 0 rgba(0,0,0,.6);
+ box-shadow:inset 0 2px 0 rgba(255,255,255,.22),inset 0 -3px 0 rgba(0,0,0,.35),0 5px 0 #070C09,0 8px 10px rgba(0,0,0,.45)}
+.seg button,.mtb,.chip{background:linear-gradient(180deg,#2B3D33,#1B2921);border:1px solid #0F1712;border-top-color:#496352;
+ box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -2px 0 rgba(0,0,0,.35),0 3px 0 #070C09,0 5px 6px rgba(0,0,0,.35)}
+.seg button.on,.mtb.on{background:linear-gradient(180deg,#E4FF9A,#C6F36B 45%,#9BCB3C);border:1px solid #7FA52F;border-top-color:#F2FFC8;
+ box-shadow:inset 0 2px 0 rgba(255,255,255,.7),inset 0 -2px 0 rgba(60,90,10,.35),0 3px 0 #5F7F1F,0 5px 6px rgba(0,0,0,.35)}
+.chip.on{background:linear-gradient(180deg,#26402F,#1A2E22);border-color:#C6F36B;box-shadow:inset 0 2px 4px rgba(0,0,0,.45),0 0 0 1px #C6F36B}
+/* 눌림: 버튼이 안으로 들어가며(음각) 위쪽이 어두워지고 두께 그림자가 사라짐 */
+.btn:active:not(:disabled),.seg button:active,.mtb:active,.chip:active,.opt:active{transform:translateY(4px)}
+.btn:active:not(:disabled){background:linear-gradient(180deg,#8DB838,#A8D24C 60%,#B8E060);border-top-color:#6E9226;
+ box-shadow:inset 0 4px 8px rgba(40,60,5,.6),inset 0 -1px 0 rgba(255,255,255,.35),0 1px 0 #5F7F1F;text-shadow:none}
+.btn.sec:active:not(:disabled){background:linear-gradient(180deg,#0F1812,#17231C 60%,#1E2D24);border-top-color:#0A100C;
+ box-shadow:inset 0 4px 8px rgba(0,0,0,.75),inset 0 -1px 0 rgba(255,255,255,.12),0 1px 0 #070C09;text-shadow:none}
+.seg button:active,.mtb:active,.chip:active{background:linear-gradient(180deg,#101A14,#1A271F);box-shadow:inset 0 3px 6px rgba(0,0,0,.7),0 0 0 #000}
+.seg button.on:active,.mtb.on:active{background:linear-gradient(180deg,#8DB838,#A8D24C);box-shadow:inset 0 3px 6px rgba(40,60,5,.6)}
+.opt:active{filter:brightness(.8)}
+.btn:disabled{box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 2px 0 rgba(0,0,0,.4);filter:grayscale(.5)}
+#match .mf .spd .btn,#match .mf .spd .btn.sec{box-shadow:inset 0 2px 0 rgba(255,255,255,.55),inset 0 -2px 0 rgba(0,0,0,.3),0 3px 0 #3E5416,0 5px 6px rgba(0,0,0,.4)}
+#match .mf .spd .btn.sec{box-shadow:inset 0 2px 0 rgba(255,255,255,.2),inset 0 -2px 0 rgba(0,0,0,.35),0 3px 0 #070C09,0 5px 6px rgba(0,0,0,.4)}
+#match .mf .spd .btn:active,#match .mf .spd .btn.sec:active{box-shadow:inset 0 3px 6px rgba(0,0,0,.6),0 0 0 #000}
+
+/* --- 나머지 클릭 요소도 입체화: 하단 탭·닫기·설정·알약·카드형 버튼·색상 선택 --- */
+.gear,.x,.pill,.sw{position:relative;transition:transform .07s ease,box-shadow .07s ease,filter .07s ease,background .07s ease}
+.gear,.x{background:linear-gradient(180deg,#34493D,#1A2820);border:1px solid #0F1712;border-top-color:#557462;box-shadow:inset 0 2px 0 rgba(255,255,255,.2),inset 0 -2px 0 rgba(0,0,0,.35),0 4px 0 #070C09,0 6px 8px rgba(0,0,0,.4)}
+.pill{background:linear-gradient(180deg,#2B3D33,#1B2921);border:1px solid #0F1712;border-top-color:#496352;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -2px 0 rgba(0,0,0,.35),0 3px 0 #070C09,0 5px 6px rgba(0,0,0,.35)}
+.sw{box-shadow:inset 0 2px 0 rgba(255,255,255,.35),inset 0 -3px 0 rgba(0,0,0,.35),0 3px 0 #070C09}
+.sw.on{box-shadow:inset 0 3px 6px rgba(0,0,0,.5),0 0 0 2px #C6F36B}
+/* 카드형(목록·선택 카드): 얇은 양각 */
+.card.lnk,.modec,.mclub,.pcard,.wcn,.news,.sqr:not(.mini){position:relative;transition:transform .07s ease,box-shadow .07s ease,filter .07s ease;box-shadow:inset 0 1px 0 rgba(255,255,255,.10),inset 0 -2px 0 rgba(0,0,0,.28),0 3px 0 #070C09,0 5px 6px rgba(0,0,0,.28)}
+.mclub.on,.wcn.on,.pcard.on{box-shadow:inset 0 3px 6px rgba(0,0,0,.45),0 0 0 2px #C6F36B}
+/* 하단 탭: 선택된 탭은 눌린(음각) 판, 나머지는 살짝 튀어나온 모양 */
+nav .nv{border-radius:12px;margin:3px 2px;transition:transform .07s ease,box-shadow .07s ease,background .07s ease;background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,0));box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 2px 0 rgba(0,0,0,.45)}
+nav .nv.on{background:linear-gradient(180deg,#0E1712,#17231C);box-shadow:inset 0 3px 6px rgba(0,0,0,.65),inset 0 -1px 0 rgba(198,243,107,.35)}
+/* 누름 효과 (공통) */
+.gear:active,.x:active,.pill:active,.sw:active,.card.lnk:active,.modec:active,.mclub:active,.pcard:active,.wcn:active,.news:active,.sqr:not(.mini):active{transform:translateY(3px);filter:brightness(.82);box-shadow:inset 0 3px 6px rgba(0,0,0,.6),0 0 0 #000}
+nav .nv:active{transform:translateY(2px);background:linear-gradient(180deg,#0E1712,#17231C);box-shadow:inset 0 3px 6px rgba(0,0,0,.65)}
+a[data-act]:active{opacity:.6}

@@ -123,7 +123,7 @@ function needVec(t) {
 const NEUTRAL = new Float64Array(11).fill(1);
 
 // ───────────── 상수 (검증 시뮬로 보정) ─────────────
-const C = { EVENT_RATE: 0.27, K_Q: 14.0, GOAL_SENS: 3.2, B_WING: 0.033, B_CEN: 0.037, B_DIR: 0.030, B_CNT: 0.041, B_SP: 0.044, HOME_CTL: 1.07, HOME_ATK: 1.09, COUNTER: 0.022, SET_RATE: 0.045, TILT: 2.0 }
+const C = { EVENT_RATE: 0.27, K_Q: 14.0, GOAL_SENS: 3.2, B_WING: 0.021, B_CEN: 0.021, B_DIR: 0.021, B_CNT: 0.0246, B_SP: 0.0264, HOME_CTL: 1.07, HOME_ATK: 1.09, COUNTER: 0.022, SET_RATE: 0.045, TILT: 1.0 }
 // 포메이션 기본 강도 보정: 자가대전 보정(balance.js)으로 '평균적으로 우월한 포메이션'이 없도록 맞춘 값. 스쿼드별 상성은 그대로 남김
 const FORM_S = {'4-4-2':1.013,'4-3-3':0.988,'4-2-3-1':0.993,'4-1-4-1':0.988,'4-3-2-1':1.023,'4-4-1-1':1.004,'3-5-2':1.01,'3-4-3':0.969,'3-4-2-1':1.004,'5-3-2':1.01};;
 const MENT_ATK = [0.93, 1.0, 1.07], MENT_DEF = [1.07, 1.0, 0.94], MENT_CTL = [0.97, 1.0, 1.02], TEMPO = [0.92, 1.0, 1.09], TRANS_M = [0.8, 1.0, 1.3];
@@ -258,10 +258,34 @@ function buildLineup(squad, tactic, userRoles) {
   }
   if (!asg) asg = assignSlots(squad, tactic.formation);
   const need = needVec(tactic); userRoles = userRoles || tactic.roles;
-  return asg.map((x, i) => {
+  const lu = asg.map((x, i) => {
     const role = (userRoles && userRoles[i]) || pickRole(x.player, x.slot, need);
     return { p: x.player, slot: x.slot, role, fam: 0.75 + 0.25 * FAM[x.player.sub][x.slot], stam: x.player.cond };
   });
+  return refineRoles(lu, tactic, userRoles);
+}
+// 역할 보정: 휴리스틱(pickRole)이 고른 역할을 '팀 전체 기대 득실(기준 상대 대비)'로 다시 검증한다.
+// 능력치를 올렸는데 역할 쏠림 때문에 팀이 오히려 약해지는 일이 없도록, 선수 한 명씩 더 나은 역할이 있으면 바꾼다(감독이 지정한 역할은 그대로).
+let NEUT_REF = null;
+function teamValue(lu, tac) {
+  if (!NEUT_REF) { NEUT_REF = {}; for (const k of K) NEUT_REF[k] = 65; NEUT_REF.gk = 65; NEUT_REF.sta = 65; }
+  const ev = blockEvents(profile(lu), NEUT_REF, tac, defaultTactic(), false); let s = 0;
+  for (const e of ev) s += (e.side === 0 ? 1 : -1) * e.prob * e.p;
+  return s;
+}
+function refineRoles(lu, tactic, userRoles) {
+  for (let pass = 0; pass < 2; pass++) {
+    let moved = false;
+    for (let i = 0; i < lu.length; i++) {
+      if (userRoles && userRoles[i]) continue;
+      const e = lu[i], opts = SLOT_ROLES[e.slot]; if (!opts || opts.length < 2) continue;
+      let bestId = e.role, bv = teamValue(lu, tactic);
+      for (const id of opts) { if (id === e.role) continue; const keep = e.role; e.role = id; const v = teamValue(lu, tactic); e.role = keep; if (v > bv + 1e-7) { bv = v; bestId = id; } }
+      if (bestId !== e.role) { e.role = bestId; moved = true; }
+    }
+    if (!moved) break;
+  }
+  return lu;
 }
 
 // ───────────── 팀 프로필 ─────────────
@@ -280,17 +304,18 @@ function rawT(lineup) {
 }
 // 기준 용량: 평범한 4-4-2의 표준 역할 구성 (능력 65 선수라면 모든 채널이 65가 되도록)
 function initCref() {
-  const ids = ['gk_trad', 'fb_def', 'cb_cover', 'cb_stop', 'fb_att', 'w_wm', 'cm_b2b', 'cm_pm', 'w_wing', 'st_comp', 'st_poach'];
-  CREF = new Float64Array(11);
-  for (const id of ids) for (let k = 0; k < 11; k++) CREF[k] += ROLES[id].inv[k];
-  for (let k = 0; k < 11; k++) CREF[k] = Math.max(0.3, CREF[k]);
+  // 기준 용량: 실제 라인업(여러 포메이션·역할 배정)에서 채널별로 나오는 평균 역할 가중치 합.
+  // (예전엔 임의의 4-4-2 표준 역할 합을 썼는데 실제 라인업과 채널별로 2~7배씩 어긋나 측면·역습은 바닥, 중앙·직선은 천장에 붙어 능력치가 반영되지 않았음)
+  CREF = Float64Array.from([1.68, 2.58, 1.58, 0.8, 1.61, 2.51, 3.98, 2.81, 4.29, 3.53, 3.12]);
 }
+function softClamp(r, lo, hi) { return r >= 1 ? 1 + (hi - 1) * Math.tanh((r - 1) / (hi - 1)) : 1 - (1 - lo) * Math.tanh((1 - r) / (1 - lo)); }
+function softFloor(x, f) { return x >= f ? x : f * Math.exp(x / f - 1); }
 function profile(lineup) {
   if (!CREF) initCref();
   const { T, Cp, gk, sta } = rawT(lineup), P = {};
   for (let k = 0; k < 11; k++) {
     if (K[k] === 'fin') { P.fin = Cp[k] ? T[k] / Cp[k] : 40; continue; }
-    const ratio = clamp(T[k] / CREF[k] / 65, 0.6, 1.3);   // 용량×능력, 수확체감
+    const ratio = softClamp(T[k] / CREF[k] / 65, 0.6, 1.3);   // 용량×능력, 수확체감
     P[K[k]] = 65 * Math.pow(ratio, 0.85);
   }
   P.gk = gk; P.sta = sta; return P;
@@ -301,7 +326,7 @@ function teamStam(lineup) { let s = 0; for (const e of lineup) s += e.stam; retu
 const sig = (x) => 1 / (1 + Math.exp(-x));
 function pressEff(Pp, Po, tp, to) {
   if (!tp.press) return 0;
-  return 0.07 * tp.press * clamp(Math.pow(Pp.prs / Math.max(40, Po.bld), 1.6), 0.5, 1.8) * (1 - 0.3 * to.build);
+  return 0.10 * tp.press * clamp(Math.pow(Pp.prs / Math.max(40, Po.bld), 1.6), 0.5, 1.8) * (1 - 0.3 * to.build);
 }
 function possShare(PA, PB, tA, tB, homeA) {
   const cA = PA.bld * MENT_CTL[tA.ment] * (homeA ? C.HOME_CTL : 1) * (1 - pressEff(PB, PA, tB, tA)) * (1 - 0.05 * tA.build);
@@ -327,19 +352,19 @@ function sideEvents(PX, PY, tx, ty, pPoss, homeX, side, out) {
   const sn = sw + sc + sd; sw /= sn; sc /= sn; sd /= sn;
   const wingS = sw, cenS = sc, dirS = sd;
   const q = (a, d) => sig(C.K_Q * Math.log(a / d));
-  const pg = (base, qq) => clamp(base * Math.exp(C.GOAL_SENS * (qq - 0.5)) * finF * gkF, 0.01, 0.5);
+  const pg = (base, qq) => Math.min(0.5, softFloor(base * Math.exp(C.GOAL_SENS * (qq - 0.5)) * finF * gkF, 0.006));
   out.push({ side, prob: opp * wingS, p: pg(C.B_WING, q(PX.wing * ma, dWy)), ch: 'wing' });
   out.push({ side, prob: opp * cenS, p: pg(C.B_CEN, q(PX.cen * ma, dCy)), ch: 'cen' });
   out.push({ side, prob: opp * dirS, p: pg(C.B_DIR, q((0.65 * PX.dir + 0.35 * PX.bld) * ma, 0.5 * PY.dA * md + 0.5 * restY)), ch: 'dir' });
   // 세트피스
   out.push({ side, prob: C.SET_RATE * (0.6 + 0.8 * pPoss), p: pg(C.B_SP, q(PX.dA, PY.dA * md)), ch: 'sp' });
   // 상대 역습 (Y가 X의 공세 뒤 공간을 노림)
-  const exposure = 0.5 * tx.ment + 0.45 * tx.press + 0.3 * tx.line;
+  const exposure = 0.5 * tx.ment + 0.30 * tx.press + 0.3 * tx.line;
   const protect = clamp(68 / PX.rst, 0.7, 1.3);
   const pc = C.COUNTER * (0.35 + exposure) * protect * TRANS_M[ty.trans] * pPoss;
   const rx = PX.rst * (1 - 0.09 * (tx.line - 1)) * MENT_DEF[tx.ment] * (FORM_S[tx.formation] || 1);
   const finY = clamp(Math.pow(PY.fin / 68, 0.9), 0.6, 1.5), gkX = clamp(1 - (PX.gk - 72) * 0.012, 0.7, 1.3);
-  out.push({ side: 1 - side, prob: pc, p: clamp(C.B_CNT * Math.exp(C.GOAL_SENS * (q(PY.cnt * MENT_ATK[ty.ment], rx) - 0.5)) * finY * gkX, 0.01, 0.5), ch: 'cnt' });
+  out.push({ side: 1 - side, prob: pc, p: Math.min(0.5, softFloor(C.B_CNT * Math.exp(C.GOAL_SENS * (q(PY.cnt * MENT_ATK[ty.ment], rx) - 0.5)) * finY * gkX, 0.006)), ch: 'cnt' });
 }
 function blockEvents(PA, PB, tA, tB, homeA) {
   const ps = possShare(PA, PB, tA, tB, homeA), ev = [];
@@ -348,7 +373,7 @@ function blockEvents(PA, PB, tA, tB, homeA) {
   return ev;
 }
 function drainRate(t, P) {
-  return (0.15 + 0.07 * t.press + 0.05 * t.tempo + 0.02 * t.trans + 0.02 * t.ment) * clamp(1.4 - P.sta / 140, 0.8, 1.2);
+  return (0.15 + 0.05 * t.press + 0.05 * t.tempo + 0.02 * t.trans + 0.02 * t.ment) * clamp(1.4 - P.sta / 140, 0.8, 1.2);
 }
 
 // 기대값 모드 (난수 없음): 체력 3구간
