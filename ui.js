@@ -2216,7 +2216,7 @@ window.addEventListener('error', (e) => { try { const st = String((e.error && e.
 window.addEventListener('unhandledrejection', (e) => { try { toast('오류: ' + String(e.reason && e.reason.message || e.reason)); } catch (e2) {} });
 
 // ---- 업데이트 알림: 저장소의 version.json 을 보고 새 빌드가 있으면 알려준다(인터넷이 없으면 조용히 무시) ----
-const APP_VER = '1.1.0', APP_BUILD = 1;
+const APP_VER = '1.2.0', APP_BUILD = 2;
 const UPD_URL = 'https://raw.githubusercontent.com/goalstark/block-fm/main/version.json';
 const UPD_PAGE = 'https://github.com/goalstark/block-fm/releases/tag/latest';
 const UPD = { last: 0, info: null, busy: false, pend: null };
