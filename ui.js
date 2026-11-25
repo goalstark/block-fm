@@ -130,7 +130,7 @@ async function idbDel(k) { try { const d = await idb(); await new Promise((res) 
 function save() { try { idbSet('save', Core.serialize()); } catch (e) {} }
 async function loadSave() { try { const s = await idbGet('save'); if (s) { Core.load(s); return true; } } catch (e) {} return false; }
 // ---------- 다음 경기 ----------
-function compLabel(ctx) { if (ctx.t==='lg') return lgName(ctx.id); if (ctx.t==='nt') return '국가대표 경기'; const c = Core.compById(ctx.id); return c ? c.name + (ctx.g!==undefined ? ' 조별리그' : ctx.third ? ' 3·4위전' : c.rl ? ' '+c.rl : '') : '대회'; }
+function compLabel(ctx) { if (ctx.t==='lg') return lgName(ctx.id); if (ctx.t==='fr') return '🤝 ' + (ctx.name || '친선경기'); if (ctx.t==='nt') return ctx.cat && ctx.cat !== 'A' ? `${ctx.cat} 대표팀 친선경기` : 'A매치 친선경기'; const c = Core.compById(ctx.id); return c ? c.name + (ctx.g!==undefined ? ' 조별리그' : ctx.third ? ' 3·4위전' : c.rl ? ' '+c.rl : '') : '대회'; }
 function nextFixture(clubId) {
   const G = G0(), m = Core.me(); const c = Core.clubOf(clubId), lg = Core.leagueOf(c.lg); let best = null;
   if (lg) for (let i=lg.ptr;i<lg.rd.length && !best;i++) { const r = lg.rd[i]; for (let k=0;k<r.ms.length;k++) { const [h,a] = r.ms[k]; if ((h===clubId||a===clubId) && (r.day + (k%2)) >= G.day) { best = { day: r.day + (k%2), h, a, label: `${lg.name} ${i+1}R` }; break; } } }
@@ -161,7 +161,7 @@ function offerModal(i) {
 }
 function offerCard(o, i) {
   const c = Core.clubOf(o.club), lg = Core.leagueOf(c.lg), tag = o.grad ? '입단 제안 (3월 1일까지)' : o.early ? '조기 프로 콜업' : o.kind==='pre' ? '자유계약 사전 협상 제안' : '영입 제안 · 구단 합의 완료';
-  return `<div class="card gl"><div class="dim">${tag}</div><b>${esc(c.name)}</b> <span class="dim">${lg?lg.name:''} · ${Core.stageOf(c)||''}</span><div class="dim">${c.kind==='pro'?`주급 ${won(o.wage)} · ${o.years}년${o.fee?` · 이적료 약 ${o.fee}억 원`:''}`:`${o.years}년 과정 · 전력 ${Math.round(c.strength)}`}</div>${c.kind==='pro'?`<div class="dim">${esc(Core.pitchOf(o).tag)} 제안</div>`:''}<div class="row g8"><button class="btn" data-act="ofd" data-id="${i}">상세 보기</button><button class="btn sec" data-act="dec" data-id="${i}">거절</button></div></div>`;
+  return `<div class="card gl"><div class="dim">${tag}</div><b>${esc(c.name)}</b> <span class="dim">${lg?lg.name:''} · ${Core.stageOf(c)||''}</span><div class="dim">${c.kind==='pro'?`주급 ${won(o.wage)} · ${o.years}년${o.fee?` · 이적료 약 ${o.fee}억 원`:''}`:`${o.years}년 과정 · 전력 ${Math.round(c.strength)}`}</div>${c.kind==='pro'?`<div class="dim">${esc(Core.pitchOf(o).tag)} 제안</div>`:''}${(() => { const a = c.kind==='pro' ? Core.agentNote(o) : null; return a ? `<div class="agn"><b>🕴️ 에이전트: ${a.verdict}</b>${a.lines.map(l => `<div class="dim">· ${esc(l)}</div>`).join('')}</div>` : ''; })()}<div class="row g8"><button class="btn" data-act="ofd" data-id="${i}">상세 보기</button><button class="btn sec" data-act="dec" data-id="${i}">거절</button></div></div>`;
 }
 function pendCard(m) {
   const pd = m.pending; if (!pd) return '';
@@ -213,6 +213,31 @@ function achCard(m) {
   const got = Object.keys(m.ach||{}); const all = Object.keys(Core.ACH);
   return `<div class="sec">업적 <span class="dim">${got.length}/${all.length}</span></div><div class="card">${all.map(id=>`<div class="li" style="opacity:${m.ach&&m.ach[id]?1:0.4}">${m.ach&&m.ach[id]?'🏅':'🔒'} <b>${Core.ACH[id][0]}</b> <span class="dim">${Core.ACH[id][1]}</span></div>`).join('')}</div>`;
 }
+function evtCard() {                                                                          // 개인 선택 이벤트
+  const e = Core.evtInfo(); if (!e) return '';
+  return `<div class="card gl"><b>${esc(e.t)}</b><div class="dim">${esc(e.q)}</div><div class="optsn">${e.o.map((o, i) => `<button class="opt" data-act="evt" data-id="${i}"><b>${esc(o[0])}</b></button>`).join('')}</div></div>`;
+}
+function snsCard(m) {
+  const L = (m.sns || []).slice(0, 4); if (!L.length) return '';
+  return `<div class="sec">💬 팬 반응 (SNS)</div><div class="card">${L.map(x => `<div class="li"><span class="dim">${Core.fmtDate(x.d).slice(5, 10)}</span> ${x.ok ? '👍' : '👎'} ${esc(x.t)}${x.r ? ` <span class="dim">(평점 ${x.r})</span>` : ''}</div>`).join('')}</div>`;
+}
+function rivalCard(m) {                                                                       // 동기 라이벌 비교
+  const I = Core.rivalInfo(); if (!I) return ''; const r = I.r, rc = Core.clubOf(r.club), mc = Core.clubOf(m.club), h = (m.rivalT && m.rivalT.h2h) || { w: 0, d: 0, l: 0 };
+  const row = (k, a, b, hi) => `<tr><td class="dim">${k}</td><td><b style="color:${hi === 1 ? '#C6F36B' : 'inherit'}">${a}</b></td><td><b style="color:${hi === -1 ? '#C6F36B' : 'inherit'}">${b}</b></td></tr>`, cmp = (a, b) => a > b ? 1 : a < b ? -1 : 0;
+  const ma = (m.awards || []).length;
+  return `<div class="sec">🆚 동기 라이벌</div><div class="card"><div class="row g8">${sprH(r, rc || mc, 28)}<div class="grow"><b>${esc(r.name)}</b> <span class="dim">${r.age}세 · ${Core.POS_KO[r.sub]} · ${rc ? esc(rc.name) : '-'}</span></div></div><table class="tb"><tr><th></th><th>나</th><th>라이벌</th></tr>${row('종합', m.ovr, r.ovr, cmp(m.ovr, r.ovr))}${row('잠재력', m.pot, r.pot, cmp(m.pot, r.pot))}${row('이번 시즌', `${m.st.a}경기 ${m.st.g}골 ${m.st.as}도움`, `${r.st.a}경기 ${r.st.g}골 ${r.st.as}도움`, cmp(m.st.g + m.st.as, r.st.g + r.st.as))}${row('통산', `${I.cm.a}경기 ${I.cm.g}골`, `${I.cr.a}경기 ${I.cr.g}골`, cmp(I.cm.g, I.cr.g))}${row('수상', ma + '회', I.rAw + '회', cmp(ma, I.rAw))}</table><div class="dim">맞대결 ${h.w}승 ${h.d}무 ${h.l}패 · 라이벌 팀과 경기하면 특별 연출이 나옵니다</div></div>`;
+}
+function offCard(m) {                                                                         // 비시즌 개인 일정
+  const I = Core.offInfo(); if (!I) return '';
+  if (I.act) { const A = Core.OFF_ACTS[I.act.id], left = Math.max(0, I.act.until - G0().day); return `<div class="card gl"><b>${A.ic} ${A.n} 중</b><div class="dim">${left ? left + '일 남음 — 진행하면 끝납니다' : '오늘 마무리됩니다'}</div></div>`; }
+  const btn = (id) => { const A = Core.OFF_ACTS[id], n = I.used[id] || 0, off = n >= A.max || (A.fame && m.fame < A.fame) || I.days < A.days; return `<button class="opt ${off ? 'dis' : ''}" data-act="offact" data-id="${id}"><b>${A.ic} ${A.n}</b><span class="dim s11">${A.d} · ${A.days}일 · ${n}/${A.max}</span></button>`; };
+  const last = m.lastAct && G0().day - m.lastAct.d < 6 ? `<div class="dim">최근: ${esc(m.lastAct.txt)}</div>` : '';
+  return `<div class="card"><div class="row"><b>🌴 비시즌 개인 일정</b><span class="tag">프리시즌까지 ${I.days}일</span></div><div class="dim">시즌이 끝났습니다. 남은 기간을 어떻게 보낼지 고르세요. 고르지 않으면 평소처럼 훈련합니다.</div>${last}<div class="optsn">${Object.keys(Core.OFF_ACTS).map(btn).join('')}</div></div>`;
+}
+function tourCard() {                                                                         // 감독 모드: 프리시즌 투어 선택
+  const P = G0().pre, m = Core.me(); if (!P || P.done || P.cid !== m.club) return '';
+  return `<div class="card gl"><b>✈️ 프리시즌 투어 선택</b><div class="dim">스폰서가 친선경기 3경기를 주최합니다. 일주일 안에 고르지 않으면 국내 친선전으로 정해집니다.</div><div class="optsn">${P.opts.map(o => `<button class="opt ${P.pick === o.id ? 'fav' : ''}" data-act="tour" data-id="${o.id}"><b>${esc(o.n)}</b><span class="dim s11">${esc(o.d)}${o.fee ? ` · 수익 약 ${(o.fee * 3).toFixed(1)}억` : ''}</span></button>`).join('')}</div>${P.pick ? `<div class="dim">선택: ${esc(P.opts.find(o => o.id === P.pick).n)} — 곧 일정이 확정됩니다.</div>` : ''}</div>`;
+}
 function homeView() {
   const G = G0(), m = Core.me(), c = Core.clubOf(m.club);
   const nf = nextFixture(m.club); let nx = '';
@@ -221,13 +246,14 @@ function homeView() {
   const offers = m.offers.map(offerCard).join('');
   const ren = m.renewal ? `<div class="card gl"><b>${esc(c.name)} 재계약 제안</b><div class="dim">주급 ${won(m.renewal.wage)} · ${m.renewal.years}년</div><div class="row g8"><button class="btn" data-act="ren">수락</button></div></div>` : '';
   const logs = m.log.slice(0,5).map(l => `<div class="li"><span class="dim">${Core.fmtDate(l[0]).slice(5,10)}</span> ${esc(l[1])}</div>`).join('') || '<div class="dim">아직 기록이 없습니다.</div>';
-  const inj = m.inj>0 ? `<div class="card warn">부상 중 · ${m.inj}일 남음</div>` : '';
+  const inj = (m.inj>0 ? `<div class="card warn">부상 중 · ${m.inj}일 남음</div>` : '') + (m.sus && (m.sus.c > 0 || m.sus.n > 0) ? `<div class="card warn">🟥 출전 정지 · ${m.sus.c > 0 ? `클럽 경기 ${m.sus.c}경기` : ''}${m.sus.c > 0 && m.sus.n > 0 ? ' · ' : ''}${m.sus.n > 0 ? `대표팀 ${m.sus.n}경기` : ''} 남음</div>` : '') + (m.yc && m.yc.c >= 3 ? `<div class="card">🟨 경고 ${m.yc.c}회 누적 — 5회가 되면 1경기 출전 정지</div>` : '');
   const cu = m.callup ? `<div class="card gl">${esc(m.callup.name)} 소집 중 — 대표팀 경기를 앞두고 있습니다.</div>` : '';
   const stage = Core.stageOf(c);
   const feel = m.inj>0 ? '😣 부상 중이에요' : m.fat>75 ? '😮‍💨 많이 지쳤어요' : m.mor>=75 ? '😄 컨디션 최고!' : m.mor<45 ? '😟 사기가 낮아요' : '🙂 준비됐어요';
   const hero = `<div class="card hero"><div class="herochar">${sprH(m, c, 46, m.plan==='rest'?'sleepy':m.inj>0?'':'train')}</div><div><div class="dim">${feel}</div><div><b>${esc(m.name)}</b> <span class="dim">종합 ${m.ovr} · ${m.plan==='rest'?'휴식 중':'훈련 중'}</span></div></div></div>`;
   const meet = m.meet ? `<div class="card gl"><div class="row"><b>감독 면담 요청</b><span class="tag">${esc(m.meet.coach)}</span></div><div class="dim">${esc(m.meet.title)} — 감독이 불렀습니다.</div><button class="btn wide" data-act="meet">면담하러 가기</button></div>` : '';
-  return topbar() + `<div class="body">${hero}${meet}${inj}${cu}${pendCard(m)}${offers}${ren}${nx}
+  const fw = m.fat >= 75 && m.plan !== 'rest' ? `<div class="card warn"><b>😮‍💨 피로 ${Math.round(m.fat)} — 부상 위험</b><div class="dim">피로가 75를 넘으면 성장이 절반으로 줄고 선발 확률이 떨어집니다.${m.autoRest !== false ? ' 자동 관리가 켜져 있어 80부터 알아서 쉽니다.' : ''}</div><button class="btn sec wide" data-act="plan" data-id="rest">오늘부터 휴식으로 바꾸기</button></div>` : '';
+  return topbar() + `<div class="body">${hero}${meet}${fw}${evtCard()}${offCard(m)}${inj}${cu}${pendCard(m)}${offers}${ren}${nx}${snsCard(m)}
   <div class="tiles">${tile('종합',m.ovr,'잠재 '+m.pot)}${tile('피로',Math.round(m.fat),m.fat>70?'위험':'양호',m.fat>70?'#FFB27A':'#C6F36B')}${tile('사기',Math.round(m.mor),'')}${tile('신뢰',Math.round(m.trust),m.trust<45?'부족':'보통')}</div>
   <div class="dim">현재 단계: ${stage==='프로' ? '프로 · '+lgName(c.lg) : lgName(c.lg)}</div>
   <div class="sec">오늘 훈련 <span class="dim">매일 적용</span></div><div class="opts">${plans}</div>${m.plan==='custom'?custPick(m):''}${trainCard(m)}<div class="card lnk" data-act="gogrow"><b>역할·멘토·잠재력 보기</b><span class="dim">내 선수 › 성장 ›</span></div>
@@ -274,7 +300,7 @@ function compView() {
   const comp = list.find(c=>c.id===S.cv);
   let h = `<div class="chips">${list.map(c=>`<button class="chip s ${S.cv===c.id?'on':''}" data-act="cv" data-id="${c.id}">${esc(c.name)}</button>`).join('')}</div>`;
   h += `<div class="card"><div class="row"><b>${esc(comp.name)}</b><span class="tag">${esc(comp.season)}</span></div>${comp.win!==null?`<div>우승 ${clubLink(comp.win)}</div>`:`<div class="dim">현재: ${esc(comp.rl||'')}</div>`}</div>`;
-  if (comp.kind==='cont' && comp.groups.length) h += comp.groups.map((g,i) => { const tb = g.teams.slice().sort((x,y)=>{ const a=g.table[x], b=g.table[y]; return (b.pts-a.pts)||((b.gf-b.ga)-(a.gf-a.ga))||(b.gf-a.gf); }); return `<div class="sec">${String.fromCharCode(65+i)}조</div><table class="tb"><tr><th></th><th>팀</th><th>경기</th><th>득실</th><th>승점</th></tr>${tb.map((id,k)=>`<tr class="${id===Core.me().club?'hl':''}"><td>${k+1}</td><td>${clubLink(id)}</td><td>${g.table[id].p}</td><td>${g.table[id].gf-g.table[id].ga}</td><td><b>${g.table[id].pts}</b></td></tr>`).join('')}</table>`; }).join('');
+  if ((comp.kind==='cont' || comp.kind==='nc') && comp.groups.length) h += comp.groups.map((g,i) => { const tb = g.teams.slice().sort((x,y)=>{ const a=g.table[x], b=g.table[y]; return (b.pts-a.pts)||((b.gf-b.ga)-(a.gf-a.ga))||(b.gf-a.gf); }); return `<div class="sec">${String.fromCharCode(65+i)}조</div><table class="tb"><tr><th></th><th>팀</th><th>경기</th><th>득실</th><th>승점</th></tr>${tb.map((id,k)=>`<tr class="${id===Core.me().club?'hl':''}"><td>${k+1}</td><td>${clubLink(id)}</td><td>${g.table[id].p}</td><td>${g.table[id].gf-g.table[id].ga}</td><td><b>${g.table[id].pts}</b></td></tr>`).join('')}</table>`; }).join('');
   if (comp.ties.length) h += `<div class="sec">${esc(comp.rl)}</div>` + comp.ties.map(tieRow).join('');
   const sc = Object.keys(comp.sc).map(id => [G.players[id], comp.sc[id]]).filter(x=>x[0]).sort((a,b)=>b[1]-a[1]).slice(0,8);
   if (sc.length) h += `<div class="sec">득점 순위</div><table class="tb">${sc.map(([p,g],i)=>`<tr><td>${i+1}</td><td>${pLink(p)}</td><td>${clubLink(p.club)}</td><td><b>${g}</b></td></tr>`).join('')}</table>`;
@@ -291,15 +317,24 @@ function natView() {
   const rec = m.nst.a>0 ? `대표팀 ${m.nst.a}경기 ${m.nst.g}골` : '대표팀 경기 기록 없음';
   return `<div class="card"><div class="row"><b>${Core.NATK(nat)} 대표팀</b><span class="tag">${m.callup?m.callup.name+' 소집':'소집 대기'}</span></div><div class="dim">${rec}${next?` · 다음 소집 ${Core.fmtDate(next)}`:''}</div><div class="dim">U15·U17·U20·U23·A대표 — 활약과 종합 능력치가 상위권이면 자동으로 소집됩니다.</div></div>
   <div class="sec">${Core.NATK(nat)} 선수 상위 16 (A대표 후보)</div><table class="tb"><tr><th>선수</th><th>팀</th><th>나이</th><th>종합</th></tr>${pl.map(p=>`<tr><td>${pLink(p)}</td><td>${clubLink(p.club)}</td><td>${p.age}</td><td>${p.ovr}</td></tr>`).join('')}</table>
-  <div class="sec">최근 대표팀 결과</div><div class="card">${log}</div>`;
+  ${ntQView(nat)}<div class="sec">최근 대표팀 결과</div><div class="card">${log}</div>`;
+}
+function ntQView(nat) {                                                                        // 국가대항전: 다음 본선 · 예선 순위 · 대표팀 커리어
+  const nx = Core.ntNext(), cf = Core.confOf(nat), m = Core.me(), T = G0().ntTour;
+  const title = nx.wc ? `${nx.y} 월드컵` : `${nx.y} ${Core.NC_NAME[cf] || '대륙컵'}`;
+  const tb = Core.qTable(cf), rows = tb.slice(0, 10).map((r, i) => `<tr class="${r.nat === nat ? 'hl' : ''}"><td>${i + 1}</td><td>${Core.FLAG[r.nat] || ''} ${esc(Core.NATK(r.nat))}</td><td>${r.p}</td><td>${r.w}-${r.d}-${r.l}</td><td><b>${r.pts}</b></td></tr>`).join('');
+  const now = T ? `<div class="card gl"><b>🏆 ${T.y} ${T.wc ? '월드컵' : '대륙컵'} 진행 중</b><div class="dim">'대회' 탭에서 조별리그·토너먼트를 볼 수 있습니다.</div></div>` : '';
+  const hist = (m.ntHist || []).slice(-5).reverse().map(h => `<div class="li dim">${h[0]} ${esc(h[1])} — <b>${esc(h[2])}</b></div>`).join('');
+  return `${now}<div class="sec">${esc(title)} ${T ? '' : '예선'} <span class="dim">(${nx.y}년 6월 본선 · A매치 기간 같은 대륙끼리 예선)</span></div>${rows ? `<table class="tb"><tr><th>#</th><th>나라</th><th>경기</th><th>승무패</th><th>승점</th></tr>${rows}</table>` : '<div class="dim">아직 예선 경기가 없습니다.</div>'}${hist ? `<div class="sec">내 국가대항전 기록</div><div class="card">${hist}</div>` : ''}`;
 }
 function leagueView() {
   const G = G0(), me = Core.me(), mc = Core.clubOf(me.club);
   if (!S.lc) S.lc = mc.cc || G.sel[0];
-  const ctop = G.sel.map(c=>`<button class="chip ${S.lc===c?'on':''}" data-act="lc" data-id="${c}">${Core.FLAG[c]||''} ${CO[c].name}</button>`).join('') + `<button class="chip ${S.lc==='_C'?'on':''}" data-act="lc" data-id="_C">대회</button><button class="chip ${S.lc==='_N'?'on':''}" data-act="lc" data-id="_N">대표팀</button>`;
+  const ctop = G.sel.map(c=>`<button class="chip ${S.lc===c?'on':''}" data-act="lc" data-id="${c}">${Core.FLAG[c]||''} ${CO[c].name}</button>`).join('') + `<button class="chip ${S.lc==='_C'?'on':''}" data-act="lc" data-id="_C">대회</button><button class="chip ${S.lc==='_N'?'on':''}" data-act="lc" data-id="_N">대표팀</button><button class="chip ${S.lc==='_H'?'on':''}" data-act="lc" data-id="_H">🏛 명예의 전당</button>`;
   let inner = '', sub = '', head = '';
   if (S.lc==='_C') inner = compView();
   else if (S.lc==='_N') inner = natView();
+  else if (S.lc==='_H') inner = hallView();
   else {
     const TO = { 1:0, 2:1, U:2, Y:3 };
     const lgs = G.leagues.filter(l=>l.cc===S.lc).slice().sort((a,b) => (TO[a.tier] ?? 9) - (TO[b.tier] ?? 9));
@@ -308,11 +343,12 @@ function leagueView() {
     const lg = Core.leagueOf(S.ld); const lts = [['table','순위'],['team','팀 기록'],['g',IC.ball+' 득점'],['as',IC.boot+' 도움'],['rt',IC.star+' 평점'],['hist','역대']];
     sub = `<div class="chips">${lgs.map(l=>`<button class="chip s ${S.ld===l.id?'on':''}" data-act="ld" data-id="${l.id}">${DIVN(l)}</button>`).join('')}</div><div class="chips">${lts.map(([i,n])=>`<button class="chip s ${S.lt===i?'on':''}" data-act="lt" data-id="${i}">${n}</button>`).join('')}</div>`;
     if (S.sea != null && !lg.hist[S.sea]) S.sea = null;
-    const hs = lg.hist.length && S.lt!=='hist' ? `<div class="chips">${['이번 시즌'].concat(lg.hist.map(h=>h.season)).map((n,i)=>`<button class="chip s ${(S.sea==null?0:S.sea+1)===i?'on':''}" data-act="lsea" data-id="${i-1}">${n}</button>`).join('')}</div>` : '';
+    const hs = lg.hist.length && S.lt!=='hist' ? `<div class="chips">${['이번 시즌'].concat(lg.hist.map(h=>h.season)).map((n,i)=>`<button class="chip s ${(S.sea==null?(!S.seaUser && S.lt!=='hist' && Object.values(lg.table||{}).every(t=>!t.p) ? lg.hist.length : 0):S.sea+1)===i?'on':''}" data-act="lsea" data-id="${i-1}">${n}</button>`).join('')}</div>` : '';
     sub += hs;
-    const past = S.sea != null && S.lt!=='hist' ? lg.hist[S.sea] : null;
-    inner = past ? pastView(lg, past, S.lt) : S.lt==='table' ? tableView(lg) : S.lt==='team' ? teamView(lg) : S.lt==='hist' ? (lg.hist.length ? lg.hist.map((h,i)=>[h,i]).reverse().map(([h,i]) => `<div class="card" data-act="lsea" data-id="${i}" style="cursor:pointer"><b>${h.season}</b> 우승 ${clubLink(h.champ)} <span class="dim" style="float:right">상세 ›</span><div class="dim">${h.top?`득점왕 ${esc(h.top[0])} ${h.top[1]}골`:''}${h.mvp?` · ${IC.crown} MVP ${esc(h.mvp[0])}`:''}</div></div>`).join('') : '<div class="dim">아직 끝난 시즌이 없습니다.</div>') : listView(lg, S.lt);
-    head = past ? `<div class="dim">${lg.name} · ${past.season} 시즌 최종${past.n?` · ${past.n}경기`:''}</div>` : `<div class="dim">${lg.name} · ${Math.min(lg.ptr,lg.rd.length)}/${lg.rd.length}라운드</div>`;
+    const fresh = lg.hist.length && Object.values(lg.table || {}).every(t => !t.p), autoPast = S.sea == null && !S.seaUser && fresh && S.lt!=='hist';
+    const past = S.sea != null && S.lt!=='hist' ? lg.hist[S.sea] : autoPast ? lg.hist[lg.hist.length - 1] : null;
+    inner = past ? pastView(lg, past, S.lt) : S.lt==='table' ? tableView(lg) : S.lt==='team' ? teamView(lg) : S.lt==='hist' ? (lg.hist.length ? lg.hist.map((h,i)=>[h,i]).reverse().map(([h,i]) => `<div class="card" data-act="lsea" data-id="${i}" style="cursor:pointer"><b>${h.season}</b> 우승 ${clubLink(h.champ)} <span class="dim" style="float:right">상세 ›</span><div class="dim">${h.top?`득점왕 ${esc(h.top[0])} ${h.top[1]}골`:''}${h.mvp?` · ${IC.crown} MVP ${esc(h.mvp[0])}`:''}${h.aw && h.aw.young?` · 🌱 영플레이어 ${esc(h.aw.young[0])}`:''}${h.aw && h.aw.ast?` · 🅰 도움왕 ${esc(h.aw.ast[0])}`:''}</div>${h.aw && h.aw.b11 && h.aw.b11.length ? `<div class="dim s11">베스트11: ${h.aw.b11.map(r => esc(r[0])).join(', ')}</div>` : ''}</div>`).join('') : '<div class="dim">아직 끝난 시즌이 없습니다.</div>') : listView(lg, S.lt);
+    head = past ? `<div class="dim">${autoPast ? '새 시즌 개막 전 · ' : ''}${lg.name} · ${past.season} 시즌 최종${past.n?` · ${past.n}경기`:''}</div>` : `<div class="dim">${lg.name} · ${Math.min(lg.ptr,lg.rd.length)}/${lg.rd.length}라운드</div>`;
   }
   return `<div class="top"><div class="ttl">순위·대회</div>${head}</div><div class="chips">${ctop}</div>${sub}<div class="body">${inner}</div>`;
 }
@@ -336,11 +372,24 @@ function subChips(cur, tabs, act) { return `<div class="chips">${tabs.map(([i,n]
 function meView() {
   const m = Core.me(), tr = Core.TRAITS[m.trait] || Core.TRAITS.grinder; let body = '';
   const pf = (m.prefs||[]).map(x => (Core.PREFS[x]||{}).n).filter(Boolean);
-  if (S.mt==='prof') body = `${profileHTML(m)}<div class="card"><div class="row"><b>신체·성향</b><span class="tag">${tr.n}</span></div><div class="dim">키 ${m.h||178}cm · 선호 플레이: ${pf.length?pf.join(', '):'없음'}</div><div class="dim">${tr.d}</div></div>`;
-  else if (S.mt==='grow') body = `${roleCard(m)}${potCard(m)}${mentorCard(m)}`;
+  if (S.mt==='prof') body = `${profileHTML(m)}${m.age >= 32 ? `<div class="card"><div class="row"><b>현역 은퇴</b><button class="btn sm sec" data-act="retire">은퇴하기</button></div><div class="dim">은퇴하면 명예의 전당에 오르고, 같은 세계에서 감독으로 이어서 할 수 있습니다.</div></div>` : ''}${(m.b11n || 0) ? `<div class="card"><b>⭐ 시즌 베스트11 ${m.b11n}회</b></div>` : ''}${(m.awards || []).length ? `<div class="card"><b>🏆 수상 경력</b>${m.awards.slice().reverse().map(a => `<div class="li dim">${esc(a[0])} ${esc(a[1])} — <b>${esc(a[2])}</b></div>`).join('')}</div>` : ''}<div class="card"><div class="row"><b>신체·성향</b><span class="tag">${tr.n}</span></div><div class="dim">키 ${m.h||178}cm · 선호 플레이: ${pf.length?pf.join(', '):'없음'}</div><div class="dim">${tr.d}</div></div>`;
+  else if (S.mt==='grow') body = `${growCard(m)}${rivalCard(m)}${roleCard(m)}${potCard(m)}${mentorCard(m)}`;
   else if (S.mt==='fin') body = finCard(m);
   else body = `${achCard(m)}${meetLogCard(m)}`;
   return `<div class="top"><div class="ttl">내 선수</div></div>${subChips(S.mt, ME_TABS, 'mt')}<div class="body">${body}</div>`;
+}
+function growCard(m) {                                                                      // 성장 그래프: 월별 종합 능력치 + 처음 대비 많이 오른 능력치
+  try { Core.ovrSnap(m); } catch (e) {}
+  const h = (m.ovrH || []).slice(); if (h.length < 2) return `<div class="sec">성장 그래프</div><div class="card dim">한 달이 지나면 성장 기록이 쌓이기 시작합니다. (현재 종합 ${m.ovr})</div>`;
+  const d0 = h[0][0], d1 = Math.max(d0 + 1, h[h.length - 1][0]), vmin = Math.min(...h.map(x => x[1])), vmax = Math.max(...h.map(x => x[1])), span = Math.max(8, vmax - vmin), lo = Math.max(0, vmin - Math.ceil(span * 0.25)), hi = Math.min(99, Math.max(vmax + Math.ceil(span * 0.25), (m.pot || 0) <= vmax + span ? (m.pot || 0) + 1 : 0));
+  const X = d => 8 + (d - d0) / (d1 - d0) * 88, Y = v => 56 - (v - lo) / Math.max(1, hi - lo) * 50;
+  const pts = h.map(x => `${X(x[0]).toFixed(1)},${Y(x[1]).toFixed(1)}`).join(' ');
+  const yrs = []; { let py = null; h.forEach(x => { const y = Core.dateOf ? Core.dateOf(x[0]).y : null; if (y != null && y !== py) { yrs.push([x[0], y]); py = y; } }); }
+  const potY = m.pot && m.pot <= hi ? Y(m.pot) : null;
+  const svg = `<svg viewBox="0 0 100 64" class="gchart" preserveAspectRatio="none" style="width:100%;height:150px;background:var(--c2,#14241a);border-radius:10px"><g stroke="#ffffff" stroke-opacity=".12" stroke-width=".3">${[0, 1, 2, 3].map(i => `<line x1="8" x2="98" y1="${6 + i * 16.67}" y2="${6 + i * 16.67}"/>`).join('')}</g>${potY == null && m.pot ? `<text x="97" y="9" font-size="3.2" fill="#FFB27A" text-anchor="end">잠재력 ${m.pot} ↑</text>` : ''}${potY != null ? `<line x1="8" x2="98" y1="${potY.toFixed(1)}" y2="${potY.toFixed(1)}" stroke="#FFB27A" stroke-width=".4" stroke-dasharray="1.5 1.2"/><text x="97" y="${(potY - 1.2).toFixed(1)}" font-size="3.2" fill="#FFB27A" text-anchor="end">잠재력 ${m.pot}</text>` : ''}<polyline points="${pts}" fill="none" stroke="#C6F36B" stroke-width=".9" stroke-linejoin="round"/>${h.length < 40 ? h.map(x => `<circle cx="${X(x[0]).toFixed(1)}" cy="${Y(x[1]).toFixed(1)}" r=".9" fill="#C6F36B"/>`).join('') : ''}<text x="1" y="${(Y(hi) + 3).toFixed(1)}" font-size="3.2" fill="#9fb3a6">${hi}</text><text x="1" y="${Y(lo).toFixed(1)}" font-size="3.2" fill="#9fb3a6">${lo}</text>${yrs.map(([d, y]) => `<text x="${X(d).toFixed(1)}" y="63" font-size="3" fill="#9fb3a6">${y}</text>`).join('')}</svg>`;
+  const a0 = m.a0 || {}, ups = Object.keys(m.a || {}).map(k => [k, (m.a[k] || 0) - (a0[k] == null ? m.a[k] : a0[k])]).filter(x => x[1] !== 0).sort((a, b) => b[1] - a[1]);
+  const chip = ([k, v]) => `<span class="tag ${v < 0 ? 'warn' : ''}">${AT_KO[k] || k} ${v > 0 ? '+' : ''}${v}</span>`;
+  return `<div class="sec">성장 그래프</div><div class="card">${svg}<div class="dim" style="margin-top:6px">시작 ${h[0][1]} → 현재 ${m.ovr} (${m.ovr - h[0][1] >= 0 ? '+' : ''}${m.ovr - h[0][1]})</div>${ups.length ? `<div class="dim" style="margin-top:6px">가장 많이 오른 능력치</div><div class="row g8 wrapx">${ups.slice(0, 5).map(chip).join('')}</div>${ups.filter(x => x[1] < 0).length ? `<div class="dim" style="margin-top:6px">떨어진 능력치</div><div class="row g8 wrapx">${ups.filter(x => x[1] < 0).slice(-3).map(chip).join('')}</div>` : ''}` : ''}</div>`;
 }
 function meetLogCard(m) {
   const l = (m.meetLog||[]).map(x=>`<div class="li"><span class="dim">${Core.fmtDate(x.d).slice(5,10)}</span> <b>${esc(x.title)}</b><div class="dim">나: ${esc(x.pick)}</div><div class="dim">감독: ${esc(x.resp)} (${x.fx})</div></div>`).join('') || '<div class="dim">아직 면담 기록이 없습니다.</div>';
@@ -418,6 +467,7 @@ function sfx(n) {
     else if (n === 'save') { noiseBurst(t, 0.18, 0.25, 1800); tone(220, t, 0.14, 'triangle', 0.1, 120); }
     else if (n === 'shot') { noiseBurst(t, 0.12, 0.2, 900); tone(160, t, 0.1, 'triangle', 0.09, 90); }
     else if (n === 'coin') { tone(988, t, 0.09, 'square', 0.06); tone(1319, t + 0.09, 0.22, 'square', 0.06); }
+    else if (n === 'crowd') { noiseBurst(t, 2.6, 0.2, 500, 1100); noiseBurst(t + 0.6, 2.0, 0.14, 900, 1400); }
     else if (n === 'trophy') { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, t + i * 0.12, 0.3, 'triangle', 0.14)); noiseBurst(t + 0.4, 1.6, 0.25, 900, 1600); }
   } catch (e) {}
 }
@@ -441,7 +491,7 @@ function bgmApply() {
 }
 function sndSet(k, on) { SND[k] = on; try { localStorage.setItem('bfm_' + k, on ? '1' : '0'); } catch (e) {} if (k === 'bgm') bgmApply(); }
 function settingsModal() {
-  return `<div class="ttl">설정</div><div class="sec">저장·불러오기</div><div class="dim">자동 저장은 매 진행마다 이뤄집니다. 칸에 따로 저장해 두면 되돌릴 수 있어요.</div>${slotRows(true)}<div class="sec">백업 코드</div><div class="dim">앱을 지우고 다시 설치할 때를 대비해 코드를 복사해 두세요(메모 앱 등에 붙여넣기). 새로 설치한 뒤 아래 칸에 붙여넣고 복원하면 이어서 할 수 있습니다.</div><textarea id="bkbox" rows="3" style="width:100%;background:#101814;color:#EAF1EC;border:1px solid #2A3A30;border-radius:10px;padding:8px;font-size:11px" placeholder="백업 코드"></textarea><div class="row g8"><button class="btn sec" data-act="bkcopy" style="flex:1">백업 코드 복사</button><button class="btn sec" data-act="bkrestore" style="flex:1">코드로 복원</button></div><div class="sec">글자·버튼 크기</div><div class="row g8">${FS_OPT.map(([v,n])=>`<button class="btn ${fsGet()===v?'':'sec'}" data-act="fs" data-id="${v}" style="flex:1">${n}</button>`).join('')}</div><div class="dim">경기 화면 필드는 그대로, 메뉴·목록·버튼 크기만 바뀝니다.</div><div class="sec">소리</div><div class="row g8"><button class="btn ${SND.sfx?'':'sec'}" data-act="snd" data-id="sfx" style="flex:1">효과음 ${SND.sfx?'ON':'OFF'}</button><button class="btn ${SND.bgm?'':'sec'}" data-act="snd" data-id="bgm" style="flex:1">배경음악 ${SND.bgm?'ON':'OFF'}</button></div><div class="dim">경기 중에는 배경음악이 잠시 멈추고 경기 소리만 나옵니다.</div><div class="sec">업데이트</div><div class="row g8" style="align-items:center"><div class="grow">현재 버전 <b>v${APP_VER}</b>${updNewer() ? ` <span class="tag">새 버전 v${esc(String(UPD.info.ver || ''))}</span>` : ''}</div><button class="btn sec" data-act="updchk">업데이트 확인</button></div><div class="dim">게임을 켤 때 새 버전이 있는지 자동으로 확인하고 알려드려요. 인터넷이 없으면 조용히 넘어갑니다.</div><div class="sec">게임</div><button class="btn sec wide" data-act="reset">새 게임 시작</button>`;
+  return `<div class="ttl">설정</div><div class="sec">저장·불러오기</div><div class="dim">자동 저장은 매 진행마다 이뤄집니다. 칸에 따로 저장해 두면 되돌릴 수 있어요.</div>${slotRows(true)}<div class="sec">백업 코드</div><div class="dim">앱을 지우고 다시 설치할 때를 대비해 코드를 복사해 두세요(메모 앱 등에 붙여넣기). 새로 설치한 뒤 아래 칸에 붙여넣고 복원하면 이어서 할 수 있습니다.</div><textarea id="bkbox" rows="3" style="width:100%;background:#101814;color:#EAF1EC;border:1px solid #2A3A30;border-radius:10px;padding:8px;font-size:11px" placeholder="백업 코드"></textarea><div class="row g8"><button class="btn sec" data-act="bkcopy" style="flex:1">백업 코드 복사</button><button class="btn sec" data-act="bkrestore" style="flex:1">코드로 복원</button></div><div class="sec">글자·버튼 크기</div><div class="row g8">${FS_OPT.map(([v,n])=>`<button class="btn ${fsGet()===v?'':'sec'}" data-act="fs" data-id="${v}" style="flex:1">${n}</button>`).join('')}</div><div class="dim">경기 화면 필드는 그대로, 메뉴·목록·버튼 크기만 바뀝니다.</div><div class="sec">소리</div><div class="row g8"><button class="btn ${SND.sfx?'':'sec'}" data-act="snd" data-id="sfx" style="flex:1">효과음 ${SND.sfx?'ON':'OFF'}</button><button class="btn ${SND.bgm?'':'sec'}" data-act="snd" data-id="bgm" style="flex:1">배경음악 ${SND.bgm?'ON':'OFF'}</button></div><div class="dim">경기 중에는 배경음악이 잠시 멈추고 경기 소리만 나옵니다.</div><div class="sec">업데이트</div><div class="row g8" style="align-items:center"><div class="grow">현재 버전 <b>v${APP_VER}</b>${updNewer() ? ` <span class="tag">새 버전 v${esc(String(UPD.info.ver || ''))}</span>` : ''}</div><button class="btn sec" data-act="updchk">업데이트 확인</button></div><div class="dim">게임을 켤 때 새 버전이 있는지 자동으로 확인하고 알려드려요. 인터넷이 없으면 조용히 넘어갑니다.</div>${(() => { try { const g = G0(); if (!g || g.mode === 'mgr' || g.me == null) return ''; const m = Core.me(); const on = m.autoRest !== false; return `<div class="sec">선수 관리</div><div class="row g8" style="align-items:center"><div class="grow"><b>피로 자동 관리</b><div class="dim">피로가 80을 넘으면 55까지 자동으로 쉬어 갑니다.</div></div><button class="btn ${on ? '' : 'sec'}" data-act="autorest">${on ? 'ON' : 'OFF'}</button></div>`; } catch (e) { return ''; } })()}<div class="sec">게임</div><button class="btn sec wide" data-act="reset">새 게임 시작</button><div class="sec">사업자 정보</div><div class="card bizinfo"><div class="ddak l">${ddakLogo(34)}<b>딱알 솔루션</b></div><div class="dim">상호: 딱알 솔루션 | 대표: 양문희</div><div class="dim">사업자등록번호: 798-17-02137</div><div class="dim">통신판매업 신고: 제2024-광주동구-0120호</div><div class="dim">주소: 광주 동구 선교로 38-33 (선교동, 선교2차 우방아이유쉘 리포레) 207-1002</div><div class="dim">전화: 010-5642-4272 | 이메일: huraimuni@naver.com</div></div>`;
 }
 function teamView(lg) {
   const G = G0(), me = Core.me();
@@ -476,6 +526,7 @@ function clubModal(id) {
   } else {
     const rows = hist.slice().reverse().map(h => { const rk = h.table.findIndex(r => r[0] === id) + 1; return `<tr><td>${esc(h.season)}</td><td><b>${rk}위</b>${rk === 1 ? ' 🏆' : ''}</td><td>${h.table[rk - 1][1]}점</td><td>${clubLink(h.champ)}</td></tr>`; }).join('');
     body = `<div class="sec">시즌별 성적</div>${rows ? `<table class="tb"><tr><th>시즌</th><th>순위</th><th>승점</th><th>우승팀</th></tr>${rows}</table>` : '<div class="dim">아직 지난 시즌 기록이 없습니다. 시즌이 끝나면 쌓입니다.</div>'}`;
+    if ((c.legends || []).length) body = `<div class="sec">🏛️ 구단 레전드 · 영구결번</div><div class="card">${c.legends.slice().reverse().map(l => `<div class="li"><span class="tag">#${l.no}</span> <b>${esc(l.name)}</b>${l.me ? ' <span class="tag">나</span>' : ''} <span class="dim">${l.s}시즌 ${l.a}경기 ${l.g}골 · ${l.y}년 은퇴</span></div>`).join('')}</div>` + body;
     if (isMine && G.mode === 'mgr' && G.mgr.seasons.length) body += `<div class="sec">감독 기록</div><div class="card">${G.mgr.seasons.slice().reverse().map(s => `<div class="li">${esc(s.season)} · ${esc(s.club)} ${s.rank}위 (목표 ${s.target}위) <span class="tag ${s.ok ? '' : 'warn'}">${s.ok ? '달성' : '미달'}</span></div>`).join('')}</div>`;
   }
   return hero + tm + `<div class="crow2"><span class="dim">최근 5경기</span><span class="fds">${frm}</span></div>` + tabs + body;
@@ -584,11 +635,29 @@ function pickKits(M, pt) {
   const mh = M.mineHome; return { m: mh ? hk : ak, o: mh ? ak : hk, gk: { m: mh ? hg : ag, o: mh ? ag : hg }, away: away ? (mh ? 'o' : 'm') : null };
 }
 const kitClub = (club, kit) => ({ id: 'k' + club.id + kit[0], name: club.name, col: kit[0], col2: kit[1] });
+// ---- 심판: 주심 1명(공을 따라 대각선으로 이동) + 부심 2명(터치라인, 각자 반쪽 담당) ----
+function susTag(p) { const s = p && p.sus; if (!s) return ''; const n = (G.wc ? s.n : s.c) || 0; return n > 0 ? ` <span class="tag warn">🟥 징계 ${n}경기</span>` : (p.yc && (G.wc ? p.yc.n : p.yc.c) >= (G.wc ? 1 : 4) ? ` <span class="tag">🟨${G.wc ? p.yc.n : p.yc.c}</span>` : ''); }
+function refCol() { const K = MV.kit, av = [K.m[0], K.o[0], K.gk.m, K.gk.o, MV.pitch.base]; return ['#1A1A1A', '#F2E14C', '#E94F9E', '#2BD9C5', '#FF8A3D'].sort((x, y) => Math.min(...av.map(c => cdist(y, c))) - Math.min(...av.map(c => cdist(x, c))))[0]; }
+function refHTML() { const c = refCol(), ol = c === '#1A1A1A' ? '#fff' : '#000';
+  const fig = (id, s, flag) => `<g id="${id}" transform="translate(50 32)"><g transform="scale(${s})"><rect x="-1.4" y="-1.4" width="2.8" height="2.9" fill="${c}" stroke="${ol}" stroke-width="0.28"/><rect x="-1.1" y="-4" width="2.2" height="2.3" fill="#E8B98C" stroke="${ol}" stroke-width="0.22"/><rect x="-1.1" y="-4" width="2.2" height="0.8" fill="#2B2420"/><rect x="-1.2" y="1.5" width="1" height="1.5" fill="#111"/><rect x="0.2" y="1.5" width="1" height="1.5" fill="#111"/>${flag ? '<path d="M1.6 -3.2 V0.4" stroke="#333" stroke-width=".3"/><rect x="1.6" y="-3.2" width="1.6" height="1.1" fill="#FF5A2E"/>' : ''}</g>${id === 'refM' ? '<rect id="refC" x="-0.9" y="-8.4" width="1.8" height="2.5" rx=".2" fill="#F2D21B" stroke="#000" stroke-width=".25" opacity="0"/>' : ''}</g>`;
+  return fig('refA1', .62, 1) + fig('refA2', .62, 1) + fig('refM', .7, 0); }
+function refStep(M, dt) {                                                                  // 심판 위치 갱신(매 프레임)
+  const b = MV.ball; if (!MV.ref) MV.ref = { x: 44, y: 40, a1: 50, a2: 50 }; const R = MV.ref;
+  const d = MV.poss === 'o' ? -dM_(M) : dM_(M); let tx = b.x - d * 9, ty = b.y + (b.y < 32 ? 11 : -11);
+  if (MV.sp) { tx = MV.sp.sx - MV.sp.d * 7; ty = MV.sp.sy + (MV.sp.sy < 32 ? 8 : -8); }
+  const rc = MV.refCard; if (rc && rc.until > MV.t) { const st = rc.ms ? MV.mst : MV.ost, i = st.indexOf(rc.p), q = i >= 0 && MV.pos[rc.ms ? 'm' : 'o'][i]; if (q) { tx = q.x + 3; ty = q.y + 1; } }
+  if (MV.over || MV.goalRes || MV.cele) { tx = 50 - dM_(M) * 4; ty = 40; }
+  tx = clampN(tx, 4, 96); ty = clampN(ty, 4, 60); const dx = tx - R.x, dy = ty - R.y, dd = Math.hypot(dx, dy), v = Math.min(dd, (dd > 10 ? 13 : 8) * dt); if (dd > 0.05) { R.x += dx / dd * v; R.y += dy / dd * v; }
+  const tA1 = clampN(b.x, 50, 98), tA2 = clampN(b.x, 2, 50); R.a1 += clampN(tA1 - R.a1, -10 * dt, 10 * dt); R.a2 += clampN(tA2 - R.a2, -10 * dt, 10 * dt);
+  const E = MV.refEl || (MV.refEl = { m: document.getElementById('refM'), a1: document.getElementById('refA1'), a2: document.getElementById('refA2'), c: document.getElementById('refC') });
+  if (E.m) E.m.setAttribute('transform', `translate(${R.x.toFixed(2)} ${R.y.toFixed(2)})`); if (E.a1) E.a1.setAttribute('transform', `translate(${R.a1.toFixed(2)} 63.2)`); if (E.a2) E.a2.setAttribute('transform', `translate(${R.a2.toFixed(2)} 1.6)`);
+  if (E.c) { const on = rc && rc.until > MV.t; E.c.setAttribute('opacity', on ? '1' : '0'); if (on) E.c.setAttribute('fill', rc.c === 'r' ? '#E0262F' : '#F2D21B'); }
+}
 function pitchHTML(M) {
   const dots = (st, col0, pre) => st.map((p,i) => { const col = p.sub === 'GK' ? MV.kit.gk[pre] : col0; const lk = lookOf(p), sk = '#' + SKIN_C[lk.skin], hr = '#' + HAIR_C[lk.hair], ol = pre==='o' ? '#fff' : '#000';
     const fig = `<rect x="-1.4" y="-1.4" width="2.8" height="2.9" fill="${col}" stroke="${ol}" stroke-width="0.28"/><rect x="-1.1" y="-4" width="2.2" height="2.3" fill="${sk}" stroke="${ol}" stroke-width="0.22"/><rect x="-1.1" y="-4" width="2.2" height="0.8" fill="${hr}"/><rect x="-1.2" y="1.5" width="1" height="1.5" fill="#232A26"/><rect x="0.2" y="1.5" width="1" height="1.5" fill="#232A26"/>`;
     return p.me ? `<g class="dot me" id="${pre}${i}" transform="translate(50 32)"><circle class="mering" cy="0" r="4.2" fill="none" stroke="#FFE45C" stroke-width="0.6"/><g transform="scale(1.1)">${fig}</g><path d="M0 -6.6 L-1.5 -8.6 L1.5 -8.6 Z" fill="#FFE45C"/><text y="-9.4" text-anchor="middle" font-size="3.4" font-weight="800" fill="#FFE45C" stroke="#000" stroke-width="0.5" paint-order="stroke">나</text></g>` : `<g class="dot" id="${pre}${i}" transform="translate(50 32)"><g transform="scale(.76)">${fig}</g></g>`; }).join('');
-  return `<div class="pwrap"><svg id="pitch" viewBox="0 0 100 64" preserveAspectRatio="xMidYMid meet">${pitchBg(MV.pitch)}<g fill="none" stroke="#fff" stroke-opacity=".75" stroke-width=".4"><rect x="1" y="1" width="98" height="62"/><path d="M50 1V63"/><circle cx="50" cy="32" r="8"/><rect x="1" y="17" width="14" height="30"/><rect x="85" y="17" width="14" height="30"/><rect x="1" y="25" width="5" height="14"/><rect x="94" y="25" width="5" height="14"/></g><line id="pline" x1="0" y1="0" x2="0" y2="0" stroke="#fff" stroke-opacity="0" stroke-width=".4" stroke-dasharray="1.2 1"/><ellipse id="bsh" rx=".85" ry=".4" fill="#000" fill-opacity=".28" transform="translate(50 32)"/>${dots(MV.ost, MV.kit.o[0], 'o')}${dots(MV.mst, MV.kit.m[0], 'm')}<g id="ball" transform="translate(50 32)"><circle r=".85" fill="#fff" stroke="#000" stroke-width=".28"/></g><text id="blbl" text-anchor="middle" font-size="3" font-weight="800" fill="#fff" stroke="#000" stroke-width=".55" paint-order="stroke" opacity="0" transform="translate(50 28)"></text></svg><div id="fx"></div></div>`;
+  return `<div class="pwrap"><svg id="pitch" viewBox="0 0 100 64" preserveAspectRatio="xMidYMid meet">${pitchBg(MV.pitch)}<g fill="none" stroke="#fff" stroke-opacity=".75" stroke-width=".4"><rect x="1" y="1" width="98" height="62"/><path d="M50 1V63"/><circle cx="50" cy="32" r="8"/><rect x="1" y="17" width="14" height="30"/><rect x="85" y="17" width="14" height="30"/><rect x="1" y="25" width="5" height="14"/><rect x="94" y="25" width="5" height="14"/></g><line id="pline" x1="0" y1="0" x2="0" y2="0" stroke="#fff" stroke-opacity="0" stroke-width=".4" stroke-dasharray="1.2 1"/><ellipse id="bsh" rx=".85" ry=".4" fill="#000" fill-opacity=".28" transform="translate(50 32)"/>${dots(MV.ost, MV.kit.o[0], 'o')}${dots(MV.mst, MV.kit.m[0], 'm')}${refHTML()}<g id="ball" transform="translate(50 32)"><circle r=".85" fill="#fff" stroke="#000" stroke-width=".28"/></g><text id="rpl" x="50" y="7" text-anchor="middle" font-size="4" font-weight="900" fill="#FFE45C" stroke="#000" stroke-width=".6" paint-order="stroke" opacity="0">⏪ 리플레이 · 탭해서 넘기기</text><text id="blbl" text-anchor="middle" font-size="3" font-weight="800" fill="#fff" stroke="#000" stroke-width=".55" paint-order="stroke" opacity="0" transform="translate(50 28)"></text></svg><div id="fx"></div></div>`;
 }
 const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // ---- 연속 이동 엔진: 포메이션 기준점 + 공 영향 + 역할 + 스티어링(속도/가속), 매 프레임 갱신 ----
@@ -597,7 +666,7 @@ const SUBX = { ST: 9, W: 5, AM: 4, CM: 0, DM: -5, FB: -2, CB: -6, GK: 0 };
 const FTS = { ST: [89, 7], W: [85, 0], AM: [77, 11], CM: [63, 0], FB: [70, 0], DM: [54, 0], CB: [44, 10] };   // 공격 3분의 1 지역에서의 팀 구조(자기 편 기준 좌표)
 const PA = (p, k) => (p && p.a && p.a[k]) || 50;
 const uOf = (x, d) => d > 0 ? x : 100 - x;
-const dM_ = (M) => M.mineHome ? 1 : -1;
+const dM_ = (M) => (M.mineHome ? 1 : -1) * (MV && MV.flip ? -1 : 1);                       // 후반·연장 후반에는 진영이 바뀜
 const tsOf = () => (MV && (MV.fast || MV.hlFast)) ? 4 : (S.spd || 1);
 const TK_DEF = { width: 1, build: 1, line: 1, press: 1, tempo: 1, ment: 1, trans: 1 }, DEPTHW = { GK: 0, CB: 1, FB: .9, DM: .8, CM: .6, AM: .4, W: .35, ST: .3 };
 const tkOf = c => Object.assign({}, TK_DEF, (c && c.tactic) || {});                         // 전술 지시(폭·빌드업·라인·압박·템포·멘탈리티·전환)를 경기 화면 움직임에 반영
@@ -704,6 +773,9 @@ function applyCele(M) {                                   // 골 세레머니·�
 function movePitch() { const M = G0().mm; if (!M || !MV || !MV.pos) return; retarget(M); if (!MV.raf) MV.raf = requestAnimationFrame(frame); }
 function lbl(t) { if (MV) MV.lbl = { t, l: 1 }; }
 function resetPos(M) { const dM = dM_(M); const f = (st, pre, d) => st.forEach((p, i) => { const b = fxy(pre, i), c = MV.pos[pre][i]; if (c) { c.x = d > 0 ? b[0] : 100 - b[0]; c.y = b[1] * 0.64; c.vx = c.vy = 0; } }); f(MV.mst, 'm', dM); f(MV.ost, 'o', -dM); MV.run = {}; }
+function swapEnds(M) {                                                                    // 진영 교체: 공격 방향을 뒤집고 킥오프 대형으로
+  if (!MV || !MV.pos) return; MV.flip = !MV.flip; MV.act = null; MV.rs = null; MV.sp = null; MV.ln = null; MV.holder = null; MV.lbl = null;
+  resetPos(M); MV.ball.x = 50; MV.ball.y = 32; if (MV.ref) { MV.ref.x = 50 - dM_(M) * 6; MV.ref.y = 40; } }
 function sideOf(s) { return s === 'm' ? MV.mst : MV.ost; }
 function passTo(s, i, sp) { const h0 = MV.holder; if (h0 && MV.st && !MV.pg) { const t0 = MV.st[h0.s]; t0.pa++; if (h0.s !== s) t0.pm++; if (h0.s === 'm' && MV.mst[h0.i] && MV.mst[h0.i].me) { MV.my.pa++; if (s !== 'm') MV.my.pm++; } }
   const ps = h0 && sideOf(h0.s)[h0.i]; MV.act = { k: 'pass', to: { s, i }, sp: sp * 0.78, pas: ps ? PA(ps, 'PAS') : 55, from: h0 ? h0.s : null }; MV.holder = null; }
@@ -850,7 +922,21 @@ function goalFx(M) {
   pg.logs.slice().reverse().forEach(o => MV.log.unshift(o)); MV.goalRes = pg.ms ? 'o' : 'm';
   { const stt = sideOf(pg.s), outf = stt.map((_, i) => i).filter(i => i > 0 && MV.pos[pg.s][i]); const si = pg.si > 0 && MV.pos[pg.s][pg.si] ? pg.si : outf[outf.length - 1], c = MV.pos[pg.s][si], dd = pg.s === 'm' ? dM_(M) : -dM_(M);
     MV.cele = { s: pg.s, si, t: 0, cx: dd > 0 ? 91 : 9, cy: c && c.y < 32 ? 6 : 58 }; MV.regroup = 0; }
-  sfx(pg.ms ? 'goal' : 'goalopp'); fxShow(pg.html, pg.ms ? 'goal' : 'goal opp', 3100, true); renderMatch();
+  sfx(pg.ms ? 'goal' : 'goalopp'); if (MV.big) setTimeout(() => sfx('crowd'), 250); fxShow(pg.html, pg.ms ? 'goal' : 'goal opp', 3100, true);
+  if (MV.big && MV.big.k === 'derby') MV.log.unshift({ min: MV.min, ic: '🔥', cls: '', t: pg.ms ? pick3(['라이벌을 상대로 한 골! 홈 관중석이 폭발합니다!', '더비의 주인공이 나왔습니다! 서포터즈가 열광합니다!', '라이벌의 골문을 열었습니다! 관중석이 들썩입니다!']) : pick3(['라이벌에게 실점… 원정석만 환호합니다.', '더비에서 뼈아픈 실점입니다. 경기장이 조용해집니다.', '라이벌 서포터즈의 함성이 경기장을 뒤덮습니다.']) });
+  if (!MV.skipping && !MV.fast && !MV.hlFast && MV.rb && MV.rb.length > 20) MV.rpWant = { f: MV.rb.slice(-42), ms: pg.ms, nm: pg.ev && pg.ev.sc ? pg.ev.sc.name : '' };
+  renderMatch();
+}
+function rpStep(M, realDt) {                                                                  // 골 리플레이: 직전 약 7초를 슬로모션으로 다시 보여 줌(탭하면 건너뜀)
+  const R = MV.rp; MV.paused = true; R.t += realDt * 0.75 * 10; const i = Math.floor(R.t), F = R.f;
+  const lab = document.getElementById('rpl'); if (i >= F.length - 1 || R.skip || MV.over) { MV.rp = null; if (lab) lab.setAttribute('opacity', '0'); if (!MV.talk && !MV.momentOpen && !MV.mgrPanel && !MV.pg && !MV.lead && !MV.sp) MV.paused = false; MV.rb = []; return false; }
+  const a = F[i], b2 = F[i + 1], k = R.t - i, L = (p, q) => p + (q - p) * k; if (lab) lab.setAttribute('opacity', (0.75 + 0.25 * Math.sin(R.t)).toFixed(2));
+  const els = MV.els || (MV.els = { m: MV.mst.map((_, j) => document.getElementById('m' + j)), o: MV.ost.map((_, j) => document.getElementById('o' + j)) });
+  for (const pre of ['m', 'o']) els[pre].forEach((el, j) => { const p = a[pre][j], q = b2[pre][j] || p; if (!el || !p) return; el.setAttribute('transform', `translate(${L(p[0], q[0]).toFixed(2)} ${L(p[1], q[1]).toFixed(2)})`); });
+  const be = document.getElementById('ball'), sh = document.getElementById('bsh'), bx = L(a.b[0], b2.b[0]), by = L(a.b[1], b2.b[1]), bz = L(a.b[2], b2.b[2]);
+  if (be) be.setAttribute('transform', `translate(${bx.toFixed(2)} ${(by - bz).toFixed(2)}) scale(${(1 + bz * 0.1).toFixed(2)})`); if (sh) sh.setAttribute('transform', `translate(${bx.toFixed(2)} ${(by + 0.9).toFixed(2)})`);
+  const ln = document.getElementById('pline'); if (ln) ln.setAttribute('stroke-opacity', '0');
+  return true;
 }
 function flushPg() { const pg = MV && MV.pg; if (!pg) return; MV.pg = null; const lg = pg.logs.slice(); if (pg.off) { try { varOverturn(G0().mm, pg.ev, pg.ms, lg, MV.min); } catch (e) {} } lg.slice().reverse().forEach(o => MV.log.unshift(o)); }
 function frame(ts) {
@@ -865,13 +951,15 @@ function frame(ts) {
       const [eh, ea] = scoreAt(MV.etOn ? 120 : 90), pks = MV.so ? `<div class="endt" style="font-size:14px">승부차기 ${M.mineHome ? MV.so.sm : MV.so.so} : ${M.mineHome ? MV.so.so : MV.so.sm}</div>` : ''; fxShow(`<div class="endt">경기 종료</div><div class="ends">${eh} : ${ea}</div>${pks}`, 'end', 3600000, false); movePitch(); }
     return; }
   let dt = MV.last ? Math.min(0.05, (ts - MV.last) / 1000) : 0.016; MV.last = ts; const realDt = dt; dt *= tsOf();
+  if (MV.rp) { if (rpStep(M, realDt)) return; }
   if (MV.momentOpen && MV.settle > 0) MV.settle -= realDt; const hold = !!MV.momentOpen && !(MV.settle > 0), pdt = hold ? 0 : dt;
   if (MV.momentOpen && !MV.over) {                                                                  // 내 선택 장면: 선택하기 전에는 상대도 절대 진행하지 않는다 + 10초 제한(초과 시 무작위 선택)
     MV.paused = true; MV.sp = null;
     if (MV.moFor !== MV.momentOpen) { MV.moFor = MV.momentOpen; MV.moT = 10; }
     if (!(MV.settle > 0) && !MV.skipping) { MV.moT -= realDt; const te = document.getElementById('mvt'); if (te) { const v = String(Math.max(0, Math.ceil(MV.moT))); if (te.textContent !== v) te.textContent = v; }
       if (MV.moT <= 0) { MV.moT = 10; const os = Core.momentOptions(MV.momentOpen); const pk = os[Math.floor(Math.random() * os.length)], bt = pk && document.querySelector(`[data-act="mv"][data-id="${pk.id}"]`); if (bt) { toast('시간 초과 — 무작위 선택'); bt.click(); } } } } else MV.moFor = null;
-  if (MV.cele) { MV.cele.t += realDt; if (MV.cele.t > 2.0) { MV.cele = null; MV.regroup = 1.0; MV.rt = 0; } } else if (MV.regroup > 0) MV.regroup -= realDt;
+  if (MV.cele) { MV.cele.t += realDt; if (MV.cele.t > 2.0) { MV.cele = null; MV.regroup = 1.0; MV.rt = 0; } }
+  if (MV.rpWant && !MV.cele) { if (MV.over || MV.skipping || MV.fast || MV.hlFast) MV.rpWant = null; else if (performance.now() > (MV.fxUntil || 0) + 80 && !MV.momentOpen && !MV.lead && !MV.pg && !MV.talk && !MV.mgrPanel) { MV.rp = { f: MV.rpWant.f, t: 0 }; MV.rpWant = null; } } else if (MV.regroup > 0) MV.regroup -= realDt;
   if (!MV.over && MV.min > 0 && !hold) { if (MV.poss && MV.st[MV.poss]) MV.st[MV.poss].pt += dt; const mi0 = MV.myI == null ? (MV.myI = MV.mst.findIndex(p => p.me)) : MV.myI, mc = mi0 >= 0 && MV.pos.m[mi0]; if (mc) { const uu = uOf(mc.x, dM_(M)); MV.heat[Math.min(5, Math.floor(mc.y / 64 * 6)) * 10 + Math.min(9, Math.max(0, Math.floor(uu / 10)))] += dt; } }
   if (MV.sp) { MV.sp.t += realDt; if (MV.sp.t > (MV.sp.dur || 1.9)) endSp(M); }
   MV.t += dt; MV.rt -= dt; if (MV.kick > 0) MV.kick -= dt; if (MV.pg) MV.pg.t += dt; if (MV.rt <= 0) { retarget(M); MV.rt = 0.22; }
@@ -938,6 +1026,8 @@ function frame(ts) {
   for (const pre of ['m', 'o']) els[pre].forEach((el, i) => { const c = MV.pos[pre][i]; if (!el || !c) return; const sp = Math.hypot(c.vx, c.vy), bob = Math.abs(Math.sin(MV.t * 11 + i * 1.3)) * Math.min(0.6, sp / 25);
     const jmp = MV.cele && pre === MV.cele.s && i > 0 && sp < 4 ? Math.abs(Math.sin(MV.t * 9 + i * 0.7)) * (i === MV.cele.si ? 2.4 : 1.5) : 0;
     el.setAttribute('transform', `translate(${c.x.toFixed(2)} ${(c.y - bob - jmp).toFixed(2)})${MV.frz && MV.frz[pre + i] > MV.t ? ' rotate(86)' : ''}`); if (MV.red[pre + i]) el.style.opacity = 0.12; });
+  try { refStep(M, realDt); } catch (e) {}
+  if (!hold && !MV.rp) { MV.rbT = (MV.rbT || 0) + dt; if (MV.rbT >= 0.1) { MV.rbT = 0; const rb = MV.rb || (MV.rb = []); rb.push({ b: [MV.ball.x, MV.ball.y, MV.act ? (MV.bz || 0) : 0], m: MV.pos.m.map(c => c ? [c.x, c.y] : null), o: MV.pos.o.map(c => c ? [c.x, c.y] : null) }); if (rb.length > 90) rb.shift(); } }
   const bz = MV.act ? (MV.bz || 0) : 0, be = document.getElementById('ball'); let cvx = 0, cvy = 0;
   if (MV.act && (MV.act.k === 'pass' || MV.act.k === 'shot') && MV.act.dev && MV.ln) { const A3 = MV.act, ex = MV.ln.x1 - A3.x0, ey = MV.ln.y1 - A3.y0, el2 = Math.hypot(ex, ey) || 1, pr = clampN(1 - Math.hypot(MV.ln.x1 - b.x, MV.ln.y1 - b.y) / A3.d0, 0, 1), o2 = A3.dev * Math.sin(Math.PI * pr); cvx = -ey / el2 * o2; cvy = ex / el2 * o2; }   // 부정확한 패스는 휘어서 날아감
   if (be) be.setAttribute('transform', `translate(${(b.x + cvx).toFixed(2)} ${(b.y + cvy - bz).toFixed(2)}) scale(${(1 + bz * 0.1).toFixed(2)})`);
@@ -1268,7 +1358,7 @@ function soEnd(M) {
 function fullTime(M, skip) {
   const end = MV.etOn ? 120 : 90; MV.min = end; const [h, a] = scoreAt(end);
   if (!MV.etOn && h === a && Core.wcKO(M)) {                                             // 월드컵 토너먼트 무승부 → 연장전 30분
-    Core.wcExtra(M); MV.etOn = true; (M.evMine.concat(M.evOpp)).forEach(e => { if (e.min > 90 && MV.keys) MV.keys.push(e.min); });
+    Core.wcExtra(M); MV.etOn = true; swapEnds(M); (M.evMine.concat(M.evOpp)).forEach(e => { if (e.min > 90 && MV.keys) MV.keys.push(e.min); });
     MV.log.unshift({ min: 90, ic: '⏱️', cls: '', t: `<b>90분 종료 ${h} : ${a} — 연장전 돌입</b>` });
     if (!skip) { MV.goalRes = 'o'; MV.regroup = 2; fxShow(`<div class="endt">연장전</div><div class="ends">${h} : ${a} · 30분</div>`, 'end', 2400, true); renderMatch(); }
     return false; }
@@ -1286,14 +1376,17 @@ function offsideFx(M, x) {                                                      
   if (svg) { const ns = 'http://www.w3.org/2000/svg', g = document.createElementNS(ns, 'g'); g.innerHTML = `<line x1="${lx.toFixed(1)}" y1="1" x2="${lx.toFixed(1)}" y2="63" stroke="#ffd34d" stroke-width=".45" stroke-dasharray="1.2 1"/>${c ? `<text x="${c.x.toFixed(1)}" y="${(c.y - 3.2).toFixed(1)}" font-size="4.2" text-anchor="middle">🚩</text>` : ''}`; svg.appendChild(g); setTimeout(() => g.remove(), 2000); }
   const nd = ds.length ? ds[0].i : 0; MV.act = null; MV.rs = null; MV.holder = { s: os, i: nd }; MV.poss = os; MV.dec = 1.0; lbl('오프사이드'); fxShow(`<div class="gb">🚩</div><div class="gs">오프사이드 · ${esc(x.p.name)}</div>`, 'save', 1000, false);
 }
+function vizIdx(st, sd, p) {                                                                  // 득점자가 화면 선발에 없으면(교체 투입 등) 같은 포지션 계열 공격수가 대신 연출
+  let i = st.indexOf(p); if (i > 0) return i; const grp = (s) => ['ST', 'W', 'AM'].includes(s) ? 0 : ['CM', 'DM'].includes(s) ? 1 : 2, g = grp((p && p.sub) || 'ST');
+  const c = st.map((q, j) => j).filter(j => j > 0 && !MV.red[sd + j] && grp(st[j].sub) === g); return c.length ? c[Math.floor(Math.random() * c.length)] : i; }
 function emitAt(M, min, anim) {
-  const out = []; const dM = M.mineHome ? 1 : -1;
+  const out = []; const dM = dM_(M);
   for (const e of M.evMine.concat(M.evOpp)) if (e.min === min && !e.shown) {
     e.shown = true; const ms = M.evMine.includes(e), team = ms ? M.mine : M.opp;
     if (!e.mine && !e.pen && min <= 90 && !MV.etOn && !MV.so && Math.random() < 0.06) e.varOff = pick3(['off', 'off', 'off', 'foul', 'foul', 'hand']);
     const lg = [{ min, ic: IC.ball, cls: 'g ' + (ms ? 'mine' : 'opp'), t: `<b>골! ${esc(e.sc.name)}</b>${e.pen ? ' <span class="tag">PK</span>' : ''} <span class="dim">${esc(team.name)}</span>` }];
     if (e.as) lg.push({ min, ic: IC.boot, cls: 'a ' + (ms ? 'mine' : 'opp'), t: `도움 ${esc(e.as.name)}` });
-    if (anim && MV.pos && MV.pos.m.length) { const sd = ms ? 'm' : 'o', si = (ms ? MV.mst : MV.ost).indexOf(e.sc), html = `<div class="gchar">${sprH(e.sc, MV.kc[ms ? 'm' : 'o'], 40)}</div><div class="gb">${IC.ball.replace('width="16" height="16"','width="44" height="44"')}</div><div class="gt">GOAL!</div><div class="gs">${e.pen ? 'PK · ' : ''}${esc(e.sc.name)}${e.as ? `<br><span class="gsa">${IC.boot} ${esc(e.as.name)}</span>` : ''}</div>`;
+    if (anim && MV.pos && MV.pos.m.length) { const sd = ms ? 'm' : 'o', si = vizIdx(ms ? MV.mst : MV.ost, sd, e.sc), html = `<div class="gchar">${sprH(e.sc, MV.kc[ms ? 'm' : 'o'], 40)}</div><div class="gb">${IC.ball.replace('width="16" height="16"','width="44" height="44"')}</div><div class="gt">GOAL!</div><div class="gs">${e.pen ? 'PK · ' : ''}${esc(e.sc.name)}${e.as ? `<br><span class="gsa">${IC.boot} ${esc(e.as.name)}</span>` : ''}</div>`;
       MV.pg = { s: sd, ms, si, html, logs: lg, t: 0, pen: !!e.pen, ev: e, off: e.varOff, ms2: ms }; MV.paused = true; MV.dec = Math.min(MV.dec, 0.3);
       { const stg = ms ? MV.mst : MV.ost, asI = e.as ? stg.indexOf(e.as) : -1, ok = si > 0 && !e.pen, pid = e.pen ? 'pk' : ok ? pgPlan(e.sc, e.as, asI > 0 && asI !== si) : 'solo';
         MV.pg.as = ok ? asI : -1; MV.pg.pat = pid; MV.pg.pp = PAT[pid]; MV.pg.sj = (Math.random() * 2 - 1) * 4; lg[0].t += ` <span class="tag">${PAT[pid].n}</span>`; (MV.pats || (MV.pats = [])).push(pid); }
@@ -1303,13 +1396,13 @@ function emitAt(M, min, anim) {
   }
   for (const x of M.evx || []) if (x.min === min && !x.shown) {
     x.shown = true; const team = x.ms ? M.mine : M.opp, nmx = esc(x.p.name);
-    if (x.t === 'yc') { out.push({ min, ic: IC.yc, cls: 'c', t: `경고 ${nmx} <span class="dim">${esc(team.name)}</span>` }); if (anim) { fxShow(`${IC.yc.replace('width="12" height="16"','width="30" height="40"')}<div class="gs">${nmx}</div>`, 'card', 1000, false); foulScene(M, { s: x.ms ? 'o' : 'm', p: x.p, card: 'y' }); } }
+    if (x.t === 'yc') { MV.refCard = { c: 'y', p: x.p, ms: x.ms, until: MV.t + 2.6 }; out.push({ min, ic: IC.yc, cls: 'c', t: `경고 ${nmx} <span class="dim">${esc(team.name)}</span>` }); if (anim) { fxShow(`${IC.yc.replace('width="12" height="16"','width="30" height="40"')}<div class="gs">${nmx}</div>`, 'card', 1000, false); foulScene(M, { s: x.ms ? 'o' : 'm', p: x.p, card: 'y' }); } }
     else if (x.t === 'dg') { const why = ({ off: '오프사이드', foul: '공격자 반칙', hand: '핸드볼' })[x.why] || '오프사이드'; out.push({ min, ic: '🚫', cls: 'c', t: `<b>골 취소</b> ${nmx} <span class="dim">${esc(team.name)} · VAR 판독 · ${why}</span>` }); if (anim) varSeq([[`<div class="gb">⚽</div><div class="gs">골인?!</div>`, 'save', 900], [`<div class="gb">📺</div><div class="gs">VAR 판독 중…</div>`, 'save', 1500], [`<div class="gb">🚫</div><div class="gs">골 취소 · ${why}</div>`, 'card', 1700]]); }
     else if (x.t === 'pk') { const gkn = x.gk ? esc(x.gk.name) : '골키퍼'; out.push({ min, ic: '🅿️', cls: 'c', t: `<b>페널티킥 선언</b> <span class="dim">${esc(team.name)} · 박스 안 반칙(VAR 확인)</span>` }); out.push({ min, ic: x.res === 'miss' ? '❌' : IC.glove, cls: 's', t: x.res === 'miss' ? `${nmx}의 페널티킥 — 골대 밖으로 벗어남` : `<b>페널티킥 선방!</b> ${gkn} <span class="dim">키커 ${nmx}</span>` }); if (anim) { const sd = x.ms ? 'm' : 'o', stp = x.ms ? MV.mst : MV.ost, idx0 = stp.indexOf(x.p), res = x.res === 'miss' ? (Math.random() < 0.7 ? 'wide' : 'post') : 'save', fin = () => fxShow(res === 'save' ? `<div class="gb">🧤</div><div class="gs">선방!</div>` : `<div class="gb">❌</div><div class="gs">실축!</div>`, 'save', 1200, false);
         if (MV.pen || MV.so || MV.pg || MV.sp) varSeq([[`<div class="gb">🅿️</div><div class="gs">페널티킥! · ${nmx}</div>`, 'card', 1100], [`<div class="gb">📺</div><div class="gs">VAR 확인 · 파울 인정</div>`, 'save', 1300], [res === 'save' ? `<div class="gb">🧤</div><div class="gs">선방!</div>` : `<div class="gb">❌</div><div class="gs">실축!</div>`, 'save', 1300]]);
         else pkBuild(M, sd, idx0 >= 0 ? idx0 : -1, () => penScene(M, { s: sd, ki: idx0 >= 0 ? idx0 : bestKicker(stp), res, intro: [[`<div class="gb">🅿️</div><div class="gs">페널티킥! · ${nmx}</div>`, 'card', 1100], [`<div class="gb">📺</div><div class="gs">VAR 확인 · 파울 인정</div>`, 'save', 1200]], done: () => { fin(); if (!MV.pg && !MV.momentOpen && !MV.lead && !MV.talk) MV.paused = false; } })); } }
     else if (x.t === 'of') { out.push({ min, ic: '🚩', cls: '', t: `오프사이드 ${nmx} <span class="dim">${esc(team.name)}</span>` }); if (anim) offsideFx(M, x); }
-    else if (x.t === 'rc') { out.push({ min, ic: IC.rc, cls: 'c r', t: x.second ? `<b>경고 누적 퇴장!</b> ${nmx} <span class="dim">${esc(team.name)} · 두 번째 경고</span>` : `<b>퇴장!</b> ${nmx} <span class="dim">${esc(team.name)}${x.var ? ' · VAR 확인' : ''}</span>` }); const idx = (x.ms ? MV.mst : MV.ost).indexOf(x.p); if (idx >= 0) MV.red[(x.ms ? 'm' : 'o') + idx] = true; if (anim) fxShow(`${IC.rc.replace('width="12" height="16"','width="30" height="40"')}<div class="gs">${nmx}</div>`, 'card red', 1300, false); foulScene(M, { s: x.ms ? 'o' : 'm', p: x.p, card: 'r' }); }
+    else if (x.t === 'rc') { MV.refCard = { c: 'r', p: x.p, ms: x.ms, until: MV.t + 2.8 }; out.push({ min, ic: IC.rc, cls: 'c r', t: x.second ? `<b>경고 누적 퇴장!</b> ${nmx} <span class="dim">${esc(team.name)} · 두 번째 경고</span>` : `<b>퇴장!</b> ${nmx} <span class="dim">${esc(team.name)}${x.var ? ' · VAR 확인' : ''}</span>` }); const idx = (x.ms ? MV.mst : MV.ost).indexOf(x.p); if (idx >= 0) MV.red[(x.ms ? 'm' : 'o') + idx] = true; if (anim) fxShow(`${IC.rc.replace('width="12" height="16"','width="30" height="40"')}<div class="gs">${nmx}</div>`, 'card red', 1300, false); foulScene(M, { s: x.ms ? 'o' : 'm', p: x.p, card: 'r' }); }
     else if (x.t === 'sv') { out.push({ min, ic: IC.glove, cls: 's', t: `<b>슈퍼세이브!</b> ${nmx} <span class="dim">${esc(team.name)}</span>` }); if (anim) fxShow(`<div class="gb">🧤</div><div class="gs">슈퍼세이브</div>`, 'save', 1000, false); }
     else if (x.t === 'ch') { out.push({ min, ic: IC.target, cls: 's', t: `<b>결정적 기회!</b> ${nmx} <span class="dim">${esc(team.name)}</span>` }); if (anim) fxShow(`<div class="gb">🎯</div><div class="gs">결정적 기회 · ${nmx}</div>`, 'save', 900, false); }
     else if (x.t === 'cn') { out.push({ min, ic: '🚩', cls: '', t: `코너킥 <span class="dim">${esc(team.name)}</span>` }); if (anim) startSp(M, 'cn', x.ms); }
@@ -1323,12 +1416,14 @@ const SPD = [1, 1.5, 2], BASE_MS = 1600;
 function spdGet() { try { const v = +localStorage.getItem('bfm_spd'); if (SPD.includes(v)) return v; } catch (e) {} return 1; }
 function spdMs() { return Math.round(BASE_MS / (S.spd || (S.spd = spdGet()))); }
 // 경기 보기: 풀(전체) / 하이라이트(골·결정적 기회·슈퍼세이브·퇴장·내 장면 앞뒤만 정상 속도, 나머지는 빠르게 지나감)
-function vmGet() { try { const v = localStorage.getItem('bfm_vm'); if (v === 'full' || v === 'hl') return v; } catch (e) {} return 'full'; }
+function vmGet() { try { const v = localStorage.getItem('bfm_vm'); if (v === 'full' || v === 'hl' || v === 'mine') return v; } catch (e) {} return 'full'; }
 function hlKeys(M) {
   const ks = new Set(); M.evMine.concat(M.evOpp).forEach(e => ks.add(e.min)); (M.evx || []).forEach(x => { if (['ch', 'sv', 'pt', 'rc', 'dg', 'pk'].includes(x.t)) ks.add(x.min); }); (M.moments || []).forEach(m => ks.add(m.min));
   return [...ks].sort((a, b) => a - b);
 }
-function hlNear() { if (!MV || !MV.hl) return true; return MV.keys.some(k => MV.min >= k - 3 && MV.min <= k + 1); }
+function mineKeys(M) { const ks = new Set(); M.evMine.concat(M.evOpp).forEach(e => ks.add(e.min)); (M.moments || []).forEach(m => ks.add(m.min)); return [...ks].sort((a, b) => a - b); }   // 내 장면만: 내 선택 장면 + 골
+function keysFor(M) { return S.vm === 'mine' ? mineKeys(M) : hlKeys(M); }
+function hlNear() { if (!MV || !MV.hl) return true; const M = G0().mm; if (M) MV.keys = keysFor(M); const pre = S.vm === 'mine' ? 2 : 3; return MV.keys.some(k => MV.min >= k - pre && MV.min <= k + 1); }
 function hlSync() {
   if (!MV || MV.over || MV.skipping || MV.fast || !MV.timer) return;
   const near = hlNear(), sp = near ? spdMs() : 40; MV.hlFast = !!MV.hl && !near;
@@ -1353,12 +1448,18 @@ function startMatch() {
   const M = Core.prepareMine(); if (!M) return;
   const PT = pickPitch(M);
   MV = { min: 0, timer: null, paused: false, log: [], over: false, momentOpen: null, speed: spdMs(), ball: { x: 50, y: 32 }, poss: 'm', holder: null, pos: { m: [], o: [] }, ballFree: false, red: {}, pitch: PT, kit: pickKits(M, PT), t: 0, rt: 0, kick: 0, act: null, dec: 1, els: null, raf: 0, last: 0, run: {}, tgt: { m: [], o: [] }, mst: sortSt(M.stMine), ost: sortSt(M.stOpp), fxT: null, st: { m: { pt: 0, sh: 0, sot: 0, xg: 0, pa: 0, pm: 0 }, o: { pt: 0, sh: 0, sot: 0, xg: 0, pa: 0, pm: 0 } }, heat: new Array(60).fill(0), my: { pa: 0, pm: 0 } };
-  placeMe(M); MV.hl = (S.vm || (S.vm = vmGet())) === 'hl'; MV.keys = hlKeys(M); if (MV.hl && !hlNear() && M.role !== 'bench' && M.role !== 'inj') { MV.speed = 40; MV.hlFast = true; }
+  placeMe(M); S.vm = S.vm || vmGet(); MV.hl = S.vm === 'hl' || S.vm === 'mine'; MV.keys = keysFor(M); if (MV.hl && !hlNear() && M.role !== 'bench' && M.role !== 'inj' && M.role !== 'sus' && M.role !== 'away') { MV.speed = 40; MV.hlFast = true; }
   try { const m0 = Core.me(); MV.snap = { mor: m0.mor, trust: m0.trust, tac: JSON.stringify(M.mine.tactic) }; } catch (e) {}   // 도중에 나가면 이 값으로 되돌림
-  MV.kc = { m: kitClub(M.mine, MV.kit.m), o: kitClub(M.opp, MV.kit.o) }; S.matchOpen = true; sfx('whistle'); if (M.role==='bench' || M.role==='inj') { MV.speed = 60; MV.fast = true; }
+  MV.kc = { m: kitClub(M.mine, MV.kit.m), o: kitClub(M.opp, MV.kit.o) }; S.matchOpen = true; sfx('whistle'); if ((M.role==='bench' || M.role==='inj' || M.role==='sus' || M.role==='away') && (S.vm || 'full') !== 'full') { MV.speed = 60; MV.fast = true; }
   $('#match').innerHTML = `<div class="mh" id="mh"></div><div id="pitchbox">${pitchHTML(M)}</div><div class="mb" id="mb"></div><div class="mf" id="mf"></div>`;
+  { const pb = $('#pitchbox'); if (pb) pb.addEventListener('click', () => { if (MV && MV.rp) MV.rp.skip = true; }); }
   lockOrient('landscape'); $('#match').classList.add('on'); initPos(M); bringMeTop(); renderMatch(); movePitch(); MV.timer = setInterval(tick, MV.speed);
-  if (!MV.fast) fxShow(`<div class="ends" style="font-size:12px;opacity:.85">${esc(M.title)}</div><div class="endt" style="font-size:18px;display:flex;align-items:center;justify-content:center;gap:8px">${crest(M.h, 22)}<span>${esc(M.h.name)}</span><span style="opacity:.6">vs</span><span>${esc(M.a.name)}</span>${crest(M.a, 22)}</div><div class="ends" style="font-size:13px">킥오프!</div>`, 'end', 2000, true);
+  try { const rv = Core.rivalOf, der = rv && M.mine.kind === 'pro' && M.opp.kind === 'pro' && (rv(M.mine) === M.opp.id || rv(M.opp) === M.mine.id), fin = /결승/.test(M.title || '') && !/준결승/.test(M.title || '');
+    MV.big = der ? { k: 'derby', t: '🔥 라이벌 더비' } : fin ? { k: 'final', t: '🏆 결승전' } : Core.wcKO && Core.wcKO(M) ? { k: 'ko', t: '⚔️ 토너먼트' } : null;
+    if (M.rivalM) { const rv = G0().players[M.rivalM]; if (rv) MV.log.unshift({ min: 0, ic: '🆚', cls: '', t: `<b>동기 라이벌 ${esc(rv.name)}과(와) 맞대결!</b> <span class="dim">${esc(M.opp.name)} · 종합 ${rv.ovr}</span>` }); }
+    if (M.order && Core.ORDERS[M.order]) MV.log.unshift({ min: 0, ic: '📋', cls: '', t: `<b>감독 지시: ${Core.ORDERS[M.order].n}</b> <span class="dim">“${Core.ORDERS[M.order].d}” · 지시에 맞는 선택(📋)은 성공률 +4%, 따르면 신뢰가 오릅니다</span>` });
+    if (MV.big) { MV.log.unshift({ min: 0, ic: der ? '🔥' : '🏆', cls: '', t: der ? `<b>라이벌 더비</b> — 경기장이 꽉 찼습니다. 양 팀 서포터즈의 응원 열기가 대단합니다!` : `<b>${MV.big.t.slice(2)}</b> — 모든 것이 걸린 한 판입니다. 관중석이 들썩입니다!` }); if (!MV.fast) setTimeout(() => sfx('crowd'), 300); } } catch (e) { MV.big = null; }
+  if (!MV.fast) fxShow(`<div class="ends" style="font-size:12px;opacity:.85">${esc(M.title)}</div><div class="endt" style="font-size:18px;display:flex;align-items:center;justify-content:center;gap:8px">${crest(M.h, 22)}<span>${esc(M.h.name)}</span><span style="opacity:.6">vs</span><span>${esc(M.a.name)}</span>${crest(M.a, 22)}</div><div class="ends" style="font-size:13px">${MV.big ? MV.big.t + ' · ' : ''}킥오프!</div>`, 'end', MV.big ? 2600 : 2000, true);
 }
 function scoreAt(min) {
   const M = G0().mm; const mine = M.evMine.filter(e => e.min <= min).length, opp = M.evOpp.filter(e => e.min <= min).length;
@@ -1378,19 +1479,22 @@ function tick() {
   MV.min++;
   const m = Core.me();
   emitAt(M, MV.min, !MV.hlFast);
+  segTick(M);
+  if (M.role !== 'mgr' && [30, 60, 75].includes(MV.min)) { try { const ps = Core.mePush(MV.min); if (ps > 0) { MV.log.unshift({ min: MV.min, ic: '🔥', cls: '', t: '<b>내 활약에 팀이 살아납니다</b> <span class="dim">동료들의 움직임이 좋아졌습니다</span>' }); if (!MV.hlFast) lbl('기세 상승'); } else if (ps < 0) MV.log.unshift({ min: MV.min, ic: '😓', cls: '', t: '<b>부진이 팀 분위기에 영향을 줍니다</b> <span class="dim">상대가 기세를 올립니다</span>' }); } catch (e) {} }
   if (MV.min === 1) MV.log.unshift({ min: 1, ic: '🧠', cls: '', t: `<b>상대 감독</b> <span class="dim">전술 이해도 ${MV.tacR.o}${M.aiNote ? ' · ' + esc(M.aiNote) : ''}</span>` });
   if ((MV.min === 60 || MV.min === 75) && !MV.etOn && !MV.hlFast) aiInGame(M);
   if (M.role==='sub' && MV.min===M.from) MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 투입 — ${esc(m.name)}` })
-  if (M.role==='sub' && MV.min===M.from && !MV.mst.some(p => p.me)) { let ix = MV.mst.findIndex(p => p.sub === m.sub && p.sub !== 'GK'); if (ix < 0) ix = MV.mst.findIndex(p => p.sub !== 'GK'); if (ix >= 0) { const outp = MV.mst[ix]; MV.mst[ix] = m; lbl('교체 투입'); const pb = $('#pitchbox'); if (pb) { pb.innerHTML = pitchHTML(M); MV.els = null; bringMeTop(); } fxShow(`<div class="gchar">${sprH(m, MV.kc.m, 40)}</div><div class="gs">교체 투입 · ${esc(m.name)}</div><div class="dim">${esc(outp.name)} ↔ ${MV.min}분</div>`, 'save', 1800, false); } }
+  if (M.role==='sub' && MV.min===M.from && !MV.mst.some(p => p.me)) { let ix = MV.mst.findIndex(p => p.sub === m.sub && p.sub !== 'GK'); if (ix < 0) ix = MV.mst.findIndex(p => p.sub !== 'GK'); if (ix >= 0) { const outp = MV.mst[ix]; MV.mst[ix] = m; lbl('교체 투입'); const pb = $('#pitchbox'); if (pb) { pb.innerHTML = pitchHTML(M); MV.els = null; MV.refEl = null; bringMeTop(); } fxShow(`<div class="gchar">${sprH(m, MV.kc.m, 40)}</div><div class="gs">교체 투입 · ${esc(m.name)}</div><div class="dim">${esc(outp.name)} ↔ ${MV.min}분</div>`, 'save', 1800, false); } }
   const mo = M.moments[M.mi];
   if (mo && !mo.done && mo.min <= MV.min && !MV.pg && !MV.lead && !MV.momentOpen && !MV.sp && !MV.pen && !MV.so) { MV.paused = true; beginLead(M, mo); }     // 골 연출 중이면 끝난 뒤에 장면을 연다
   if (!MV.htDone && MV.min >= 45 && MV.min < 90 && !MV.pg && !MV.momentOpen && !MV.fast && !MV.skipping) {         // 전반 종료 → 잠깐 멈춤 → 후반 킥오프
-    MV.htDone = true; const [hh, ha] = scoreAt(45); MV.log.unshift({ min: 45, ic: '⏸️', cls: '', t: `<b>전반 종료</b> ${hh} : ${ha}` });
+    MV.htDone = true; MV.flipH = true; swapEnds(M); const [hh, ha] = scoreAt(45); MV.log.unshift({ min: 45, ic: '⏸️', cls: '', t: `<b>전반 종료</b> ${hh} : ${ha}` });
     MV.regroup = 2.2; fxShow(`<div class="endt">전반 종료</div><div class="ends">${hh} : ${ha}</div>`, 'end', 2200, true);
     if (M.role === 'mgr') { MV.talkDiff = M.mineHome ? hh - ha : ha - hh; MV.talk = Core.mgrTalkInfo(MV.talkDiff); }
     else if (M.role === 'start' || M.role === 'sub') MV.talk = Object.assign(Core.talkInfo(M.mineHome ? hh - ha : ha - hh), { }); 
     else setTimeout(startSecond, 2300); }
-  if (MV.etOn && MV.min === 105 && !MV.pg) { MV.log.unshift({ min: 105, ic: '⏸️', cls: '', t: '<b>연장 전반 종료</b> — 연장 후반 시작' }); lbl('연장 후반'); }
+  if (!MV.flipH && MV.min >= 46 && !MV.pg && !MV.momentOpen && !MV.lead && !MV.pen) { MV.flipH = true; swapEnds(M); MV.goalRes = 'o'; }      // 빠른 진행 중에도 후반엔 진영 교체
+  if (MV.etOn && MV.min === 105 && !MV.pg) { swapEnds(M); MV.goalRes = 'm'; MV.regroup = 1.2; MV.log.unshift({ min: 105, ic: '⏸️', cls: '', t: '<b>연장 전반 종료</b> — 연장 후반 시작' }); lbl('연장 후반'); }
   if (MV.min >= (MV.etOn ? 120 : 90) && !MV.pg) fullTime(M, !!(MV.skipping || MV.fast));
   movePitch(); renderMatch(); hlSync();
 }
@@ -1407,7 +1511,73 @@ function skipMatch() {
 
 const lvl3 = (p) => p >= 0.62 ? ['높음', 'hi'] : p >= 0.4 ? ['보통', 'mid'] : ['낮음', 'lo'];
 function startSecond() { if (!MV || MV.over || !G0().mm) return; MV.talk = null; if (!MV.momentOpen) MV.paused = false; MV.regroup = 0; MV.goalRes = 'o'; MV.log.unshift({ min: 46, ic: '▶️', cls: '', t: '<b>후반 시작</b>' }); fxShow('<div class="endt" style="font-size:26px">후반 시작</div>', 'end', 1100, false); renderMatch(); }
-function mtabs() { const T = [['flow', '경기 흐름'], ['stat', '통계'], ['tac', '전술']].concat(isM() ? [] : [['me', '내 평점']]); return `<div class="mtabs">${T.map(([k, n]) => `<button class="mtb ${(S.mtab || 'flow') === k ? 'on' : ''}" data-act="mtab" data-id="${k}">${n}</button>`).join('')}</div>`; }
+function mtabs() { const T = (MV && MV.over ? [['ana', '분석']] : []).concat([['flow', '경기 흐름'], ['stat', '통계'], ['tac', '전술']]).concat(isM() ? [] : [['me', '내 평점']]); return `<div class="mtabs">${T.map(([k, n]) => `<button class="mtb ${(S.mtab || 'flow') === k ? 'on' : ''}" data-act="mtab" data-id="${k}">${n}</button>`).join('')}</div>`; }
+function anaRec(M) {                                                                        // 이번 경기 기록(추세 계산용)
+  const A = MV.st.m, B = MV.st.o, tot = (A.pt + B.pt) || 1, [fh, fa] = scoreAt(MV.etOn ? 120 : 90), gm = M.mineHome ? fh : fa, go = M.mineHome ? fa : fh;
+  return { d: G0().day, gm, go, xa: Math.round(A.xg * 100) / 100, xb: Math.round(B.xg * 100) / 100, pa: Math.round(A.pt / tot * 100), sh: A.sh, sot: A.sot, so: B.sh, r: gm > go ? 'W' : gm < go ? 'L' : 'D', sk: !!MV.skipping };
+}
+function anaSave(M) { if (!M || !MV || !MV.st || MV.anaSaved) return; MV.anaSaved = true; const g = G0(), h = g.anaHist || (g.anaHist = []); h.push(anaRec(M)); if (h.length > 12) h.shift(); }
+function trendHTML(M, cur) {                                                                  // 최근 5경기 추세(이번 경기 포함)
+  const prev = (G0().anaHist || []).filter(x => !x.sk).slice(-4), L = prev.concat([{ gm: cur.gm, go: cur.go, xa: cur.xa, xb: cur.xb, pa: cur.pa, r: cur.res }]);
+  if (L.length < 2) return '';
+  const av = (k) => L.reduce((s, x) => s + (x[k] || 0), 0) / L.length, half = Math.floor(L.length / 2), early = L.slice(0, half), late = L.slice(half), avs = (l, k) => l.reduce((s, x) => s + (x[k] || 0), 0) / Math.max(1, l.length);
+  const arrow = (a, b, good) => Math.abs(a - b) < 0.15 ? '<span class="dim">→</span>' : `<b style="color:${(a > b) === good ? '#C6F36B' : '#FF7A6B'}">${a > b ? '▲' : '▼'}</b>`;
+  const form = L.map(x => `<span class="tag ${x.r === 'L' ? 'warn' : ''}">${x.r === 'W' ? '승' : x.r === 'L' ? '패' : '무'}</span>`).join('');
+  const notes = [];
+  const gLate = avs(late, 'gm'), gEarly = avs(early, 'gm'), cLate = avs(late, 'go'), cEarly = avs(early, 'go');
+  if (cLate - cEarly >= 0.8) notes.push('최근 실점이 눈에 띄게 늘었습니다.');
+  if (gLate - gEarly >= 0.8) notes.push('공격력이 살아나고 있습니다.');
+  if (av('xa') - av('gm') >= 0.6) notes.push('기대득점보다 실제 득점이 적습니다 — 결정력이 아쉬운 흐름입니다.');
+  if (av('go') - av('xb') >= 0.6) notes.push('상대 기대득점보다 실점이 많습니다 — 골키퍼·수비 집중력 점검이 필요합니다.');
+  if (L.slice(-3).every(x => x.r === 'L') && L.length >= 3) notes.push('3연패 — 분위기 반전이 필요합니다.');
+  if (L.slice(-3).every(x => x.r === 'W') && L.length >= 3) notes.push('3연승 — 지금 흐름을 이어 가세요.');
+  return `<div class="sec">최근 ${L.length}경기 추세</div><div class="card"><div class="row g8 wrapx">${form}</div><div class="ali dim">평균 득점 ${av('gm').toFixed(1)} ${arrow(gLate, gEarly, true)} · 실점 ${av('go').toFixed(1)} ${arrow(cLate, cEarly, false)} · xG ${av('xa').toFixed(2)} : ${av('xb').toFixed(2)} · 점유율 ${Math.round(av('pa'))}%</div>${notes.map(n => `<div class="ali">📈 ${n}</div>`).join('')}</div>`;
+}
+function anaTips(M, o) {                                                                     // 상황별 조언(여러 문구 중 무작위) — 반복감을 줄임
+  const { A, B, pa, gm, go, xa, xb, res, pct } = o, T = [], P = (a) => pick3(a), mgr = M.role === 'mgr';
+  const late = MV.log.filter(l => /\bg opp\b/.test(l.cls || '') && l.min >= 75).length, early = MV.log.filter(l => /\bg opp\b/.test(l.cls || '') && l.min <= 15).length;
+  const spC = MV.log.filter(l => /\bg opp\b/.test(l.cls || '') && /(코너킥|프리킥|스로인)/.test(l.t || '')).length, spF = MV.log.filter(l => /\bg mine\b/.test(l.cls || '') && /(코너킥|프리킥|스로인)/.test(l.t || '')).length;
+  const red = MV.log.filter(l => /\bc r\b/.test(l.cls || '')).length, ht = (() => { const [h1, a1] = scoreAt(45); return M.mineHome ? h1 - a1 : a1 - h1; })(), ftd = gm - go;
+  if (xb > xa + 0.5) T.push(P(mgr ? ['상대에게 슈팅 기회를 많이 내줬습니다 — 수비 라인을 낮추거나 압박 강도를 조절해 보세요.', '수비 뒷공간이 자주 열렸습니다 — 수비형 미드필더를 한 명 더 두는 포메이션을 고려해 보세요.', '상대 공격을 너무 쉽게 허용했습니다 — 성향을 균형이나 수비적으로 바꿔 보세요.'] : ['상대에게 기회를 많이 내준 경기입니다 — 수비 장면에서 지연 수비·커버링 선택이 도움이 됩니다.', '팀 수비가 흔들렸습니다 — 다음 경기에선 무리한 태클보다 위치 선정을 노려 보세요.']));
+  if (A.sh >= 8 && A.sot <= A.sh * 0.3) T.push(P([`슈팅 ${A.sh}개 중 유효슈팅 ${A.sot}개 — 결정력 높은 공격수 기용이나 마무리 훈련이 필요합니다.`, `슈팅은 많았지만(${A.sh}개) 골문으로 간 건 ${A.sot}개뿐입니다 — 박스 안 슈팅 비율을 높여야 합니다.`, '먼 거리 슈팅이 많았습니다 — 컷백·스루패스로 더 좋은 위치를 만들어 보세요.']));
+  if (pct(A) && pct(A) < 72) T.push(P([`패스 성공률 ${pct(A)}% — 빌드업을 짧은 패스 위주로 바꾸면 소유권을 더 지킬 수 있습니다.`, `패스가 자주 끊겼습니다(${pct(A)}%) — 템포를 조금 늦춰 보세요.`]));
+  if (pa < 40 && res !== 'W') T.push(P([`점유율 ${pa}% — 중원 숫자를 늘리는 포메이션을 고려해 보세요.`, `공을 거의 갖지 못했습니다(${pa}%) — 압박을 높여 높은 위치에서 공을 되찾아 보세요.`]));
+  if (pa >= 60 && xa < 1.0) T.push(P(['점유는 많았지만 위협적인 기회가 적었습니다 — 템포를 올리거나 측면 크로스를 늘려 보세요.', '공만 돌리다 끝난 경기입니다 — 공격 성향을 높이거나 침투형 공격수를 써 보세요.']));
+  if (late >= 1 && ftd <= 0) T.push(P(['막판(75분 이후)에 실점했습니다 — 체력이 떨어진 선수를 일찍 교체하세요.', '경기 막판 집중력이 흔들렸습니다 — 리드 중엔 70분 이후 수비적으로 전환하는 것도 방법입니다.']));
+  if (early >= 1) T.push(P(['경기 초반(15분 이내)에 실점했습니다 — 시작부터 압박 강도를 조절해 보세요.', '이른 실점으로 끌려간 경기입니다 — 킥오프 직후 집중력이 필요합니다.']));
+  if (spC >= 1) T.push(P(['세트피스로 실점했습니다 — 키 큰 수비수·공중볼 강한 선수 기용을 고려하세요.', '코너킥·프리킥 수비가 약했습니다 — 헤딩 능력이 좋은 선수를 선발로 써 보세요.']));
+  if (spF >= 1 && res !== 'L') T.push('세트피스가 효과를 봤습니다 — 크로스가 좋은 키커를 계속 기용하세요.');
+  if (red >= 1) T.push(P(['퇴장이 경기 흐름을 바꿨습니다 — 경고를 받은 선수는 일찍 교체하는 게 안전합니다.', '카드 관리가 필요합니다 — 경고 누적 5회면 다음 경기에 뛸 수 없습니다.']));
+  if (ht < 0 && ftd > 0) T.push(P(['역전승! 후반 조정이 통했습니다 — 같은 상황에서 다시 써 볼 만합니다.', '전반 열세를 뒤집었습니다 — 하프타임 이후 변화가 정답이었습니다.']));
+  if (ht > 0 && ftd <= 0) T.push(P(['앞서다 놓친 경기입니다 — 리드 중 후반엔 성향을 수비적으로 바꿔 보세요.', '리드를 지키지 못했습니다 — 후반 체력 관리와 교체 타이밍을 점검하세요.']));
+  if (go === 0) T.push(P(['무실점 경기! 수비 조직이 잘 작동했습니다.', '클린시트 — 지금 수비 라인을 유지하세요.']));
+  if (!T.length) T.push(P(['전반적으로 계획대로 풀린 경기입니다. 지금 전술을 유지해도 좋습니다.', '큰 약점 없이 끝난 경기입니다 — 선수들 컨디션만 잘 관리하세요.', '균형 잡힌 경기였습니다 — 다음 상대에 맞춰 세부 지시만 다듬어 보세요.']));
+  return T;
+}
+function anaView(M) {                                                                      // 경기 후 분석: 총평 · 승부처 · 평점 이유 · 개선 포인트
+  const A = MV.st.m, B = MV.st.o, tot = (A.pt + B.pt) || 1, pa = Math.round(A.pt / tot * 100), [fh, fa] = scoreAt(MV.etOn ? 120 : 90), gm = M.mineHome ? fh : fa, go = M.mineHome ? fa : fh;
+  const pct = (st) => st.pa ? Math.round((st.pa - st.pm) / st.pa * 100) : 0, xa = A.xg, xb = B.xg, res = gm > go ? 'W' : gm < go ? 'L' : 'D';
+  let sum;
+  if (res === 'W' && gm - go >= 3) sum = xa >= xb ? `${gm - go}골 차 완승입니다. 내용과 결과 모두 압도한 경기입니다.` : `${gm - go}골 차 완승이지만, 상대 기회(xG ${xb.toFixed(2)})도 적지 않았습니다. 결정력 차이가 승부를 갈랐습니다.`;
+  else if (res === 'L' && go - gm >= 3) sum = xa >= xb ? '기회는 비슷했지만 실점이 몰려 크게 진 경기입니다. 수비 집중력을 점검하세요.' : `${go - gm}골 차 완패입니다. 전반적으로 밀린 경기라 전술 재정비가 필요합니다.`;
+  else if (res === 'W') sum = xa >= xb + 0.4 ? (pa >= 55 ? '점유와 기회 창출 모두 앞서며 내용과 결과를 함께 챙긴 승리입니다.' : '공을 덜 갖고도 더 좋은 기회를 만든 효율적인 승리입니다.') : xa + 0.4 < xb ? '내용은 밀렸지만 결정적인 순간을 살려 이긴 경기입니다. 운도 따랐습니다.' : '팽팽한 흐름 속에서 한 끗 차이로 이긴 경기입니다.';
+  else if (res === 'L') sum = xa >= xb + 0.4 ? '기회는 더 많이 만들었지만 마무리가 부족해 진 경기입니다.' : xa + 0.4 < xb ? '상대에게 기회를 너무 많이 내준 경기입니다. 수비 조직을 점검할 필요가 있습니다.' : '비슷한 내용이었지만 결정력에서 밀린 경기입니다.';
+  else sum = Math.abs(xa - xb) < 0.4 ? '양 팀 모두 결정타가 없었던 균형 잡힌 경기입니다.' : xa > xb ? '이길 수 있었던 경기를 놓친 무승부입니다.' : '밀리는 흐름에서 승점 1점을 지켜낸 경기입니다.';
+  const keys = MV.log.filter(l => /\b(g|mvp)\b/.test(l.cls || '') || /\bc r\b/.test(l.cls || '') || /페널티/.test(l.t || '')).filter(l => !/mvp/.test(l.cls || '')).slice().reverse().slice(0, 4);
+  const keyH = keys.length ? keys.map(l => `<div class="ali"><span class="tag">${l.min}'</span> ${l.t}</div>`).join('') : '<div class="dim">큰 사건 없이 지나간 경기입니다.</div>';
+  const tips = anaTips(M, { A, B, pa, gm, go, xa, xb, res, pct });
+  let me = '';
+  if (M.role === 'start' || M.role === 'sub') {
+    const rs = (M.moments || []).filter(o => o.done && o.result).map(o => { const r = o.result, d = Core.OPT_N ? Core.OPT_N(r.choice) : r.choice, tag = r.goal ? '⚽ 골' : r.assist ? '🅰 도움' : r.stop ? '🛡 실점 차단' : r.conc ? '❌ 실점 허용' : r.ok ? '✅ 성공' : '❌ 실패', sg = r.goal ? '+1.3' : r.assist ? '+0.9' : r.stop ? '+0.7' : r.conc ? '-0.8' : r.ok ? '+0.2~0.3' : '-0.1~0.25';
+      return `<div class="ali"><span class="tag">${o.min}'</span> ${esc(d)}${r.ord ? ' 📋' : ''} → <b>${tag}</b> <span class="dim">(${sg})</span></div>`; }).join('') + (M.order && Core.ORDERS[M.order] ? `<div class="ali dim">📋 감독 지시 “${Core.ORDERS[M.order].n}” — 따른 선택 ${M.ordOk || 0}번 · 다른 선택 ${M.ordNo || 0}번 (신뢰 ${((M.ordOk || 0) * 0.8 - (M.ordNo || 0) * 0.3) >= 0 ? '+' : ''}${((M.ordOk || 0) * 0.8 - (M.ordNo || 0) * 0.3).toFixed(1)})</div>` : '');
+    const r = clampN(M.myRate, 3, 10);
+    me = `<div class="sec">내 평점 ${r.toFixed(1)} — 이유</div><div class="card">${rs || '<div class="dim">선택 장면이 없었습니다.</div>'}<div class="ali dim">기본 6.3에서 시작 · 팀 ${res === 'W' ? '승리 +' : res === 'L' ? '패배 −' : '무승부 '}${res === 'D' ? '0' : (Math.min(3, Math.abs(gm - go)) * 0.17).toFixed(2)} · 최종 평점은 경기 종료 후 약간의 변동이 있습니다.</div></div>`;
+  } else if (M.role === 'mgr') {
+    const ch = MV.log.filter(l => /감독 지시|교체 —/.test(l.t || '')).length;
+    me = `<div class="sec">감독 결정</div><div class="card"><div class="ali">경기 중 전술 변경·교체 ${ch}회${M.talk ? ` · 하프타임 지시 효과 ${M.talk > 0 ? '+' : ''}${Math.round(M.talk * 100)}%` : ''}</div><div class="ali dim">경기 중 전술은 15분 단위로 남은 시간 결과에 반영됩니다.</div></div>`;
+  }
+  return `<div class="sec">경기 분석</div><div class="card"><b>${sum}</b><div class="dim" style="margin-top:4px">점유율 ${pa}% · 슈팅 ${A.sh}:${B.sh} · 유효슈팅 ${A.sot}:${B.sot} · xG ${xa.toFixed(2)}:${xb.toFixed(2)}</div></div><div class="sec">승부를 가른 장면</div><div class="card">${keyH}</div>${me}${trendHTML(M, { gm, go, xa, xb, pa, res })}<div class="sec">다음 경기를 위한 포인트</div><div class="card">${tips.slice(0, 3).map(t => `<div class="ali">💡 ${t}</div>`).join('')}</div>`;
+}
 function statView(M) {
   const A = MV.st.m, B = MV.st.o, tot = (A.pt + B.pt) || 1, pa = Math.round(A.pt / tot * 100), pct = (st) => st.pa ? Math.round((st.pa - st.pm) / st.pa * 100) : 0;
   const row = (n, a, b, fa, fb) => { const t = (+a + +b) || 1; return `<div class="strow"><b>${fa || a}</b><div class="stm"><span>${n}</span><i><u style="width:${a / t * 100}%"></u><u class="o" style="width:${b / t * 100}%"></u></i></div><b>${fb || b}</b></div>`; };
@@ -1430,13 +1600,13 @@ function renderMatch() {
   const G = G0(), M = G.mm; if (!M || !MV || !$('#mh')) return; const [sh, sa] = scoreAt(MV.pg ? MV.min - 1 : MV.min);
   let dec = '';
   if (MV.talk) dec = `<div class="card gl"><div class="row g8"><b style="font-size:13.5px;line-height:1.25">감독: “${esc(MV.talk.text)}”</b></div><div class="opts3">${MV.talk.opts.map(o => `<button class="opt" data-act="talk" data-id="${o.id}"><b>${o.t}</b></button>`).join('')}</div></div>`;
-  else if (MV.momentOpen) { const mo = MV.momentOpen; const opts = Core.momentOptions(mo); dec = `<div class="card gl"><div class="row g8" style="align-items:flex-end"><span class="mebub">${sprH(Core.me(), MV.kc.m, 28, 'idle')}</span><b>${Core.momentText(mo.kind)}</b></div><div class="dim">${MV.min}분 · 어떻게 할까? <b id="mvt" style="color:#FFB27A">${Math.max(0, Math.ceil(MV.moT == null ? 10 : MV.moT))}</b>초 안에 고르세요</div><div class="${opts.length===3?'opts3':'optsn'}">${opts.map(o => { const lv = lvl3(o.shown); return `<button class="opt ${o.fav?'fav':''}" data-act="mv" data-id="${o.id}"><b>${o.fav?'★ ':''}${o.n}</b><span class="lv ${lv[1]}">${lv[0]}</span><span class="pbar sm"><i class="${lv[1]}" style="width:${Math.round(o.shown*100)}%"></i></span><span class="dim s11 pc ${lv[1]}">성공 ${Math.round(o.shown*100)}%</span></button>`; }).join('')}</div></div>`; }
-  else if (MV.over) { const st = M.role==='start'?'선발':M.role==='sub'?'교체':M.role==='inj'?'부상 결장':'벤치(결장)'; const mv = M.mvp || Core.mvpOf(M), [fh, fa] = scoreAt(MV.etOn ? 120 : 90), won = (M.mineHome ? fh - fa : fa - fh) || (MV.so ? (MV.so.sm > MV.so.so ? 1 : -1) : 0), res = won > 0 ? '승리' : won < 0 ? '패배' : '무승부';
-    dec = `<div class="card mom"><div class="momt">경기 종료 · ${res}</div><div class="momsc">${fh} : ${fa}</div>${MV.so ? `<div class="dim">승부차기 ${M.mineHome ? MV.so.sm : MV.so.so} : ${M.mineHome ? MV.so.so : MV.so.sm}</div>` : MV.etOn ? '<div class="dim">연장전 종료</div>' : ''}${mv ? `<div class="momch">${sprH(mv.p, MV.kc[mv.mine ? 'm' : 'o'], 64, mv.me ? 'jump' : 'idle')}${mv.me ? '<i class="crown">' + IC.crown + '</i>' : ''}</div><div class="momn ${mv.me ? 'me' : ''}">${IC.crown} MVP ${esc(mv.p.name)}${mv.me ? ' (나!)' : ''}</div>` : ''}<div class="dim">${M.role==='mgr' ? '감독 모드' : '내 역할: ' + st}</div><div class="row g8 wrapx" style="justify-content:center">${M.myGoals ? `<span class="tag">${IC.ball} ${M.myGoals}골</span>` : ''}${M.myAssists ? `<span class="tag">${IC.boot} ${M.myAssists}도움</span>` : ''}</div><button class="btn wide" data-act="mend">결과 확인</button></div>`; }
-  const roleTxt = M.role==='mgr' ? '감독석' : M.role==='start' ? '선발 출전' : M.role==='sub' ? (MV && MV.min >= M.from ? `${M.from}분 교체 투입` : `벤치 → ${M.from}분 투입 예정`) : M.role==='inj' ? '부상으로 결장' : '벤치 (출전 명단 제외)';
+  else if (MV.momentOpen) { const mo = MV.momentOpen; const opts = Core.momentOptions(mo); dec = `<div class="card gl"><div class="row g8" style="align-items:flex-end"><span class="mebub">${sprH(Core.me(), MV.kc.m, 28, 'idle')}</span><b>${Core.momentText(mo.kind)}</b></div><div class="dim">${MV.min}분 · 어떻게 할까? <b id="mvt" style="color:#FFB27A">${Math.max(0, Math.ceil(MV.moT == null ? 10 : MV.moT))}</b>초 안에 고르세요</div><div class="${opts.length===3?'opts3':'optsn'}">${opts.map(o => { const lv = lvl3(o.shown); return `<button class="opt ${o.fav?'fav':''}" data-act="mv" data-id="${o.id}"><b>${o.fav?'★ ':''}${o.ord?'📋 ':''}${o.n}</b><span class="lv ${lv[1]}">${lv[0]}</span><span class="pbar sm"><i class="${lv[1]}" style="width:${Math.round(o.shown*100)}%"></i></span><span class="dim s11 pc ${lv[1]}">성공 ${Math.round(o.shown*100)}%</span></button>`; }).join('')}</div></div>`; }
+  else if (MV.over) { const st = M.role==='start'?'선발':M.role==='sub'?'교체':M.role==='inj'?'부상 결장':M.role==='sus'?'출전 정지':M.role==='away'?'대표팀 차출':'벤치(결장)'; const mv = M.mvp || Core.mvpOf(M), [fh, fa] = scoreAt(MV.etOn ? 120 : 90), won = (M.mineHome ? fh - fa : fa - fh) || (MV.so ? (MV.so.sm > MV.so.so ? 1 : -1) : 0), res = won > 0 ? '승리' : won < 0 ? '패배' : '무승부';
+    dec = `<div class="card mom"><div class="momt">경기 종료 · ${res}</div><div class="momsc">${fh} : ${fa}</div>${MV.so ? `<div class="dim">승부차기 ${M.mineHome ? MV.so.sm : MV.so.so} : ${M.mineHome ? MV.so.so : MV.so.sm}</div>` : MV.etOn ? '<div class="dim">연장전 종료</div>' : ''}${mv ? `<div class="momch">${sprH(mv.p, MV.kc[mv.mine ? 'm' : 'o'], 64, mv.me ? 'jump' : 'idle')}${mv.me ? '<i class="crown">' + IC.crown + '</i>' : ''}</div><div class="momn ${mv.me ? 'me' : ''}">${IC.crown} MVP ${esc(mv.p.name)}${mv.me ? ' (나!)' : ''}</div>` : ''}<div class="dim">${M.role==='mgr' ? '감독 모드' : '내 역할: ' + st}</div><div class="row g8 wrapx" style="justify-content:center">${M.myGoals ? `<span class="tag">${IC.ball} ${M.myGoals}골</span>` : ''}${M.myAssists ? `<span class="tag">${IC.boot} ${M.myAssists}도움</span>` : ''}</div><div class="row g8"><button class="btn sec grow" data-act="mtab" data-id="ana">📊 경기 분석</button><button class="btn grow" data-act="mend">결과 확인</button></div></div>`; }
+  const roleTxt = M.role==='mgr' ? '감독석' : M.role==='start' ? '선발 출전' : M.role==='sub' ? (MV && MV.min >= M.from ? `${M.from}분 교체 투입` : `벤치 → ${M.from}분 투입 예정`) : M.role==='inj' ? '부상으로 결장' : M.role==='sus' ? '출전 정지 (징계)' : M.role==='away' ? '대표팀 차출로 결장' : '벤치 (출전 명단 제외)';
   $('#mh').innerHTML = `<div class="dim">${esc(M.title)} · ${Core.fmtDate(G.day)}</div><div class="sc"><div>${crest(M.h,18)} ${esc(M.h.name)}</div><b>${sh} : ${sa}</b><div>${esc(M.a.name)} ${crest(M.a,18)}</div></div><div class="dim">${MV.so ? '승부차기 ' + MV.so.sm + ' : ' + MV.so.so : (MV.etOn ? '연장 ' : '') + MV.min + "'"} · ${roleTxt}</div><div class="bar"><i style="width:${Math.min(100, MV.min / (MV.etOn ? 120 : 90) * 100)}%"></i></div>`;
-  $('#mb').className = 'mb' + (MV.momentOpen || MV.talk ? ' hasdec' : MV.over ? ' isover' : ''); $('#mb').innerHTML = `${MV.momentOpen || MV.talk ? dec : mtabs() + ((S.mtab || 'flow') === 'flow' || !MV.over ? dec : '<button class="btn wide" data-act="mend" style="margin:4px 0">결과 확인</button>')}${MV.momentOpen || MV.talk || (S.mtab || 'flow') === 'flow' ? `<div class="sec">경기 흐름</div>${MV.log.map(x => `<div class="li ev ${x.cls||''}"><span class="mn">${x.min}'</span><span class="ico">${x.ic}</span><span class="et">${x.t}</span></div>`).join('') || '<div class="dim">킥오프!</div>'}` : S.mtab === 'stat' ? statView(M) : S.mtab === 'tac' ? tacView(M) : matchMeView(M)}`;
-  $('#mf').innerHTML = MV.over ? '' : `<div class="spd">${[['full', '풀'], ['hl', '하이라이트']].map(([k, n]) => `<button class="chip ${(S.vm || 'full') === k ? 'on' : ''}" data-act="mvm" data-id="${k}">${n}</button>`).join('')}${SPD.map(v => `<button class="chip ${(S.spd||1)===v?'on':''}" data-act="mspd" data-id="${v}">${v}배속</button>`).join('')}${MV.momentOpen || MV.mgrPanel ? '' : (M.role==='mgr' ? '<button class="btn sec" data-act="mpopen">전술·교체</button>' : '<button class="btn sec" data-act="mpopen">전술·교체 보기</button>') + '<button class="btn sec" data-act="mskip">끝까지 자동 진행</button>'}<button class="btn sec" data-act="mexit">나가기</button></div>`;
+  $('#mb').className = 'mb' + (MV.momentOpen || MV.talk ? ' hasdec' : MV.over ? ' isover' : ''); $('#mb').innerHTML = `${MV.momentOpen || MV.talk ? dec : mtabs() + ((S.mtab || 'flow') === 'flow' || !MV.over ? dec : '<button class="btn wide" data-act="mend" style="margin:4px 0">결과 확인</button>')}${MV.momentOpen || MV.talk || (S.mtab || 'flow') === 'flow' ? `<div class="sec">경기 흐름</div>${MV.log.map(x => `<div class="li ev ${x.cls||''}"><span class="mn">${x.min}'</span><span class="ico">${x.ic}</span><span class="et">${x.t}</span></div>`).join('') || '<div class="dim">킥오프!</div>'}` : S.mtab === 'ana' && MV.over ? anaView(M) : S.mtab === 'stat' ? statView(M) : S.mtab === 'tac' ? tacView(M) : matchMeView(M)}`;
+  $('#mf').innerHTML = MV.over ? '' : `<div class="spd">${S.mfOpen ? [['full', '풀'], ['hl', '하이라이트'], ['mine', '내 장면만']].map(([k, n]) => `<button class="chip ${(S.vm || 'full') === k ? 'on' : ''}" data-act="mvm" data-id="${k}">${n}</button>`).join('') + SPD.map(v => `<button class="chip ${(S.spd||1)===v?'on':''}" data-act="mspd" data-id="${v}">${v}배속</button>`).join('') + '<button class="chip on" data-act="mfold">닫기 ✕</button>' : `<button class="chip vset" data-act="mfold">⚙ ${({ full: '풀', hl: '하이라이트', mine: '내 장면만' })[S.vm || 'full']} · ${S.spd || 1}배속</button>`}${MV.momentOpen || MV.mgrPanel ? '' : (M.role==='mgr' ? `<div class="seg qm">${['수비적', '균형', '공격적'].map((n, v) => `<button class="${((M.mine.tactic || {}).ment == null ? 1 : M.mine.tactic.ment) === v ? 'on' : ''}" data-act="mment" data-id="${v}">${n}</button>`).join('')}</div>` + '<button class="btn sec" data-act="mpopen">전술·교체</button>' : '<button class="btn sec" data-act="mpopen">전술·교체 보기</button>') + '<button class="btn sec" data-act="mskip">끝까지 자동 진행</button>'}<button class="btn sec" data-act="mexit">나가기</button></div>`;
   if (MV.mgrPanel) { $('#mb').className = 'mb'; $('#mb').innerHTML = M.role === 'mgr' ? mgrPanelHTML(M) : playerPanelHTML(M); $('#mf').innerHTML = '<div class="spd"><button class="btn wide" data-act="mpclose" style="flex:2">경기 재개 ▶</button><button class="btn sec" data-act="mexit" style="flex:1">나가기</button></div>'; }
 }
 
@@ -1511,6 +1681,7 @@ function endMatchUI() {
   if (MV && MV.raf) cancelAnimationFrame(MV.raf);
   const ctx0 = G0().mm && G0().mm.ctx; G0().wcLast = null;
   const mm0 = G0().mm, snap = (MV && mm0 && !mm0.xt && MV.mst && MV.ost) ? { mineId: mm0.mineHome ? mm0.h.id : mm0.a.id, my: mm0.mine.name, op: mm0.opp.name, mst: MV.mst.map(p => ({ n: p.name, sub: p.sub, fin: PA(p, 'FIN') })), ost: MV.ost.map(p => ({ n: p.name, sub: p.sub, fin: PA(p, 'FIN') })) } : null;
+  try { anaSave(G0().mm); } catch (e) {}
   const r = Core.finishMine(); $('#match').classList.remove('on'); lockOrient('portrait'); S.matchOpen = false; MV = null; save(); try { if (G0().mode === 'mgr' && !G0().wc && !G0().mgr.sacked) { const pr = Core.mgrPressGen(); if (pr && (pr.derby || Math.random() < 0.5)) { S.modalKind = 'press'; S.modal = pressModal(); } } } catch (e) {}
   const rt = r.rating ? ` · 평점 ${f1(r.rating)}` : ''; { const wl = G0().wcLast; if (wl && snap) { render(); etShow(etBuild(snap, wl, r.res)); return; } toast(wl ? `종료 ${r.res.gh}-${r.res.ga} · ${wl.pen ? '연장 ' + wl.et.join(':') + ' 후 승부차기 ' : '연장전 ' + wl.et.join(':') + ' · '}${Core.clubOf(wl.w).name} 승` : `종료 ${r.res.gh}-${r.res.ga}${rt}`); } render();
 }
@@ -1520,12 +1691,15 @@ const isM = () => { try { return !!(Core.G && Core.G.mode === 'mgr'); } catch (e
 const MNAV = [['home', '홈'], ['squad', '선수단'], ['mtac', '전술'], ['mkt', '이적'], ['mclub', '구단'], ['league', '순위']];
 const POSL = ['ALL', 'GK', 'CB', 'FB', 'DM', 'CM', 'AM', 'W', 'ST'];
 const roleNm = (id) => { const R = Core.Eng.ROLES[id]; return R ? R.name : (id || '-'); };
+function ddakLogo(sz) {                                                                      // 딱알 솔루션 통일 로고: 빨간 둥근 사각형 + 흰 'ㄷ' 두 개
+  return `<svg width="${sz}" height="${sz}" viewBox="0 0 100 100" aria-label="딱알 솔루션" style="flex:none;display:block"><rect width="100" height="100" rx="24" fill="#E23B2A"/><path d="M47 31H25V69H47M79 31H57V69H79" fill="none" stroke="#FFF8EE" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
 function modeView() {
   return `<div class="top"><div>${pixLogo(92)}</div><div class="dim">블록 풋볼매니저</div></div><div class="body"><div class="dim">어떤 길로 시작할까요? 나라·리그(월드) 선택은 다음 단계입니다.</div>
   <div class="card lnk modec" data-act="mode" data-id="player"><div><div class="mi">⚽</div><b>선수 육성 모드</b><div class="dim">유스·신인에서 출발해 훈련과 경기 속 선택으로 한 명의 선수를 월드클래스로 키웁니다.</div></div></div>
   <div class="card lnk modec" data-act="mode" data-id="mgr"><div><div class="mi">📋</div><b>감독 모드</b><div class="dim">구단을 맡아 선발·포메이션·역할·팀 지시를 직접 정하고, 이적 시장과 이사회 신임을 관리하며 시즌 목표에 도전합니다. 경기는 직접 관전하거나 요약으로 빠르게 진행할 수 있습니다.</div></div></div>
   <div class="card lnk modec" data-act="mode" data-id="wc"><div><div class="mi">🌍</div><b>월드컵 모드</b><div class="dim">48개국 중 한 나라의 감독이 되어 조별리그부터 결승까지 한 대회를 치릅니다. 선발·전술·교체를 직접 정하고, 우승에 도전하세요. 월드 생성 없이 바로 시작합니다.</div></div></div>
-  ${Object.keys(S.slots || {}).length ? `<div class="sec">저장된 게임 불러오기</div>${slotRows(false)}` : ''}</div>`;
+  ${Object.keys(S.slots || {}).length ? `<div class="sec">저장된 게임 불러오기</div>${slotRows(false)}` : ''}<div class="ddak">${ddakLogo(22)}<span>딱알 솔루션</span></div></div>`;
 }
 function mcreateView() {
   const c = S.cr, G = G0(); if (!S.sel.includes(c.cc)) c.cc = S.sel[0];
@@ -1616,21 +1790,21 @@ function mgrHomeView() {
   const G = G0(), g = G.mgr, m = Core.me(), c = Core.clubOf(m.club), st = Core.mgrStanding(), nf = nextFixture(m.club), L = Core.mgrLineup(), sq = Core.mgrSquad();
   const bd = Math.round(g.board), bc = bd >= 65 ? '#C6F36B' : bd >= 35 ? '#FFD46B' : '#FF7A6B', bt = bd < 25 ? '⚠ 경질 위험' : bd >= 75 ? '매우 신뢰' : bd >= 50 ? '안정' : '불안';
   const ontrack = st ? st.rank <= g.target : true;
-  const board = `<div class="card"><div class="row"><b>이사회 신임</b><span class="tag ${bd < 35 ? 'warn' : ''}">${bt}</span></div><div class="mbar"><i style="width:${bd}%;background:${bc}"></i></div><div class="row"><span class="dim">시즌 목표</span><b>${g.target}위 이내</b></div><div class="row"><span class="dim">현재 순위</span><b style="color:${ontrack ? '#C6F36B' : '#FFB27A'}">${st ? st.rank + '위 / ' + st.n + '팀 · ' + st.pts + '점 (' + st.p + '경기)' : '-'}</b></div></div>`;
+  const board = `<div class="card"><div class="row"><b>이사회 신임</b><span class="tag ${bd < 35 ? 'warn' : ''}">${bt}</span></div><div class="mbar"><i style="width:${bd}%;background:${bc}"></i></div><div class="row"><span class="dim">시즌 목표</span><b>${g.target}위 이내</b></div><div class="row"><span class="dim">현재 순위</span>${st && !st.p ? '<b class="dim">개막 전</b>' : `<b style="color:${ontrack ? '#C6F36B' : '#FFB27A'}">`}${st && !st.p ? '' : st ? st.rank + '위 / ' + st.n + '팀 · ' + st.pts + '점 (' + st.p + '경기)</b>' : '-</b>'}</div></div>`;
   let nx = '';
   if (G.pendingMine) nx = `<div class="card gl"><b>오늘은 경기일입니다</b><div class="dim">${esc(Core.clubOf(G.pendingMine.h).name)} vs ${esc(Core.clubOf(G.pendingMine.a).name)}</div><button class="btn wide" data-act="mpre">경기 준비 ⚽</button></div>`;
   else if (nf) { const h = Core.clubOf(nf.h), a = Core.clubOf(nf.a), d = nf.day - G.day, op = nf.h === m.club ? a : h; nx = `<div class="card"><div class="row"><span class="dim">다음 경기 · ${Core.fmtDate(nf.day)} ${d === 0 ? '· 오늘' : '· D-' + d}</span><span class="tag">${(Core.rivalOf(c) === op.id) ? '🔥 라이벌전 · ' : ''}${esc(nf.label)}</span></div><div class="vs"><div>${crest(h, 30)}<div>${esc(h.name)}</div></div><b>vs</b><div>${crest(a, 30)}<div>${esc(a.name)}</div></div></div><div class="dim">상대 전력 ${Math.round(op.strength)} · 우리 ${Math.round(c.strength)}</div></div>`; }
   const inj = L.injured.length ? `<div class="card warn"><b>부상자 ${L.injured.length}명</b><div class="dim">${L.injured.slice(0, 6).map(p => esc(p.name) + '(' + p.inj + '일)').join(' · ')}</div></div>` : '';
   const news = G.news.filter(n => n.me).slice(0, 5).map(n => `<div class="li"><span class="dim">${Core.fmtDate(n.d).slice(5, 10)}</span> ${esc(n.text)}</div>`).join('') || '<div class="dim">아직 소식이 없습니다.</div>';
   const hist = g.seasons.length ? `<div class="sec">지난 시즌</div><div class="card">${g.seasons.slice(-5).reverse().map(s => `<div class="li">${esc(s.season)} · ${esc(s.club)} ${s.rank}위 <span class="tag ${s.ok ? '' : 'warn'}">${s.ok ? '목표 달성' : '미달'}</span></div>`).join('')}</div>` : '';
-  return mgrTop() + `<div class="body">${board}${nx}<div class="tiles">${tile('예산', g.cash + '억', '이적 자금')}${tile('전적', g.w + '-' + g.d + '-' + g.l, '승-무-패')}${tile('선수단', sq.length + '명', '16~30')}${tile('전력', Math.round(c.strength), '1부 평균 비교')}</div>${inj}
+  return mgrTop() + `<div class="body">${board}${isW() ? '' : tourCard()}${nx}<div class="tiles">${tile('예산', g.cash + '억', '이적 자금')}${tile('전적', g.w + '-' + g.d + '-' + g.l, '승-무-패')}${tile('선수단', sq.length + '명', '16~30')}${tile('전력', Math.round(c.strength), '1부 평균 비교')}</div>${inj}
   <div class="sec">구단 소식 <span class="dim" data-act="tab" data-id="news" style="float:right">전체 ›</span></div><div class="card">${news}</div>${hist}</div>`;
 }
 function mgrSquadView() {
   const sq = Core.mgrSquad(), L = Core.mgrLineup(), xi = new Set(L.slots.map(e => e.p.id)), f = S.sqf || 'ALL';
   const list = sq.filter(p => f === 'ALL' || p.sub === f).sort((a, b) => b.ovr - a.ovr);
   const chips = `<div class="chips">${POSL.map(k => `<button class="chip ${f === k ? 'on' : ''}" data-act="sqf" data-id="${k}">${k === 'ALL' ? '전체' : k}</button>`).join('')}</div>`;
-  const rows = list.map(p => `<div class="card sqr" data-act="pl" data-id="${p.id}"><span class="tag pos">${p.sub}</span><div class="grow"><b>${esc(p.name)}</b>${xi.has(p.id) ? ' <span class="tag">선발</span>' : ''}${p.inj > 0 ? ` <span class="tag warn">부상 ${p.inj}일</span>` : ''}<div class="dim">${p.age}세 · ${Core.NATK(p.nat)} · 계약 ${p.ct ? p.ct.until : '-'} · 가치 ${Core.mgrValue(p)}억</div></div><b class="ovr">${p.ovr}</b>${isW() ? '' : `<button class="btn sec sm" data-act="msell" data-id="${p.id}">${S.sellArm === p.id ? '확정?' : '매각'}</button>`}</div>`).join('');
+  const rows = list.map(p => `<div class="card sqr" data-act="pl" data-id="${p.id}"><span class="tag pos">${p.sub}</span><div class="grow"><b>${esc(p.name)}</b>${xi.has(p.id) ? ' <span class="tag">선발</span>' : ''}${p.inj > 0 ? ` <span class="tag warn">부상 ${p.inj}일</span>` : ''}${susTag(p)}<div class="dim">${p.age}세 · ${Core.NATK(p.nat)} · 계약 ${p.ct ? p.ct.until : '-'} · 가치 ${Core.mgrValue(p)}억</div></div><b class="ovr">${p.ovr}</b>${isW() ? '' : `<button class="btn sec sm" data-act="msell" data-id="${p.id}">${S.sellArm === p.id ? '확정?' : '매각'}</button>`}</div>`).join('');
   return mgrTop() + `<div class="body"><div class="row"><b>선수단 ${sq.length}명</b><span class="dim">${isW() ? '탭하면 능력치' : '탭하면 능력치 · 매각은 이적 시장 기간에만'}</span></div>${chips}${rows || '<div class="dim">선수가 없습니다.</div>'}</div>`;
 }
 function mgrTacView() {
@@ -1685,7 +1859,8 @@ function mgrClubView() {
   const tr = g.trophies || [];
   const shelf = tr.length ? `<div class="shelf">${tr.slice().reverse().map(t => `<div class="trp">${trophySvg('#FFD54A', 38)}<b>${esc(t.name)}</b><span class="dim">${esc(t.season)}</span></div>`).join('')}</div>` : `<div class="dim" style="padding:8px 0">아직 트로피가 없습니다. 첫 우승을 노려 보세요!</div>`;
   const hall = `<div class="sec">🏆 트로피장 <span class="dim">${tr.length}개</span></div><div class="card">${shelf}</div>`;
-  return mgrTop() + `<div class="body">${fans}${rivalCard}${hall}${spons}${fin}${stf}</div>`;
+  const fac = `<div class="sec">🏗️ 시설 투자</div><div class="card">${Object.keys(Core.FAC).map(k => { const F = Core.FAC[k], lv = Core.facLv(k), cost = Core.facCost(lv); return `<div class="stf"><span class="ic">${F.ic}</span><div class="grow"><b>${F.n}</b> <span class="tag">Lv.${lv}/5</span><div class="dim">${esc(F.d)}</div></div>${lv >= 5 ? '<span class="tag">최고</span>' : `<button class="btn sm ${g.cash >= cost ? '' : 'sec'}" data-act="facup" data-id="${k}">${cost}억</button>`}</div>`; }).join('')}<div class="dim">시설은 한 번 지으면 계속 효과가 납니다. 남는 예산을 쓰기 좋은 곳입니다.</div></div>`;
+  return mgrTop() + `<div class="body">${fans}${rivalCard}${hall}${fac}${spons}${fin}${stf}</div>`;
 }
 function pressModal() {
   const g = Core.mgrX(), pr = g.press; if (!pr) return '';
@@ -1712,14 +1887,20 @@ function playerPanelHTML(M) {                                               // �
 }
 function matchTitleUI(ctx) { try { return compLabel(ctx); } catch (e) { return '경기'; } }
 // ----- 경기 중 감독 패널 -----
+const SEG = [15, 30, 45, 60, 75];
+function segNext(min) { return SEG.find(s => s > min) || null; }
+function segTick(M) {                                                                         // 15분 구간: 감독 모드에서 남은 시간 결과를 현재 전술·상황으로 다시 계산
+  if (!M || M.role !== 'mgr' || !SEG.includes(MV.min)) return; try { if (!Core.mgrSegment(MV.min)) return; } catch (e) { return; }
+  if (M.segDirty) { M.segDirty = false; MV.log.unshift({ min: MV.min, ic: '⏱️', cls: '', t: `<b>${MV.min}분 구간</b> 새 전술·교체가 경기 결과에 반영되기 시작합니다` }); if (!MV.hlFast) lbl('전술 반영'); }
+}
 function mgrPanelHTML(M) {
-  const t = M.mine.tactic, left = 5 - (M.mgrSubs || 0), chg = Math.max(0, 3 - (M.mgrChanges || 0));
+  const t = M.mine.tactic, left = 5 - (M.mgrSubs || 0), nxt = segNext(MV.min);
   const ins = Object.keys(INSTR_L).map(k => `<div class="inrow"><span class="dim">${INSTR_L[k][0]}</span><div class="seg">${INSTR_L[k][1].map((n, v) => `<button class="${(t[k] == null ? 1 : t[k]) === v ? 'on' : ''}" data-act="mpinstr" data-k="${k}" data-id="${v}">${n}</button>`).join('')}</div></div>`).join('');
   const yc = new Set(), rc = new Set(); (M.evx || []).forEach(x => { if (x.shown && x.p) { if (x.t === 'yc') yc.add(x.p.id); if (x.t === 'rc') rc.add(x.p.id); } });
   const tir = p => MV.min >= 55 && PA(p, 'STA') < 58 ? ' <span class="dim">⚡피로</span>' : '', yel = p => yc.has(p.id) ? ' 🟨' : '';
   const st = MV.mst.filter(p => !rc.has(p.id)).map(p => `<div class="sqr mini ${S.mpout === p.id ? 'on' : ''}" data-act="mpout" data-id="${p.id}"><span class="tag pos">${p.sub}</span><div class="grow">${esc(p.name)}${yel(p)}${tir(p)}</div><b>${p.ovr}</b></div>`).join('');
   const bn = (M.benchMine || []).slice().sort((a, b) => b.ovr - a.ovr).map(p => `<div class="sqr mini" data-act="mpin" data-id="${p.id}"><span class="tag pos">${p.sub}</span><div class="grow">${esc(p.name)}</div><b>${p.ovr}</b></div>`).join('');
-  return `<div class="card gl"><b>전술·교체</b><div class="dim">경기 일시정지 중 · 교체 ${left}회 남음 · 전술 반영 ${chg}회 남음${MV.min >= 88 ? ' · 종료 직전이라 효과가 거의 없습니다' : ''}</div></div><div class="sec">팀 지시</div><div class="card">${ins}</div>
+  return `<div class="card gl"><b>전술·교체</b><div class="dim">경기 일시정지 중 · 교체 ${left}회 남음 · 전술·교체는 15분 구간마다 결과에 반영됩니다${nxt ? ` (다음 반영 ${nxt}분)` : ' · 남은 구간이 없어 효과가 없습니다'}</div></div><div class="sec">팀 지시</div><div class="card">${ins}</div>
   <div class="sec">교체 <span class="dim">나갈 선수 → 들어올 선수 순서로 탭</span></div><div class="card"><div class="dim">그라운드</div>${st}</div><div class="card"><div class="dim">벤치</div>${bn || '<div class="dim">벤치 선수가 없습니다.</div>'}</div>`;
 }
 function mgrPanelOpen() {
@@ -1730,21 +1911,49 @@ function mgrPanelOpen() {
 }
 function mgrPanelClose() {
   if (!MV || !MV.mgrPanel) return; const M = G0().mm;
-  if (MV.mgrDirty && M) { if ((M.mgrChanges || 0) < 3) { Core.mgrReplan(MV.min); if (MV.fxy) MV.fxy.m = fpos(MV.mst, (M.mine.tactic && M.mine.tactic.formation) || '4-4-2'); MV.tk.m = tkOf(M.mine); M.mgrChanges = (M.mgrChanges || 0) + 1; MV.log.unshift({ min: MV.min, ic: '📋', cls: '', t: '<b>감독 지시</b> 전술을 조정했습니다' }); } else MV.log.unshift({ min: MV.min, ic: '📋', cls: '', t: '전술 변경 한도를 넘어 효과가 반영되지 않습니다' }); }
+  if (MV.mgrDirty && M) { if (MV.fxy) MV.fxy.m = fpos(MV.mst, (M.mine.tactic && M.mine.tactic.formation) || '4-4-2'); MV.tk.m = tkOf(M.mine); M.segDirty = true; const nx = segNext(MV.min); MV.log.unshift({ min: MV.min, ic: '📋', cls: '', t: `<b>감독 지시</b> 전술을 조정했습니다${nx ? ` <span class="dim">· ${nx}분 구간부터 결과에 반영</span>` : ''}` }); }
   MV.mgrPanel = false; MV.mgrDirty = false;
   // 창을 열기 전에 멈춰 있던 이유가 '하프타임 휴식'이거나 장면 선택·연출(득점·세트피스 등)이면 그 흐름을 이어 가고, 배너 연출용 일시정지였다면 풀어 준다(예전엔 그대로 멈춰 버렸음)
   { const hold = !!MV.talk || !!MV.momentOpen || !!MV.pen || !!MV.so || !!MV.lead || !!MV.pg || !!MV.sp; MV.paused = hold; if (!hold) { clearTimeout(MV.fxP); } MV.pzUntil = performance.now() + 12000; }
   renderMatch();
 }
 function mgrSubUI(outId, inId) {
-  const M = G0().mm, r = Core.mgrSub(outId, inId, MV.min); if (!r) { toast('교체할 수 없습니다 (5회 한도)'); return; }
+  const M = G0().mm, r = Core.mgrSub(outId, inId, MV.min); if (r) M.segDirty = true; if (!r) { toast('교체할 수 없습니다 (5회 한도)'); return; }
   const i = MV.mst.findIndex(p => p.id === outId); if (i >= 0) MV.mst[i] = r.inn;
   MV.mgrDirty = true; MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 — ${esc(r.inn.name)} IN / ${esc(r.out.name)} OUT` });
-  const pb = $('#pitchbox'); if (pb) { pb.innerHTML = pitchHTML(M); MV.els = null; } S.mpout = null; renderMatch();
+  const pb = $('#pitchbox'); if (pb) { pb.innerHTML = pitchHTML(M); MV.els = null; MV.refEl = null; } S.mpout = null; renderMatch();
 }
 
 const NAV = [['home','홈'],['me','내 선수'],['ctr','이적'],['league','순위·대회'],['news','뉴스']];
 function navBadge(id) { try { const m = Core.me(); if (id==='home') return m.meet ? '●' : ''; if (id==='ctr') return (m.offers.length || m.pending || m.renewal) ? '●' : ''; } catch (e) {} return ''; }
+function seasonCardModal() {                                                                  // 시즌 결산 카드
+  const s = G0().seasonCard, tile2 = (k, v, sub) => `<div class="tile"><div class="dim">${k}</div><div class="big">${v}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div>`;
+  const head = `<div style="text-align:center"><div class="dim">${esc(s.lg)} · ${esc(s.season)} 시즌 결산</div><div class="ttl">${esc(s.club)} ${s.rank}위 <span class="dim">/ ${s.n}팀</span></div></div>`;
+  let body;
+  if (s.mgr) body = `<div class="tiles">${tile2('성적', `${s.w}-${s.d}-${s.l}`, '승-무-패')}${tile2('득실', `${s.gf}:${s.ga}`, '')}${tile2('승점', s.pts, '')}${tile2('목표', s.rank <= s.target ? '달성 ✅' : '미달 ❌', `${s.target}위 이내`)}</div><div class="card">${s.troph.length ? `<div class="li">🏆 ${s.troph.map(esc).join(', ')}</div>` : ''}${s.top ? `<div class="li">⚽ 팀 득점왕 ${esc(s.top[0])} ${s.top[1]}골</div>` : ''}<div class="li">이사회 신임 ${s.board} · 팬 지지도 ${s.fans}</div>${(s.aw || []).length ? `<div class="li">🎖️ ${s.aw.map(esc).join(' · ')}</div>` : ''}</div>`;
+  else body = `<div class="tiles">${tile2('출전', s.a, `선발 ${s.s}`)}${tile2('골', s.g, '')}${tile2('도움', s.as, '')}${tile2('평점', s.rt || '-', '')}</div><div class="card"><div class="li">📈 종합 ${s.ovr0} → <b>${s.ovr}</b> (${s.ovr - s.ovr0 >= 0 ? '+' : ''}${s.ovr - s.ovr0}) · 인지도 ${s.fame}</div>${s.cupA ? `<div class="li">🏆 컵·대륙 대회 ${s.cupA}경기 ${s.cupG}골</div>` : ''}${s.ntA ? `<div class="li">🛡️ 대표팀 통산 ${s.ntA}경기</div>` : ''}${(s.aw || []).length ? `<div class="li">🎖️ ${s.aw.map(esc).join(' · ')}</div>` : '<div class="li dim">이번 시즌 개인 수상은 없습니다.</div>'}</div>`;
+  return `<div class="cerbox" style="text-align:left">${head}${body}<div class="dim" style="text-align:center;margin:6px 0">화면을 캡처해 공유해 보세요 📸</div><button class="btn wide" data-act="close">다음 시즌으로</button></div>`;
+}
+function awardModal() {                                                                     // 시즌 시상식
+  const G = G0(), A = G.awardPop, aw = A.aw, cl = (id) => { const c = Core.clubOf(id); return c ? esc(c.name) : ''; };
+  const one = (ic, t, r, v) => r ? `<div class="li"><span class="tag">${ic} ${t}</span> <b>${esc(r[0])}</b> <span class="dim">${cl(r[1])} · ${v}</span></div>` : '';
+  const POSN = { GK: 'GK', CB: 'CB', FB: 'FB', DM: 'DM', CM: 'CM', AM: 'AM', W: 'W', ST: 'ST' }, me = Core.me();
+  const b11 = aw.b11.map(r => `<div class="li ${r[3] === me.id || (Core.isMgr && Core.isMgr() && r[1] === me.club) ? 'hl' : ''}"><span class="tag pos">${POSN[r[4]] || r[4]}</span> ${esc(r[0])} <span class="dim">${cl(r[1])} · 평점 ${r[2]}</span></div>`).join('');
+  const win = A.wins && A.wins.length ? `<div class="card gl"><b>🎉 ${A.wins.map(esc).join(' · ')}</b></div>` : '';
+  return `<div class="cerbox" style="text-align:left"><div style="text-align:center">${trophySvg('#FFD54A', 70)}<div class="ttl">${esc(A.lgName)} ${esc(aw.season)} 시상식</div></div>${win}<div class="card">${one('👑', 'MVP', aw.mvp, aw.mvp ? '평점 ' + aw.mvp[2] : '')}${one('⚽', '득점왕', aw.top, aw.top ? aw.top[2] + '골' : '')}${one('🅰', '도움왕', aw.ast, aw.ast ? aw.ast[2] + '도움' : '')}${one('🌱', '영플레이어', aw.young, aw.young ? '평점 ' + aw.young[2] : '')}</div><div class="sec">베스트11 (4-3-3)</div><div class="card">${b11 || '<div class="dim">기준 출전 수를 채운 선수가 부족합니다.</div>'}</div><button class="btn wide" data-act="close">확인</button></div>`;
+}
+function hallView() {                                                                       // 명예의 전당
+  const L = Core.hallList().slice(0, 40), POS = Core.POS_KO || {};
+  if (!L.length) return '<div class="card dim">아직 은퇴한 선수가 없습니다. 시즌이 지나면 은퇴한 선수들의 통산 기록이 이곳에 남습니다.</div>';
+  return `<div class="dim" style="margin:4px 2px 8px">은퇴 선수 통산 기록 · 최고 능력치·출전·득점·수상으로 순위를 매깁니다</div>${L.map((h, i) => `<div class="card ${h.me ? 'gl' : ''}"><div class="row g8"><span class="tag">${i + 1}</span><div class="grow"><b>${esc(h.name)}</b>${h.me ? ' <span class="tag">나</span>' : ''} <span class="dim">${h.sub ? (POS[h.sub] || h.sub) : ''}${h.nat ? ' · ' + (Core.FLAG[h.nat] || '') : ''}${h.yr ? ' · ' + h.yr + '년 은퇴' : ''}</span><div class="dim">${h.a || 0}경기 ${h.g || 0}골 ${h.as || 0}도움${h.rt ? ' · 평균 평점 ' + h.rt : ''}${h.peak ? ' · 최고 ' + h.peak : ''}${h.aw ? ' · 수상 ' + h.aw + '회' : ''}</div><div class="dim s11">${(h.clubs || []).map(id => { const c = Core.clubOf(id); return c ? esc(c.name) : ''; }).filter(Boolean).join(' → ')}</div></div></div></div>`).join('')}`;
+}
+function retireView() {                                                                     // 은퇴 후 진로 선택
+  const m = Core.me(), cr = Core.careerOf(m), offers = Core.retireOffers();
+  return `<div class="top"><div class="ttl">현역 은퇴</div></div><div class="body"><div class="card gl"><b>${esc(m.name)} 선수, 그동안 수고 많으셨습니다</b><div class="dim">통산 ${cr.a}경기 ${cr.g}골 ${cr.as}도움${cr.rt ? ' · 평균 평점 ' + cr.rt : ''}${(m.awards || []).length ? ' · 수상 ' + m.awards.length + '회' : ''}</div><div class="dim">명예의 전당에 이름이 올랐습니다.</div>${m.legend ? `<div class="li">🏛️ <b>${esc(m.legend.clubName)}</b>, 등번호 <b>${m.legend.no}번 영구결번</b> — 구단 통산 ${m.legend.a}경기 ${m.legend.g}골</div><div class="li dim">🎉 은퇴 경기에 만원 관중이 모여 기립박수를 보냈습니다.</div>` : '<div class="li dim">🎉 마지막 경기 후 동료들이 헹가래를 쳐 주었습니다.</div>'}</div>
+  <div class="sec">감독으로 이어하기</div><div class="dim" style="margin:0 2px 6px">같은 세계에서 감독으로 새 커리어를 시작합니다. 지금까지의 기록·리그·선수들은 그대로 이어집니다. 선수 시절 명성 ${Math.round(m.fame || 0)}${(m.fame || 0) < 35 ? ' — 명성이 낮아 강호 구단의 제안은 오지 않았습니다.' : (m.fame || 0) >= 60 ? ' — 스타 출신이라 강호 구단도 관심을 보입니다.' : ''}</div>
+  ${offers.map(o => { const cl = Core.clubOf(o.id); return `<div class="card mclub" data-act="rtmgr" data-id="${o.id}"><div class="row g8">${crest(cl, 30)}<div class="grow"><b>${esc(o.name)}</b><div class="dim">${esc(o.tag)}</div></div><span class="tag">전력 ${o.strength}</span></div><div class="dim">목표: ${esc(o.goal)} · 예산 ${o.cash}억 원</div></div>`; }).join('') || '<div class="dim">제안이 없습니다.</div>'}
+  <div class="sec">명예의 전당</div>${hallView()}</div>`;
+}
 function cerModal() {
   const G = G0(), cr = G.cer, c = Core.clubOf(cr.cid);
   const pl = c.pl.map(x => G.players[x]).filter(p => p && !p.mgr && !p.retired).sort((a, b) => b.ovr - a.ovr).slice(0, 5);
@@ -1759,6 +1968,8 @@ function render() {
   try { const g = G0(); if (g && S.step === 'game') Core.normStats(Core.me()); } catch (e) {}
   try { if (S.welcome && S.step === 'game' && !S.busy && !S.matchOpen) { const w = S.welcome; S.welcome = null; setTimeout(() => popup('게임 시작!', w==='start' ? '선수 육성 모드가 시작되었습니다.\n아래 ‘진행’ 버튼으로 하루씩 보내며 훈련하고, 경기 일정에 맞춰 컨디션을 관리하세요.' : w==='mstart' ? '감독 모드가 시작되었습니다.\n구단 탭에서 스폰서·스태프를, 전술 탭에서 포메이션을 먼저 살펴보세요.' : '월드컵 모드가 시작되었습니다.\n조별리그를 통과해 결승 트로피를 노려보세요!', '🎉'), 250); } } catch (e) {}
   try { const g0 = G0(); if (g0 && g0.cer && !S.modal && !S.matchOpen && !S.busy && S.step === 'game') { S.modalKind = 'cer'; S.modal = cerModal(); sfx('trophy'); } } catch (e) {}
+  try { const g0 = G0(); if (g0 && !g0.cer && !g0.awardPop && g0.seasonCard && !S.modal && !S.matchOpen && !S.busy && S.step === 'game') { S.modalKind = 'sc'; S.modal = seasonCardModal(); } } catch (e) { try { G0().seasonCard = null; } catch (e2) {} }
+  try { const g0 = G0(); if (g0 && !g0.cer && g0.awardPop && !S.modal && !S.matchOpen && !S.busy && S.step === 'game') { S.modalKind = 'aw'; S.modal = awardModal(); sfx('trophy'); } } catch (e) { try { G0().awardPop = null; } catch (e2) {} }
   if (S.step==='setup' || S.step==='create' || S.step==='mode' || S.step==='mcreate' || S.step==='wcsel' || S.step==='wcsquad') {
     const o0 = document.querySelector('.scr'); const k0 = S.step + '|' + (S.step==='setup' ? (S.sel ? 'x' : '') : '') ; const t0 = (o0 && S._sk === k0) ? o0.scrollTop : 0;
     app.innerHTML = `<div class="scr">${S.step==='wcsquad' ? wcSquadView() : S.step==='mode' ? modeView() : S.step==='mcreate' ? mcreateView() : S.step==='wcsel' ? wcselView() : S.step==='setup' ? setupView() : creatorView()}</div>`;
@@ -1766,6 +1977,7 @@ function render() {
   }
   const oldSc = document.querySelector('.scr'); const keyNow = S.step + '|' + S.tab; const keepTop = (oldSc && S._sk === keyNow) ? oldSc.scrollTop : 0;
   const MG = isM();
+  if (!MG && G0().meRetired) { app.innerHTML = `<div class="scr">${retireView()}</div>`; $('#modal').style.display = S.modal ? 'block' : 'none'; return; }
   if (MG && !isW() && G0().mgr.sacked && !G0().pendingMine) { app.innerHTML = `<div class="scr">${sackView()}</div>`; $('#modal').style.display = S.modal ? 'block' : 'none'; return; }
   let v; try { v = MG ? (S.tab==='home' ? (isW() ? wcHomeView() : mgrHomeView()) : S.tab==='wcg' ? wcView() : S.tab==='squad' ? mgrSquadView() : S.tab==='mtac' ? mgrTacView() : S.tab==='mkt' ? mgrMktView() : S.tab==='mclub' ? mgrClubView() : S.tab==='news' ? newsView() : leagueView()) : S.tab==='home' ? homeView() : S.tab==='news' ? newsView() : S.tab==='league' ? leagueView() : S.tab==='me' ? meView() : contractView(); }
   catch (err) { v = `<div class="card"><b>화면 오류</b><div class="dim">${esc(String(err && err.message || err))}</div><div class="dim">이 글자를 화면 캡처해서 알려주세요.</div><button class="btn sec" data-act="tab" data-id="home">홈으로</button></div>`; try { console.error(err); } catch (e2) {} }
@@ -1878,6 +2090,8 @@ document.addEventListener('click', (e) => {
   if (a==='mjob') { Core.mgrTakeJob(+id); S.tab = 'home'; save(); render(); return; }
   if (a==='mpopen') { mgrPanelOpen(); return; }
   if (a==='mpclose') { mgrPanelClose(); return; }
+  if (a==='mfold') { S.mfOpen = !S.mfOpen; renderMatch(); return; }
+  if (a==='mment') { const M = G0().mm; if (!M || !MV || MV.over) return; Core.mgrSetInstr('ment', +id); MV.tk.m = tkOf(M.mine); M.segDirty = true; const nx = segNext(MV.min); MV.log.unshift({ min: MV.min, ic: '📋', cls: '', t: `<b>감독 지시</b> ${['수비적', '균형', '공격적'][+id]}으로 전환${nx ? ` <span class="dim">· ${nx}분 구간부터 결과에 반영</span>` : ''}` }); toast(nx ? `${['수비적', '균형', '공격적'][+id]} 전환 — ${nx}분부터 결과에 반영` : '남은 구간이 없어 결과에는 반영되지 않습니다'); renderMatch(); return; }
   if (a==='mpinstr') { Core.mgrSetInstr(t.dataset.k, +id); if (MV) MV.mgrDirty = true; renderMatch(); return; }
   if (a==='mpout') { S.mpout = (S.mpout === +id) ? null : +id; renderMatch(); return; }
   if (a==='mpin') { if (S.mpout == null) { toast('먼저 나갈 선수를 탭하세요'); return; } mgrSubUI(S.mpout, +id); return; }
@@ -1887,6 +2101,7 @@ document.addEventListener('click', (e) => {
   if (a==='start') { const nm = $('#nm'); const name = (nm && nm.value.trim()) || '양메시'; fixCreator(); Core.createMe({ name, h: S.cr.h, prefs: (S.cr.prefs||[]).filter(k => (Core.PREF_POS[S.cr.pos]||[]).includes(k)), trait: S.cr.trait, pos: S.cr.pos, club: S.cr.club, nat: S.cr.nat, age: S.cr.stage==='youth'?15:19, look: { skin:S.cr.skin, hair:S.cr.hair, style:S.cr.style } }); S.step = 'game'; S.lc = null; S.ld = null; save(); render(); return; }
   if (a==='tab') { S.tab = id; S.modal = null; S.modalKind = null; S._sk = null; }
   else if (a==='plan') { Core.me().plan = id; }
+  else if (a==='autorest') { const m = Core.me(); m.autoRest = m.autoRest === false; m.autoResting = false; toast('피로 자동 관리 ' + (m.autoRest ? 'ON' : 'OFF')); save(); S.modal = settingsModal(); render(); return; }
   else if (a==='cust') { const m = Core.me(); let l = (m.cust||[]).slice(); const ix = l.indexOf(id); if (ix>=0) l.splice(ix,1); else { l.push(id); if (l.length>2) l.shift(); } m.cust = l; m.plan = 'custom'; }
   else if (a==='roletrain') { Core.setRoleTraining(); toast('역할에 맞는 부족한 능력치를 집중 훈련합니다'); }
   else if (a==='spa') { Core.sponsorAccept(+id); toast('스폰서 계약 완료'); }
@@ -1896,11 +2111,17 @@ document.addEventListener('click', (e) => {
   else if (a==='add') Core.adDecline(+id);
   else if (a==='shop') { const [k, i] = id.split(':'); const r = Core.shopBuy(k, i); toast(r.ok ? '구매·계약 완료' : r.msg); if (r.ok) sfx('coin'); }
   else if (a==='ofd') S.modal = offerModal(+id);
-  else if (a==='nf') S.nf = id; else if (a==='lc') { S.lc = id; S.ld = null; S.sea = null; } else if (a==='ld') { S.ld = id; S.sea = null; } else if (a==='lsea') { S.sea = +id < 0 ? null : +id; if (S.lt==='hist') S.lt = 'table'; } else if (a==='lt') S.lt = id; else if (a==='cv') S.cv = id;
+  else if (a==='nf') S.nf = id; else if (a==='lc') { S.lc = id; S.ld = null; S.sea = null; } else if (a==='ld') { S.ld = id; S.sea = null; } else if (a==='lsea') { S.seaUser = true; S.sea = +id < 0 ? null : +id; if (S.lt==='hist') S.lt = 'table'; } else if (a==='lt') S.lt = id; else if (a==='cv') S.cv = id;
   else if (a==='pl') S.modal = profileHTML(G0().players[id]);
   else if (a==='club') { S.modal = clubModal(+id); }
   else if (a==='cmt') { S.cmt = id; S.modal = clubModal(S.cmid); }
-  else if (a==='close') { S.modal = null; S.modalKind = null; if (G0() && G0().cer) G0().cer = null; save(); }
+  else if (a==='evt') { const r = Core.evtPick(+id); if (r) { popup('선택 결과', r.txt, '📌'); save(); } render(); return; }
+  else if (a==='facup') { const r = Core.facUp(id); toast(r.msg); if (r.ok) save(); render(); return; }
+  else if (a==='offact') { const r = Core.offStart(id); toast(r.msg); if (r.ok) save(); render(); return; }
+  else if (a==='tour') { if (Core.tourPick(id)) { toast('프리시즌 투어를 정했습니다'); save(); } render(); return; }
+  else if (a==='retire') { ask('현역 은퇴', '정말 은퇴할까요?\n은퇴하면 선수로는 더 뛸 수 없고, 감독으로 이어서 할 수 있습니다.', '은퇴', () => { Core.meRetire(); save(); render(); }, '👋'); return; }
+  else if (a==='rtmgr') { if (Core.meToMgr(+id)) { S.tab = 'home'; S.welcome = 'mstart'; save(); render(); } return; }
+  else if (a==='close') { S.modal = null; S.modalKind = null; if (G0() && G0().cer) G0().cer = null; else if (G0() && G0().awardPop) G0().awardPop = null; else if (G0() && G0().seasonCard) G0().seasonCard = null; save(); }
   else if (a==='cerpress') { const g0 = G0(); Core.mgrCerPress(); g0.cer = null; S.modalKind = 'press'; S.modal = pressModal(); }
   else if (a==='mprepress') { const g0 = G0(); Core.mgrPreGen(); Core.mgrX().preDay = g0.day; S.modalKind = 'press'; S.modal = pressModal(); }
   else if (a==='msponsor') { const [sl, ix] = id.split(':'); const r = Core.mgrSponsorSign(sl, +ix); toast(r.msg); if (r.ok) sfx('coin'); save(); }
@@ -1941,8 +2162,8 @@ document.addEventListener('click', (e) => {
   else if (a==='fs') { try { localStorage.setItem('bfm_fs', String(+id)); } catch (e) {} fsApply(); render(); { const f = FS_OPT.find(x => String(x[0]) === String(id)); popup('글자·버튼 크기', `‘${f ? f[1] : id}’ 크기로 바꿨습니다.`, '🔠', 1800); } return; }
   else if (a==='talk') { if (!MV || !MV.talk) return; const r = (G0().mm && G0().mm.role === 'mgr') ? Core.mgrTalkPick(id, MV.talkDiff || 0) : Core.talkPick(id); MV.log.unshift({ min: 45, ic: '💬', cls: '', t: `<b>하프타임</b> ${esc(r.text)}` }); MV.talk = null; setTimeout(startSecond, 600); renderMatch(); return; }
   else if (a==='mtab') { S.mtab = id; renderMatch(); return; }
-  else if (a==='mvm') { S.vm = id; try { localStorage.setItem('bfm_vm', id); } catch (e) {} if (MV) { MV.hl = id === 'hl'; if (!MV.hl) MV.hlFast = false; MV.speed = -1; hlSync(); renderMatch(); } return; }
-  else if (a==='mspd') { S.spd = +id; try { localStorage.setItem('bfm_spd', String(S.spd)); } catch (e) {} if (MV) { MV.speed = spdMs(); if (MV.timer && !MV.skipping && !MV.over) { clearInterval(MV.timer); MV.timer = setInterval(tick, MV.speed); } hlSync(); renderMatch(); } return; }
+  else if (a==='mvm') { S.mfOpen = false; S.vm = id; try { localStorage.setItem('bfm_vm', id); } catch (e) {} if (MV) { MV.hl = id === 'hl' || id === 'mine'; if (!MV.hl) MV.hlFast = false; MV.speed = -1; hlSync(); renderMatch(); } return; }
+  else if (a==='mspd') { S.mfOpen = false; S.spd = +id; try { localStorage.setItem('bfm_spd', String(S.spd)); } catch (e) {} if (MV) { MV.speed = spdMs(); if (MV.timer && !MV.skipping && !MV.over) { clearInterval(MV.timer); MV.timer = setInterval(tick, MV.speed); } hlSync(); renderMatch(); } return; }
   else if (a==='pwatch' || a==='psum') { S.modal = null; S.modalKind = null; render(); startMatch(); if (a==='psum' && MV && !MV.over) { S.mtab = 'flow'; skipMatch(); } return; }
   else if (a==='mexit') { exitAskOpen(); return; }
   else if (a==='mexitno') { exitAskClose(); return; }
