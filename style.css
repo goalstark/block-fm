@@ -287,3 +287,9 @@ a[data-act]:active{opacity:.6}
 .v3cams{position:absolute;right:2.2%;bottom:4%;display:flex;flex-direction:column;gap:.45em;pointer-events:auto}
 .v3cams button{min-width:5.6em;height:2.5em;border-radius:.6em;border:1px solid #2A3446;background:#151B24;color:#F1F4F8;font:inherit;font-weight:900;box-shadow:0 .2em 0 rgba(0,0,0,.45)}
 .v3cams button.on{background:#FFD23F;color:#0E131A;border-color:#FFD23F}
+@media (max-width:520px){                                   /* 폰 세로: 경기장이 작으니 HUD를 줄여 가리지 않게 */
+  .v3cams{flex-direction:row;top:3%;bottom:auto;gap:.3em}
+  .v3cams button{min-width:0;height:2.1em;padding:0 .55em;font-size:.95em}
+  .v3cap{right:2.2%;bottom:3%;padding:.3em .6em}
+  .v3cap .ct{-webkit-line-clamp:1}
+}
