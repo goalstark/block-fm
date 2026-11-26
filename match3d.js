@@ -10,6 +10,7 @@ const V3D = (() => {
   const K = L / 35;                                                        // 시안(70×45)에서 커진 비율 — 경기장 주변 구조물 배치에 사용
   const wx = (g) => (g - 50) * (L / 49), wz = (g) => (g - 32) * (W / 31), WS = L / 49, WZ = W / 31;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const ADS = [{ t: '블록 풋볼 매니저', c: '#FFD23F', w: 300 }, { t: '딱알 솔루션', c: '#9fdcff', w: 240 }, { t: '딱펫', c: '#ff8fb1', w: 160 }, { t: 'BLOCK FOOTBALL MANAGER', c: '#ffffff', w: 324 }];   // 경기장 LED 광고판 문구(나중에 광고 자리로 사용)
   const col = (h) => new THREE.Color(h).convertSRGBToLinear();
   const lum = (h) => { const n = parseInt(String(h).slice(1, 7), 16); return ((n >> 16 & 255) * .299 + (n >> 8 & 255) * .587 + (n & 255) * .114) / 255; };
 
@@ -145,7 +146,7 @@ const V3D = (() => {
   function netTex() { return cached('net', () => { const c = mkCanvas(64, 64), x = c.getContext('2d'); x.strokeStyle = '#fff'; x.lineWidth = 3; x.strokeRect(0, 0, 64, 64); const t = toTex(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(10, 4); return t; }); }
   function boardTex() {                                                            // LED 광고판(모두 가상의 이름)
     return cached('board', () => { const c = mkCanvas(1024, 64), x = c.getContext('2d');
-      const items = [['#05080e', '#9fdcff', 'BLOCK FOOTBALL MANAGER'], ['#05080e', '#ffffff', '큐브 에너지'], ['#05080e', '#ff7a59', 'BRICK AIR'], ['#05080e', '#c6ff6a', 'PIXEL BANK']], wseg = [400, 208, 208, 208]; let px = 0;
+      const items = ADS.map(a => ['#05080e', a.c, a.t]), wseg = ADS.map(a => a.w); let px = 0;
       items.forEach((it, i) => { x.fillStyle = it[0]; x.fillRect(px, 0, wseg[i], 64); x.fillStyle = it[1]; x.font = `700 ${i ? 30 : 32}px ${NUMFONT}`; x.textAlign = 'center'; x.textBaseline = 'middle'; if (!R.lp) { x.shadowColor = it[1]; x.shadowBlur = 10; } x.fillText(it[2], px + wseg[i] / 2, 33); x.shadowBlur = 0; px += wseg[i]; });
       const t = toTex(c); t.wrapS = THREE.RepeatWrapping; return t; });
   }
@@ -312,7 +313,7 @@ const V3D = (() => {
     r.legL.rotation.x = s * .95 * amp * (1 - side * .6); r.legR.rotation.x = -s * .95 * amp * (1 - side * .6); r.armL.rotation.x = -s * .8 * amp; r.armR.rotation.x = s * .8 * amp;
     r.legL.rotation.z = side * .25 * Math.max(0, s); r.legR.rotation.z = -side * .25 * Math.max(0, -s);
     r.armL.rotation.z = .07 + (1 - amp) * .03; r.armR.rotation.z = -.07 - (1 - amp) * .03;
-    r.upper.rotation.x = (a.back ? -.08 : .16) * amp + (1 - amp) * Math.sin(t * 2.1 + (a.seed || 0)) * .015; r.upper.rotation.z = 0; r.head.rotation.y = (1 - amp) * Math.sin(t * .7 + (a.seed || 0)) * .25; r.head.rotation.x = 0;
+    r.upper.rotation.x = (a.back ? -.08 : .16) * amp + (1 - amp) * Math.sin(t * 2.1 + (a.seed || 0)) * .015; r.upper.rotation.z = 0; r.upper.rotation.y = 0; r.head.rotation.y = (1 - amp) * Math.sin(t * .7 + (a.seed || 0)) * .25; r.head.rotation.x = 0;
     r.body.position.y = Math.abs(Math.cos(a.phase || 0)) * .09 * amp; r.body.rotation.z = 0; r.body.rotation.x = 0;
     if (a.ready) { r.body.position.y = -.1; r.upper.rotation.x = .3; r.armL.rotation.z = .55; r.armR.rotation.z = -.55; r.armL.rotation.x = r.armR.rotation.x = -.35; r.legL.rotation.z = .12; r.legR.rotation.z = -.12; }
     if (a.touch > 0) { const k = Math.sin(clamp(a.touch / .28, 0, 1) * Math.PI); r.legR.rotation.x = -.55 * k; r.upper.rotation.x = .18; }
@@ -323,9 +324,17 @@ const V3D = (() => {
     if (a.head > 0) { const k = Math.sin(clamp((.55 - a.head) / .55, 0, 1) * Math.PI); r.body.position.y = .55 * k; r.legL.rotation.x = .5 * k; r.legR.rotation.x = .3 * k; r.armL.rotation.z = .9 * k; r.armR.rotation.z = -.9 * k; r.head.rotation.x = (a.head < .3 ? .55 : -.35) * k; r.upper.rotation.x = (a.head < .3 ? .35 : -.25) * k; }
     if (a.catch > 0) { const k = Math.sin(clamp((.6 - a.catch) / .6, 0, 1) * Math.PI); r.armL.rotation.x = r.armR.rotation.x = -1.6 * k; r.armL.rotation.z = .2; r.armR.rotation.z = -.2; r.body.position.y = .15 * k; r.upper.rotation.x = .2 * k; }
     if (a.slide > 0) { const k = Math.sin(clamp((.6 - a.slide) / .6, 0, 1) * Math.PI); r.body.rotation.x = -1.15 * k; r.body.position.y = .3 * k; r.legR.rotation.x = -1.2 * k; r.legL.rotation.x = .2 * k; r.armL.rotation.z = .9 * k; r.armR.rotation.z = -.9 * k; }
+    if (a.kick > 0 && a.kind === 'volley') { r.legR.rotation.x = Math.min(r.legR.rotation.x, 0) - .6; r.body.rotation.z = -.35; r.upper.rotation.z = -.25; }
+    if (a.kick > 0 && a.kind === 'chip') { const p = 1 - a.kick / .35; r.legR.rotation.x = p < .5 ? .5 * p / .5 : .5 - 1.6 * (p - .5) / .5; r.upper.rotation.x = -.2; }
+    if (a.kick > 0 && a.kind === 'curve') { r.upper.rotation.y = .35; r.legR.rotation.z = -.25; }
+    if (a.duel > 0) { const k = Math.sin(clamp(a.duel / .7, 0, 1) * Math.PI); r.upper.rotation.z = (a.duelS || 1) * .32 * k; r.armL.rotation.z = .45 * k; r.armR.rotation.z = -.45 * k; }
+    if (a.hand > 0) { r.armR.rotation.x = -2.4; r.armR.rotation.z = -.2; }
+    if (a.punch > 0) { const k = Math.sin(clamp((.5 - a.punch) / .5, 0, 1) * Math.PI); r.armL.rotation.x = r.armR.rotation.x = -2.0 * k; r.body.position.y = .45 * k; r.upper.rotation.x = -.15 * k; }
+    if (a.tip > 0) { const k = Math.sin(clamp((.6 - a.tip) / .6, 0, 1) * Math.PI); r.armR.rotation.x = -2.9 * k; r.armR.rotation.z = -.3; r.body.position.y = .8 * k; r.body.rotation.z = -.5 * k; }
+    if (a.catchHi > 0) { const k = Math.sin(clamp((.6 - a.catchHi) / .6, 0, 1) * Math.PI); r.armL.rotation.x = r.armR.rotation.x = -2.7 * k; r.body.position.y = .5 * k; }
     if (a.throw) { r.armL.rotation.x = r.armR.rotation.x = -2.9 + (a.throwT || 0) * 1.6; r.armL.rotation.z = .15; r.armR.rotation.z = -.15; r.upper.rotation.x = -.15 + (a.throwT || 0) * .5; }
     if (a.celeb) { r.armL.rotation.x = r.armR.rotation.x = -2.75 + Math.sin(t * 10) * .15; r.armL.rotation.z = .4; r.armR.rotation.z = -.4; r.body.position.y = Math.abs(Math.sin(t * 7 + (a.seed || 0))) * .55; r.head.rotation.y = 0; r.upper.rotation.x = -.12; }
-    if (a.dive > 0) { const k = Math.sin(clamp((.7 - a.dive) / .7, 0, 1) * Math.PI); r.body.rotation.z = (a.diveSide || 1) * 1.25 * k; r.body.position.y = .7 * k; r.armL.rotation.z = .4 + 2.4 * k; r.armR.rotation.z = -.4 - 2.4 * k; r.armL.rotation.x = r.armR.rotation.x = 0; }
+    if (a.dive > 0) { const k = Math.sin(clamp((.7 - a.dive) / .7, 0, 1) * Math.PI); r.body.rotation.z = (a.diveSide || 1) * 1.25 * k; r.body.position.y = (.2 + (a.diveH == null ? 1.4 : a.diveH) * .32) * k; r.armL.rotation.z = .4 + 2.4 * k; r.armR.rotation.z = -.4 - 2.4 * k; r.armL.rotation.x = r.armR.rotation.x = 0; }
     if (a.down) { r.body.rotation.x = -1.45; r.body.position.y = .25; }
   }
   const HAIR_MAP = { short: 'crop', sidepart: 'crop', curly: 'bowl', long: 'bowl', buzz: 'buzz', mohawk: 'mohawk', bun: 'bun' }, BOOTS = ['#111317', '#f4f4f4', '#ff5a36', '#2f7bff', '#ffd23f'];
@@ -357,8 +366,8 @@ const V3D = (() => {
     let dot = 1, side = 0; if (sp > .6) { let d = moveYaw - st.yaw; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; dot = Math.cos(d); side = Math.abs(Math.sin(d)); }
     const back = dot < -.3, sideStep = !back && side > .65;
     st.ph += dt * (2 + sp * (back ? 1.3 : 1.7));
-    for (const k of ['kick', 'dive', 'touch', 'head', 'catch', 'slide']) st[k] = Math.max(0, (st[k] || 0) - dt);
-    animateRig(r, Object.assign({ speed: sp, phase: st.ph, seed: st.seed, kick: st.kick, kind: st.kind, dive: st.dive, diveSide: st.diveSide, touch: st.touch, head: st.head, catch: st.catch, slide: st.slide, back, side: sideStep ? .8 : 0 }, extra || {}), R.t);
+    for (const k of ['kick', 'dive', 'touch', 'head', 'catch', 'slide', 'duel', 'hand', 'punch', 'tip', 'catchHi']) st[k] = Math.max(0, (st[k] || 0) - dt);
+    animateRig(r, Object.assign({ speed: sp, phase: st.ph, seed: st.seed, kick: st.kick, kind: st.kind, dive: st.dive, diveSide: st.diveSide, touch: st.touch, head: st.head, catch: st.catch, slide: st.slide, duel: st.duel, duelS: st.duelS, hand: st.hand, punch: st.punch, tip: st.tip, catchHi: st.catchHi, diveH: st.diveH, back, side: sideStep ? .8 : 0 }, extra || {}), R.t);
   }
   const angTo = (x1, z1, x2, z2) => Math.atan2(x2 - x1, z2 - z1);
   const angMix = (a, b, k) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d * k; };
@@ -387,16 +396,20 @@ const V3D = (() => {
         const p = playerOf(kh.s, kh.i), c = MV.pos[kh.s] && MV.pos[kh.s][kh.i], d = atkDir(kh.s), u = c ? (d > 0 ? c.x : 100 - c.x) : 50;
         const high = (R.ballZ || 0) > 1.1 || act.h0 > 1;                   // 공이 떠 있을 때 처리 → 헤딩
         if (high && kh.i !== 0) { r.st.head = .55; }
-        else { r.st.kick = act.k === 'shot' ? .45 : .35; r.st.kind = act.k === 'shot' ? 'shot' : (u < 30 && act.to && act.to.s !== kh.s) || (u < 34 && ['CB', 'FB', 'DM', 'GK'].includes(p.sub) && (act.d0 || 0) > 30) ? 'clear' : (act.cross || act.hi || (act.d0 || 0) > 32) ? 'long' : 'pass'; }
+        else { r.st.kick = act.k === 'shot' ? .45 : .35; r.st.kind = act.k === 'shot' ? 'shot' : (u < 30 && act.to && act.to.s !== kh.s) || (u < 34 && ['CB', 'FB', 'DM', 'GK'].includes(p.sub) && (act.d0 || 0) > 30) ? 'clear' : (act.cross || act.hi || (act.d0 || 0) > 32) ? 'long' : 'pass';
+          if (act.k === 'shot' && act.sty) { const k2 = { volley: 'volley', chip: 'chip', curve: 'curve', knuckle: 'shot', drive: 'shot', low: 'shot', tap: 'pass', first: 'shot', overhead: 'volley' }[act.sty]; if (k2) r.st.kind = k2; if (act.sty === 'header') { r.st.kick = 0; r.st.head = .55; } } }
       }
+      if (act.k === 'shot' && (act.out === 'post' || (act.out === 'wide' && Math.abs((act.ty || 32) - 32) < 9 && (act.eh || 0) < 2.6)) && Math.random() < .6) { const ds = act.s === 'm' ? 'o' : 'm', gk = R.pl[ds] && R.pl[ds][0]; if (gk) { gk.st.dive = .7; gk.st.diveH = act.eh || 1; gk.st.diveSide = ((act.ty || 32) > 32 ? 1 : -1) * (atkDir(act.s) > 0 ? 1 : -1); } }
       if (act.k === 'shot' && (act.out === 'save' || act.out === 'goal')) { const ds = act.s === 'm' ? 'o' : 'm', gk = R.pl[ds] && R.pl[ds][0];
-        if (gk) { const near = Math.abs((act.ty || 32) - 32) < 2.6 && act.out === 'save'; if (near) gk.st.catch = .6; else { gk.st.dive = .7; gk.st.diveSide = ((act.ty || 32) > 32 ? 1 : -1) * (atkDir(act.s) > 0 ? 1 : -1); } } }
+        if (gk) { const ty = act.ty || 32, eh = act.eh == null ? 1 : act.eh, near = Math.abs(ty - 32) < 2.6 && act.out === 'save';
+          if (near) { if (eh > 1.6) gk.st.catchHi = .6; else gk.st.catch = .6; } else { gk.st.dive = .7; gk.st.diveH = eh; gk.st.diveSide = (ty > 32 ? 1 : -1) * (atkDir(act.s) > 0 ? 1 : -1); } } }
       if (act.k === 'pass' && act.to) { const c = MV.pos[act.to.s] && MV.pos[act.to.s][act.to.i]; if (c) R.rmode = { s: act.to.s, i: act.to.i, m: recvMode(act.to.s, act.to.i, c) }; }
     }
     if (!act && R.lastAct && R.lastAct.k === 'pass' && MV.holder) { const r = R.pl[MV.holder.s] && R.pl[MV.holder.s][MV.holder.i]; if (r) { r.st.touch = .28; r.st.keep = R.rmode && R.rmode.s === MV.holder.s && R.rmode.i === MV.holder.i ? R.rmode.m : 'open'; r.st.keepT = .7; } }
-    if (MV.lbl && MV.lbl !== R.lastLbl && /태클/.test(MV.lbl.t || '')) {       // 태클 장면: 공을 빼앗은 팀에서 공에 가장 가까운 선수가 슬라이딩
-      const s2 = MV.poss; let bi = -1, bd = 1e9; (MV.pos[s2] || []).forEach((q, j) => { if (!j || !q) return; const dd = Math.hypot(q.x - bx, q.y - by); if (dd < bd) { bd = dd; bi = j; } });
-      const r = bi >= 0 && R.pl[s2] && R.pl[s2][bi]; if (r && bd < 5) r.st.slide = .6; }
+    { const sr = MV.slideReq; if (sr && sr !== R.lastSR) { R.lastSR = sr; const r = R.pl[sr.s] && R.pl[sr.s][sr.i]; if (r) r.st.slide = .6; } }
+    { const du = MV.duel; if (du && du !== R.lastDu) { R.lastDu = du; for (const [p, sg] of [[du.a, 1], [du.b, -1]]) { const r = R.pl[p.s] && R.pl[p.s][p.i]; if (r) { r.st.duel = .7; r.st.duelS = sg; } } } }
+    { const hq = MV.handReq; if (hq && hq !== R.lastHq) { R.lastHq = hq; const r = R.pl[hq.s] && R.pl[hq.s][hq.i]; if (r) r.st.hand = .9; } }
+    { const ga = MV.gkAct; if (ga && ga !== R.lastGa) { R.lastGa = ga; const r = R.pl[ga.s] && R.pl[ga.s][0]; if (r) { if (ga.k === 'tip') r.st.tip = .6; else if (ga.k === 'punch') r.st.punch = .5; } } }
     R.lastLbl = MV.lbl; R.lastAct = act; if (MV.holder) R.lastHolder = MV.holder;
     const recv = act && act.k === 'pass' && act.to ? act.to : null;
     let meR = null; const cele = MV.cele, hold = !act && !rpA && MV.holder ? MV.holder : null, sp0 = MV.sp, thr = sp0 && sp0.type === 'th' ? sp0 : null;
@@ -454,7 +467,7 @@ const V3D = (() => {
       for (let i = 0; i < cr.length; i++) { const c = cr[i]; let j = R.lp ? 0 : Math.max(0, Math.sin(R.t * 1.3 + c.ph)) * .03; if (celT >= 0 && c.team === celT) j = Math.abs(Math.sin(R.t * 9 + c.ph)) * .5;
         d.position.set(c.x, c.y + .39 + j, c.z); d.scale.setScalar(c.sc); d.updateMatrix(); C.bodies.setMatrixAt(i, d.matrix); d.position.y += .6 * c.sc; d.updateMatrix(); C.heads.setMatrixAt(i, d.matrix); }
       C.bodies.instanceMatrix.needsUpdate = true; C.heads.instanceMatrix.needsUpdate = true; R.crowdJ = celT >= 0; }
-    R.boards.forEach(t => { t.offset.x = (t.offset.x + dt * .02) % 1; });
+    R.boards.forEach(t => { t.offset.x = (t.offset.x + dt * .035) % 1; });
     camUpdate(bx, by, dt); hudUpdate(dt);
   }
   // ---------- 카메라 5종: 원거리 / 근거리 / 중계 / 홈 골대 뒤 / 원정 골대 뒤 (+ 골 장면 클로즈업) ----------
