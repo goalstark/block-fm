@@ -754,7 +754,7 @@ function retarget(M) {
             if (isH && (!MV.paused || MV.pg)) { if (MV.pg && hp) { u = Math.max(u + 16, uOf(hp.x, d) + 15); if (!(MV.pg.pp && MV.pg.pp.as)) y = hp.y + (32 - hp.y) * 0.35; else y = hp.y; sprint = true; } else { u += MV.pg ? 16 : 7; const cr = MV.carry; if (!MV.pg && cr && cr.s === pre && cr.i === i && cr.until > MV.t) { u += PX_CFG.carry.push; if (ball > 50) y += ((Math.abs(y - 32) > 18 ? (y < 32 ? 21 : 43) : 32) - y) * PX_CFG.carry.inward; } } }                                                     // 공 가진 선수는 드리블로 전진
             if (!isH) { const pmv = MV.pm && MV.pm[pre + i], rn = MV.runs && MV.runs[pre + i];                       // 패스 앤 무브 / 미리 뛰는 침투
               if (rn && rn.t0 <= MV.t && rn.until > MV.t) { u = rn.tu; y = rn.ty; sprint = true; } else if (pmv && pmv.until > MV.t) { u = pmv.u; y = pmv.y; sprint = true; } }
-            if (!isH) u = Math.min(u, line[pre] + 0.5);                                                  // 오프사이드 라인 지킴(공이 나에게 나가면 아래 '받으러 감'에서 풀림)
+            if (!isH) { const rn2 = MV.runs && MV.runs[pre + i]; u = Math.min(u, line[pre] + (rn2 && rn2.early && rn2.t0 <= MV.t && rn2.until > MV.t ? PX_CFG.run.earlyAhead : 0.5)); }                                                  // 오프사이드 라인 지킴(공이 나에게 나가면 아래 '받으러 감'에서 풀림)
           } else {
             if (sub === 'ST' || sub === 'W') u -= (A('WOR') > 60 ? 8 : 2) * (1 - 0.7 * Math.max(0, Tr)) + (Tr < 0 ? -Tr * 3 : 0);   // 역습 지향이면 공격수가 앞에 남음
             if (sub === 'CB' || sub === 'DM') u += (A('POS') > 62 ? 3 : 0);
@@ -898,7 +898,7 @@ const PX_CFG = {
   cut: { react0: .35, POS: .10, DEC: .05, margin: .05, slope: .08, scale: .6, ballSp: 36 },  // 2-3 가로채기(시간 비교, 예측용)
   carry: { gainW: 2.4, step: 6, Lw: .05, Lcap: 15, prW: .5, DRI: .10, Lmin: 6, prMax: .25, cone: 25, tempo: .04, push: 6, inward: .15, dur: 1.2 },   // 2-4 운반
   aim: { iters: 3, runFrac: .9, leadMin: .6, leadMax: 1.2, meet: .12, wait: 1.6, waitR: 2.2 },   // 3-1 도착 지점
-  run: { ST: [.30, .25], W: [.20, .20], AM: [.10, .15], FB: [.05, .10], CM: [.05, .10], every: .5, max: 2, angMin: 20, angMax: 35, len: 12, delay0: .4, delayOTB: .3, dur: 1.6, behindMax: 5, spaceMin: 10, faceMax: 60, seeDelay0: .6, seeVIS: .3, thr: .5, thrVIS: .10, thrPAS: .10, thrBase: .15, thrMax: .75, prMax: .25, transMul: 1.5 },   // 3-3 미리 뛰는 침투
+  run: { ST: [.30, .25], W: [.20, .20], AM: [.10, .15], FB: [.05, .10], CM: [.05, .10], every: .5, max: 2, angMin: 20, angMax: 35, len: 12, delay0: .4, delayOTB: .3, dur: 1.6, behindMax: 5, spaceMin: 10, faceMax: 60, seeDelay0: .6, seeVIS: .3, thr: .5, thrVIS: .10, thrPAS: .10, thrBase: .15, thrMax: .75, prMax: .25, transMul: 1.5, offBase: .07, offOTB: .05, offDEC: .02, offMin: .02, early: .2, earlyAhead: 2.5, offMargin: 1.0 },   // 오프사이드 실수: 일찍 출발(0.2초)하면 라인을 넘어가 있을 수 있음   // 3-3 미리 뛰는 침투
   thrOld: { base: .06, VIS: 150, PAS: 200, max: .35 },                                     // 침투가 없을 때 일반 스루패스(시야 좋은 선수)
   pm: { onetwo: [.30, .15], overlap: [.25, .15], underlap: [.22, .10], support: .15, home: .10, homeWOR: .15, durMin: 1.5, durMax: 3.0, defHalf: .5, free: .02, tau: .25 },   // 4장 패스 앤 무브
   scan: { base: .4, VIS: 2.0, DEC: .6, win: 2, dur: .25, reach: 30, mem: 2.2, every: .25, loseBase: .35, loseCOM: .2, loseScale: .3, backR: 4.5 },   // 5-2 스캔
@@ -937,7 +937,8 @@ function runsUpdate(M) { const C = PX_CFG.run, h = MV.holder; if (MV.runsS !== M
     const pr = (tb[0] + tb[1] * nA(p, 'OTB')) * (.8 + .2 * T.tempo) * (trans ? C.transMul : 1); if (rnd2() >= pr) return;
     const a = (C.angMin + rnd2() * (C.angMax - C.angMin)) * Math.PI / 180, inward = q.y < 32 ? 1 : -1, sg = sub === 'W' && Math.abs(q.y - 32) < 14 ? -inward : inward;
     const tu = c01(cu + C.len * Math.cos(a), 5, 97), ty = c01(q.y + sg * C.len * Math.sin(a), 4, 60), t0 = MV.t + Math.max(0, C.delay0 - C.delayOTB * nA(p, 'OTB'));
-    R[s + i] = { t0, until: t0 + C.dur, tu, ty }; active++; cntAdd('runN'); (MV.point || (MV.point = {}))[s + i] = t0 + PX_CFG.ask.point; }); }
+    const early = rnd2() < Math.max(C.offMin, C.offBase - C.offOTB * nA(p, 'OTB') - C.offDEC * nA(p, 'DEC'));
+    R[s + i] = { t0: early ? t0 - C.early : t0, until: t0 + C.dur, tu, ty, early }; active++; cntAdd('runN'); (MV.point || (MV.point = {}))[s + i] = t0 + PX_CFG.ask.point; }); }
 // 5-2 받기 전 스캔: 공 가진 동료 30 안에서 2초당 1~3회 고개를 돌려 주변 확인(시야·판단력). 스캔한 선수만 몸을 열고 받음
 function scanUpdate(M) { const C = PX_CFG.scan, h = MV.holder; if (!h || MV.pg || MV.sp || MV.pen || MV.so) return; if ((MV.scanT0 || -9) > MV.t - C.every) return; const dtS = MV.t - (MV.scanT0 || MV.t); MV.scanT0 = MV.t;
   const s = h.s, hp = MV.pos[s][h.i]; if (!hp) return; const L = MV.scanL || (MV.scanL = {}), V = MV.scanV || (MV.scanV = {});
@@ -1028,6 +1029,8 @@ function decide(M) {
   const pass0 = (t, sp, lead, tag) => { const err = clampN((55 - PA(who, 'PAS')) / 220 + press * 0.08 + (t.dist > 30 ? 0.05 : 0) + (lead ? 0.04 : 0), 0, 0.3);   // 패스 정확도: 능력치/압박/거리
     if (rnd2() < err && ni >= 0) { let bi = -1, bd = 1e9; oarr.forEach((q, i) => { if (i && q && !MV.red[os + i]) { const dd = Math.hypot(q.x - t.q.x, q.y - t.q.y); if (dd < bd) { bd = dd; bi = i; } } }); if (bi >= 0) { passTo(os, bi, sp); return; } }
     if (!lead && !tag && Math.abs(t.q.y - 32) > 23 && rnd2() < 0.07 + err * 0.5 && canStage() && !MV.pg) { const ty = t.q.y < 32 ? 0.6 : 63.4; MV.act = { k: 'out', tx: t.q.x + d * 2, ty, sp: sp * 0.78, s: os, kind: 'th' }; MV.holder = null; return; }
+    if (s === h.s && t.i && !MV.pg && !MV.sp && !MV.pen && !MV.so) { let ln = 0, cnt2 = 0; const us = []; oarr.forEach((q, j) => { if (q && !MV.red[os + j]) us.push(uOf(q.x, d)); }); us.sort((a, b2) => b2 - a); ln = Math.max(us[1] != null ? us[1] : 50, 50, uOf(MV.ball.x, d));   // 두 번째로 깊은 수비(골키퍼 포함)·공·하프라인 중 앞선 것
+      if (uOf(t.q.x, d) > ln + PX_CFG.run.offMargin) { offScreen(M, s, t.i); return; } }
     passTo(s, t.i, sp); if (lead) MV.act.lead = d * lead; if (tag) { MV.act.tag = tag; lbl(tag); if (tag === '스루패스' && pstatOn()) { const c = MV.cnt || (MV.cnt = {}); c.thr = (c.thr || 0) + 1; MV.act.thrC = 1; } } if (tag === '크로스' || tag === '얼리 크로스' || tag === '롱패스' || tag === '걷어내기' || tag === '대지를 가르는 롱패스' || tag === '사이드 체인지' || tag === '헤딩 걷어내기') MV.act.hi = true; };
   if (ni >= 0 && nd < 2.4 && rnd2() < 0.22 && !(MV.duelT && MV.t - MV.duelT < 2)) {        // 몸싸움: 바짝 붙었을 때 힘 대결
     MV.duelT = MV.t; MV.duel = { a: { s, i: h.i }, b: { s: os, i: ni }, t: MV.t };
@@ -1607,6 +1610,10 @@ function fullTime(M, skip) {
     MV.log.unshift({ min: 120, ic: '🏆', cls: '', t: `<b>승부차기 ${plan.sm} : ${plan.so}</b> — ${esc(plan.sm > plan.so ? M.mine.name : M.opp.name)} 승리` }); }
   clearInterval(MV.timer); MV.over = true; PX.ui.sfx('whistle'); finishLog(M); return true;
 }
+function offScreen(M, s, i) {                                                               // 화면에서 생긴 오프사이드(이른 침투에 패스): 깃발·기록·상대 프리킥. 엔진 골·결과와는 무관
+  const p = sideOf(s)[i], team = s === 'm' ? M.mine : M.opp; if (!p) return; MV.aim = null;
+  MV.log.unshift({ min: MV.min, ic: '🚩', cls: '', t: `오프사이드 ${esc(p.name)} <span class="dim">${esc(team.name)}</span>` }); cntAdd('offS');
+  offsideFx(M, { ms: s === 'm', p }); }
 function offsideFx(M, x) {                                                                // 오프사이드: 깃발·오프사이드 라인 표시 + 상대 공격권
   if (!MV || !MV.pos || MV.sp || MV.pg || MV.pen || MV.so || MV.momentOpen || MV.lead || MV.goalRes || MV.talk || MV.cele || MV.over || MV.skipping || MV.fast) { lbl('오프사이드'); return; }
   const s = x.ms ? 'm' : 'o', os = s === 'm' ? 'o' : 'm', st = sideOf(s), d = s === 'm' ? dM_(M) : -dM_(M), pi = st.indexOf(x.p), c = pi >= 0 && MV.pos[s][pi];
