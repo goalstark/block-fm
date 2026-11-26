@@ -27,12 +27,17 @@ jobs:
           sed -i 's/super.onCreate(b); applyFs();/super.onCreate(b); getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); applyFs();/' "$f"
           grep -c FLAG_KEEP_SCREEN_ON "$f"
       - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
-      - name: APK 서명 지문 출력
+      - name: APK 서명 지문·최소 안드로이드 버전 확인
         run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
           echo "== APK 서명 지문 (폰의 앱과 같아야 덮어 설치됨) =="
-          keytool -printcert -jarfile android/app/build/outputs/apk/debug/app-debug.apk | grep -E "Owner|SHA256|Valid"
-          echo "== 고정 키 지문 =="
-          grep -c "androiddebugkey" patch-android.js || true
+          "$BT/apksigner" verify --print-certs "$APK" | tee certs.txt
+          # 최소 버전 7.0부터는 v2 서명만 들어가서 keytool -printcert 로는 못 읽음 → apksigner 사용
+          grep -qi "365952c4f3799e5136acf3b2d8c3bd3e6dbbcbdb076f26a0315c5920a4b520a8" certs.txt || { echo "서명 키가 기존 앱과 다름 — 배포 중단"; exit 1; }
+          echo "== 최소 안드로이드 버전 =="
+          "$BT/aapt2" dump badging "$APK" | grep -E "^sdkVersion|^targetSdkVersion" | tee sdk.txt
+          grep -q "sdkVersion:'24'" sdk.txt || { echo "최소 버전이 24(안드로이드 7.0)가 아님"; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: football-sim-apk
