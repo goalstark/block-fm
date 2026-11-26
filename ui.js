@@ -2331,9 +2331,9 @@ const PIXR = '<rect x="0" y="0" width="1" height="1"/><rect x="1" y="0" width="1
 function pixLogo(w) { return `<svg class="pixlogo" width="${w}" height="${Math.round(w*7.6/17.8)}" viewBox="-0.2 -0.2 17.8 7.6" shape-rendering="crispEdges" aria-label="BFM"><g fill="#0B110E" transform="translate(.4 .4)">${PIXR}</g><g fill="#0B110E" stroke="#0B110E" stroke-width=".3">${PIXR}</g><g fill="#FFD23F">${PIXR}</g></svg>`; }
 const SPL_TEAM = [   // 로딩 화면 선수 5명: 이름 없음·실제 로고/유니폼 디자인 아님, 국가 색과 등번호만 비슷하게 — [외모, 유니폼 색(상의·하의), 등번호], 첫 번째가 가운데
   [{ skin: 'tan', hair: 'black', style: 'short' }, ['#C8102E', '#111418'], 7],      // 한국 색
-  [{ skin: 'fair', hair: 'blond', style: 'bun' }, ['#BA0C2F', '#0B2A5B'], 9],      // 노르웨이 색
+  [{ skin: 'fair', hair: 'blond', style: 'bun' }, ['#F2F2F2', '#0B2A5B'], 9],      // 노르웨이 원정 색(흰색)
   [{ skin: 'deep', hair: 'black', style: 'buzz' }, ['#14285A', '#F2F2F2'], 10],     // 프랑스 색
-  [{ skin: 'olive', hair: 'black', style: 'curly' }, ['#C60B1E', '#0B2A5B'], 19],   // 스페인 색
+  [{ skin: 'olive', hair: 'black', style: 'curly' }, ['#7FD3C8', '#F2F2F2'], 19],   // 스페인 원정 색(민트)
   [{ skin: 'brown', hair: 'black', style: 'short' }, ['#F7D117', '#1F4FA8'], 7]];   // 브라질 색
 function splashSprites() { return SPL_TEAM.map(([lk, kit], i) => `<span class="spr spl-c" style="animation-delay:${i * 0.12}s;width:44px;height:94px;background-image:url(${sprite(lk, kit)})"></span>`).join(''); }
 function splashView() {
