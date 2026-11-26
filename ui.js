@@ -2242,8 +2242,8 @@ window.addEventListener('unhandledrejection', (e) => { try { toast('오류: ' + 
 
 // ---- 업데이트 알림: 저장소의 version.json 을 보고 새 빌드가 있으면 알려준다(인터넷이 없으면 조용히 무시) ----
 const APP_VER = '1.2.0', APP_BUILD = 2;
-const UPD_URL = 'https://raw.githubusercontent.com/goalstark/block-fm/main/version.json';
-const UPD_PAGE = 'https://github.com/goalstark/block-fm/releases/tag/latest';
+const UPD_URL = 'https://raw.githubusercontent.com/goalstark/bfm-download/main/version.json';   // 배포용 공개 저장소(코드 저장소는 비공개 예정)
+const UPD_PAGE = 'https://github.com/goalstark/bfm-download/releases/tag/latest';
 const UPD = { last: 0, info: null, busy: false, pend: null };
 async function updFetch() {
   const c = typeof AbortController === 'function' ? new AbortController() : null, to = setTimeout(() => { try { c && c.abort(); } catch (e) {} }, 7000);

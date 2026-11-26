@@ -14,7 +14,10 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - run: node build.js
+      - name: 게임 빌드(난독화 포함)
+        run: |
+          npm install --no-save javascript-obfuscator@4.1.1
+          BFM_OBF=1 node build.js
       - run: npm install
       - run: npx cap add android
       - run: npx cap sync android
@@ -37,6 +40,8 @@ jobs:
       - uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'   # 정식 릴리스(latest)는 main에서만. 다른 브랜치는 위 artifact로만 APK를 받음
         with:
+          repository: goalstark/bfm-download   # 배포용 공개 저장소(코드 저장소는 비공개 예정)
+          token: ${{ secrets.RELEASE_TOKEN }}
           tag_name: latest
           name: Block FM APK (latest)
           files: android/app/build/outputs/apk/debug/app-debug.apk
