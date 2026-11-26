@@ -7,7 +7,7 @@ let js=[eng,R('data.js'),R('stars.js'),R('core.js'),R('ui.js'),R('match3d.js')].
 if(process.env.BFM_OBF==='1'){
   const O=require('javascript-obfuscator');
   js=O.obfuscate(js,{compact:true,simplify:true,target:'browser',seed:20261126,renameGlobals:false,identifierNamesGenerator:'mangled',
-    stringArray:true,stringArrayThreshold:0.3,stringArrayRotate:true,stringArrayShuffle:true,stringArrayIndexShift:true,stringArrayWrappersCount:1,stringArrayEncoding:[],
+    stringArray:false,   // 문자열 숨기기(stringArray)는 시즌 진행을 약 2배 느리게 해서 끔(1시즌 45초→89초, 끄면 46초)
     controlFlowFlattening:false,deadCodeInjection:false,selfDefending:false,debugProtection:false,disableConsoleOutput:false,numbersToExpressions:false,splitStrings:false,transformObjectKeys:false,unicodeEscapeSequence:false}).getObfuscatedCode();
   if(/<\/script/i.test(js))throw new Error('난독화 결과에 </script 가 들어 있음');
   console.log('obfuscated');
