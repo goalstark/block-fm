@@ -965,7 +965,7 @@ function rpStep(M, realDt) {                                                    
 function flushPg() { const pg = MV && MV.pg; if (!pg) return; MV.pg = null; const lg = pg.logs.slice(); if (pg.off) { try { varOverturn(G0().mm, pg.ev, pg.ms, lg, MV.min); } catch (e) {} } lg.slice().reverse().forEach(o => MV.log.unshift(o)); }
 function frame(ts) {
   if (!MV) return; MV.raf = requestAnimationFrame(frame);
-  if (MV.exitAsk) { MV.last = 0; return; }                                                          // 나가기 확인 창이 떠 있는 동안은 경기 완전 정지
+  if (MV.exitAsk || MV.setOpen) { MV.last = 0; return; }                                                          // 나가기 확인 창이 떠 있는 동안은 경기 완전 정지
   const M = G0().mm; if (!M || !MV.pos) return;
   if (MV.pzUntil && MV.paused && !MV.over && !MV.talk && !MV.momentOpen && !MV.pen && !MV.so && !MV.lead && !MV.pg && !MV.sp && !MV.mgrPanel && !MV.wantPanel && MV.min > 0) {       // 창을 닫은 직후 12초 동안: 이유 없이 멈춘 경기를 자동으로 재개(안전장치)
     const nw = performance.now(); if (nw > (MV.fxUntil || 0) + 1200) { MV.paused = false; MV.pzUntil = 0; } else if (nw > MV.pzUntil) MV.pzUntil = 0; }
@@ -1499,7 +1499,7 @@ function aiInGame(M) {                                                          
   }
 }
 function tick() {
-  const M = G0().mm; if (!M || !MV || MV.paused || MV.over || MV.momentOpen || MV.exitAsk) return;
+  const M = G0().mm; if (!M || !MV || MV.paused || MV.over || MV.momentOpen || MV.exitAsk || MV.setOpen) return;
   MV.min++;
   const m = Core.me();
   emitAt(M, MV.min, !MV.hlFast);
@@ -1630,7 +1630,7 @@ function renderMatch() {
   const roleTxt = M.role==='mgr' ? '감독석' : M.role==='start' ? '선발 출전' : M.role==='sub' ? (MV && MV.min >= M.from ? `${M.from}분 교체 투입` : `벤치 → ${M.from}분 투입 예정`) : M.role==='inj' ? '부상으로 결장' : M.role==='sus' ? '출전 정지 (징계)' : M.role==='away' ? '대표팀 차출로 결장' : '벤치 (출전 명단 제외)';
   $('#mh').innerHTML = `<div class="dim">${esc(M.title)} · ${Core.fmtDate(G.day)}</div><div class="sc"><div>${crest(M.h,18)} ${esc(M.h.name)}</div><b>${sh} : ${sa}</b><div>${esc(M.a.name)} ${crest(M.a,18)}</div></div><div class="dim">${MV.so ? '승부차기 ' + MV.so.sm + ' : ' + MV.so.so : (MV.etOn ? '연장 ' : '') + MV.min + "'"} · ${roleTxt}</div><div class="bar"><i style="width:${Math.min(100, MV.min / (MV.etOn ? 120 : 90) * 100)}%"></i></div>`;
   $('#mb').className = 'mb' + (MV.momentOpen || MV.talk ? ' hasdec' : MV.over ? ' isover' : ''); $('#mb').innerHTML = `${MV.momentOpen || MV.talk ? dec : mtabs() + ((S.mtab || 'flow') === 'flow' || !MV.over ? dec : '<button class="btn wide" data-act="mend" style="margin:4px 0">결과 확인</button>')}${MV.momentOpen || MV.talk || (S.mtab || 'flow') === 'flow' ? `<div class="sec">경기 흐름</div>${MV.log.map(x => `<div class="li ev ${x.cls||''}"><span class="mn">${x.min}'</span><span class="ico">${x.ic}</span><span class="et">${x.t}</span></div>`).join('') || '<div class="dim">킥오프!</div>'}` : S.mtab === 'ana' && MV.over ? anaView(M) : S.mtab === 'stat' ? statView(M) : S.mtab === 'tac' ? tacView(M) : matchMeView(M)}`;
-  $('#mf').innerHTML = MV.over ? '' : `<div class="spd">${S.mfOpen ? [['full', '풀'], ['hl', '하이라이트'], ['mine', '내 장면만']].map(([k, n]) => `<button class="chip ${(S.vm || 'full') === k ? 'on' : ''}" data-act="mvm" data-id="${k}">${n}</button>`).join('') + ['hy', 'lp'].map(k => `<button class="chip ${viewNow() === k ? 'on' : ''}" data-act="mview" data-id="${k}">${VIEW_S[k]}</button>`).join('') + SPD.map(v => `<button class="chip ${(S.spd||1)===v?'on':''}" data-act="mspd" data-id="${v}">${v}배속</button>`).join('') + '<button class="chip on" data-act="mfold">닫기 ✕</button>' : `<button class="chip vset" data-act="mfold">⚙ ${({ full: '풀', hl: '하이라이트', mine: '내 장면만' })[S.vm || 'full']} · ${S.spd || 1}배속 · ${VIEW_N[viewNow()]}</button>`}${MV.momentOpen || MV.mgrPanel ? '' : (M.role==='mgr' ? `<div class="seg qm">${['수비적', '균형', '공격적'].map((n, v) => `<button class="${((M.mine.tactic || {}).ment == null ? 1 : M.mine.tactic.ment) === v ? 'on' : ''}" data-act="mment" data-id="${v}">${n}</button>`).join('')}</div>` + '<button class="btn sec" data-act="mpopen">전술·교체</button>' : '<button class="btn sec" data-act="mpopen">전술·교체 보기</button>') + '<button class="btn sec" data-act="mskip">끝까지 자동 진행</button>'}<button class="btn sec" data-act="mexit">나가기</button></div>`;
+  $('#mf').innerHTML = MV.over ? '' : `<div class="spd">${S.mfOpen ? [['full', '풀'], ['hl', '하이라이트'], ['mine', '내 장면만']].map(([k, n]) => `<button class="chip ${(S.vm || 'full') === k ? 'on' : ''}" data-act="mvm" data-id="${k}">${n}</button>`).join('') + ['hy', 'lp'].map(k => `<button class="chip ${viewNow() === k ? 'on' : ''}" data-act="mview" data-id="${k}">${VIEW_S[k]}</button>`).join('') + SPD.map(v => `<button class="chip ${(S.spd||1)===v?'on':''}" data-act="mspd" data-id="${v}">${v}배속</button>`).join('') + '<button class="chip on" data-act="mfold">닫기 ✕</button>' : `<button class="chip vset" data-act="mset">⚙ 설정 · ${VM_N[S.vm || 'full']} · ${S.spd || 1}배속</button>`}${MV.momentOpen || MV.mgrPanel ? '' : (M.role==='mgr' ? `<div class="seg qm">${['수비적', '균형', '공격적'].map((n, v) => `<button class="${((M.mine.tactic || {}).ment == null ? 1 : M.mine.tactic.ment) === v ? 'on' : ''}" data-act="mment" data-id="${v}">${n}</button>`).join('')}</div>` + '<button class="btn sec" data-act="mpopen">전술·교체</button>' : '<button class="btn sec" data-act="mpopen">전술·교체 보기</button>') + '<button class="btn sec" data-act="mskip">끝까지 자동 진행</button>'}<button class="btn sec" data-act="mexit">나가기</button></div>`;
   if (MV.mgrPanel) { $('#mb').className = 'mb'; $('#mb').innerHTML = M.role === 'mgr' ? mgrPanelHTML(M) : playerPanelHTML(M); $('#mf').innerHTML = '<div class="spd"><button class="btn wide" data-act="mpclose" style="flex:2">경기 재개 ▶</button><button class="btn sec" data-act="mexit" style="flex:1">나가기</button></div>'; }
 }
 
@@ -1691,6 +1691,25 @@ function exitAskOpen() {                                                        
   el.innerHTML = '<div class="card" style="max-width:340px;width:100%;text-align:center"><b style="font-size:16px">경기를 중단하고 나갈까요?</b><div class="dim" style="margin:8px 0 12px;line-height:1.45">지금까지의 경기 내용은 기록되지 않고,<br>이 경기는 처음부터 다시 진행해야 해요.</div><div class="row g8" style="justify-content:center"><button class="btn sec" data-act="mexitno">계속 보기</button><button class="btn" data-act="mexityes">나가기</button></div></div>';
   $('#match').appendChild(el);
 }
+// ---- 경기 설정(⚙): 누르면 경기가 멈추고 카메라·그림·배속·보기 방식을 바꾼 뒤 '경기 재개'로 이어 감 ----
+const VM_N = { full: '풀', hl: '하이라이트', mine: '내 장면만' };
+function msetHTML() {
+  const cams = (typeof V3D !== 'undefined' && V3D.CAMS) || [], cm = (typeof V3D !== 'undefined' && V3D.camNow) ? V3D.camNow() : 'bc';
+  const chips = (act, list, cur) => list.map(([k, n]) => `<button class="chip ${String(cur) === String(k) ? 'on' : ''}" data-act="${act}" data-id="${k}">${n}</button>`).join('');
+  return `<div class="mset-card"><div class="mset-h"><b>경기 설정</b><span class="mset-p">⏸ 일시정지</span></div>
+    <div class="mset-s">카메라</div><div class="mset-c">${chips('mcam', cams, cm)}</div>
+    <div class="mset-s">그림</div><div class="mset-c">${chips('mview', [['hy', '하이브리드 3D'], ['lp', '로우폴리 3D']], viewNow())}</div>
+    <div class="mset-s">속도</div><div class="mset-c">${chips('mspd', SPD.map(v => [v, v + '배속']), S.spd || 1)}</div>
+    <div class="mset-s">보기</div><div class="mset-c">${chips('mvm', Object.entries(VM_N), S.vm || 'full')}</div>
+    <button class="btn wide mset-go" data-act="msetx">▶ 경기 재개</button></div>`;
+}
+function msetOpen() {
+  if (!MV || MV.over || !G0().mm || MV.exitAsk || MV.setOpen) return;
+  MV.setOpen = true; S.mfOpen = false; let el = document.getElementById('mset'); if (!el) { el = document.createElement('div'); el.id = 'mset'; $('#match').appendChild(el); }
+  el.innerHTML = msetHTML();
+}
+function msetSync() { const el = document.getElementById('mset'); if (el && MV && MV.setOpen) el.innerHTML = msetHTML(); }
+function msetClose() { const el = document.getElementById('mset'); if (el) el.remove(); if (MV) { MV.setOpen = false; MV.last = 0; } }
 function exitAskClose() { const el = document.getElementById('exitq'); if (el) el.remove(); if (MV) { MV.exitAsk = false; MV.last = 0; } }
 function exitMatch() {                                                                              // 경기 폐기: 결과·기록 없이 경기 전 상태로 복귀(경기일은 그대로 남아 다시 진행)
   const el = document.getElementById('exitq'); if (el) el.remove();
@@ -2114,7 +2133,9 @@ document.addEventListener('click', (e) => {
   if (a==='mjob') { Core.mgrTakeJob(+id); S.tab = 'home'; save(); render(); return; }
   if (a==='mpopen') { mgrPanelOpen(); return; }
   if (a==='mpclose') { mgrPanelClose(); return; }
-  if (a==='mfold') { S.mfOpen = !S.mfOpen; renderMatch(); return; }
+  if (a==='mfold' || a==='mset') { msetOpen(); return; }
+  if (a==='msetx') { msetClose(); return; }
+  if (a==='mcam') { try { V3D.setCam(id); } catch (e) {} msetSync(); return; }
   if (a==='mment') { const M = G0().mm; if (!M || !MV || MV.over) return; Core.mgrSetInstr('ment', +id); MV.tk.m = tkOf(M.mine); M.segDirty = true; const nx = segNext(MV.min); MV.log.unshift({ min: MV.min, ic: '📋', cls: '', t: `<b>감독 지시</b> ${['수비적', '균형', '공격적'][+id]}으로 전환${nx ? ` <span class="dim">· ${nx}분 구간부터 결과에 반영</span>` : ''}` }); toast(nx ? `${['수비적', '균형', '공격적'][+id]} 전환 — ${nx}분부터 결과에 반영` : '남은 구간이 없어 결과에는 반영되지 않습니다'); renderMatch(); return; }
   if (a==='mpinstr') { Core.mgrSetInstr(t.dataset.k, +id); if (MV) MV.mgrDirty = true; renderMatch(); return; }
   if (a==='mpout') { S.mpout = (S.mpout === +id) ? null : +id; renderMatch(); return; }
@@ -2186,9 +2207,9 @@ document.addEventListener('click', (e) => {
   else if (a==='fs') { try { localStorage.setItem('bfm_fs', String(+id)); } catch (e) {} fsApply(); render(); { const f = FS_OPT.find(x => String(x[0]) === String(id)); popup('글자·버튼 크기', `‘${f ? f[1] : id}’ 크기로 바꿨습니다.`, '🔠', 1800); } return; }
   else if (a==='talk') { if (!MV || !MV.talk) return; const r = (G0().mm && G0().mm.role === 'mgr') ? Core.mgrTalkPick(id, MV.talkDiff || 0) : Core.talkPick(id); MV.log.unshift({ min: 45, ic: '💬', cls: '', t: `<b>하프타임</b> ${esc(r.text)}` }); MV.talk = null; setTimeout(startSecond, 600); renderMatch(); return; }
   else if (a==='mtab') { S.mtab = id; renderMatch(); return; }
-  else if (a==='mview') { S.mfOpen = false; viewSet(id); if (MV) renderMatch(); else render(); if (!MV) popup('경기 화면', `‘${VIEW_N[viewNow()]}’ 화면으로 바꿨습니다. 경기 결과에는 영향이 없습니다.`, '🏟', 1800); return; }
-  else if (a==='mvm') { S.mfOpen = false; S.vm = id; try { localStorage.setItem('bfm_vm', id); } catch (e) {} if (MV) { MV.hl = id === 'hl' || id === 'mine'; if (!MV.hl) MV.hlFast = false; MV.speed = -1; hlSync(); renderMatch(); } return; }
-  else if (a==='mspd') { S.mfOpen = false; S.spd = +id; try { localStorage.setItem('bfm_spd', String(S.spd)); } catch (e) {} if (MV) { MV.speed = spdMs(); if (MV.timer && !MV.skipping && !MV.over) { clearInterval(MV.timer); MV.timer = setInterval(tick, MV.speed); } hlSync(); renderMatch(); } return; }
+  else if (a==='mview') { S.mfOpen = false; viewSet(id); if (MV) { renderMatch(); msetSync(); } else render(); if (!MV) popup('경기 화면', `‘${VIEW_N[viewNow()]}’ 화면으로 바꿨습니다. 경기 결과에는 영향이 없습니다.`, '🏟', 1800); return; }
+  else if (a==='mvm') { S.mfOpen = false; S.vm = id; try { localStorage.setItem('bfm_vm', id); } catch (e) {} if (MV) { MV.hl = id === 'hl' || id === 'mine'; if (!MV.hl) MV.hlFast = false; MV.speed = -1; hlSync(); renderMatch(); msetSync(); } return; }
+  else if (a==='mspd') { S.mfOpen = false; S.spd = +id; try { localStorage.setItem('bfm_spd', String(S.spd)); } catch (e) {} if (MV) { MV.speed = spdMs(); if (MV.timer && !MV.skipping && !MV.over) { clearInterval(MV.timer); MV.timer = setInterval(tick, MV.speed); } hlSync(); renderMatch(); msetSync(); } return; }
   else if (a==='pwatch' || a==='psum') { S.modal = null; S.modalKind = null; render(); startMatch(); if (a==='psum' && MV && !MV.over) { S.mtab = 'flow'; skipMatch(); } return; }
   else if (a==='mexit') { exitAskOpen(); return; }
   else if (a==='mexitno') { exitAskClose(); return; }
@@ -2221,7 +2242,7 @@ function slotRows(inGame) {
   return rows.join('');
 }
 const PIXR = '<rect x="0" y="0" width="1" height="1"/><rect x="1" y="0" width="1" height="1"/><rect x="2" y="0" width="1" height="1"/><rect x="3" y="0" width="1" height="1"/><rect x="0" y="1" width="1" height="1"/><rect x="4" y="1" width="1" height="1"/><rect x="0" y="2" width="1" height="1"/><rect x="4" y="2" width="1" height="1"/><rect x="0" y="3" width="1" height="1"/><rect x="1" y="3" width="1" height="1"/><rect x="2" y="3" width="1" height="1"/><rect x="3" y="3" width="1" height="1"/><rect x="0" y="4" width="1" height="1"/><rect x="4" y="4" width="1" height="1"/><rect x="0" y="5" width="1" height="1"/><rect x="4" y="5" width="1" height="1"/><rect x="0" y="6" width="1" height="1"/><rect x="1" y="6" width="1" height="1"/><rect x="2" y="6" width="1" height="1"/><rect x="3" y="6" width="1" height="1"/><rect x="6" y="0" width="1" height="1"/><rect x="7" y="0" width="1" height="1"/><rect x="8" y="0" width="1" height="1"/><rect x="9" y="0" width="1" height="1"/><rect x="10" y="0" width="1" height="1"/><rect x="6" y="1" width="1" height="1"/><rect x="6" y="2" width="1" height="1"/><rect x="6" y="3" width="1" height="1"/><rect x="7" y="3" width="1" height="1"/><rect x="8" y="3" width="1" height="1"/><rect x="9" y="3" width="1" height="1"/><rect x="6" y="4" width="1" height="1"/><rect x="6" y="5" width="1" height="1"/><rect x="6" y="6" width="1" height="1"/><rect x="12" y="0" width="1" height="1"/><rect x="16" y="0" width="1" height="1"/><rect x="12" y="1" width="1" height="1"/><rect x="13" y="1" width="1" height="1"/><rect x="15" y="1" width="1" height="1"/><rect x="16" y="1" width="1" height="1"/><rect x="12" y="2" width="1" height="1"/><rect x="14" y="2" width="1" height="1"/><rect x="16" y="2" width="1" height="1"/><rect x="12" y="3" width="1" height="1"/><rect x="16" y="3" width="1" height="1"/><rect x="12" y="4" width="1" height="1"/><rect x="16" y="4" width="1" height="1"/><rect x="12" y="5" width="1" height="1"/><rect x="16" y="5" width="1" height="1"/><rect x="12" y="6" width="1" height="1"/><rect x="16" y="6" width="1" height="1"/>';
-function pixLogo(w) { return `<svg class="pixlogo" width="${w}" height="${Math.round(w*7.6/17.8)}" viewBox="-0.2 -0.2 17.8 7.6" shape-rendering="crispEdges" aria-label="BFM"><g fill="#0B110E" transform="translate(.4 .4)">${PIXR}</g><g fill="#0B110E" stroke="#0B110E" stroke-width=".3">${PIXR}</g><g fill="#C6F36B">${PIXR}</g></svg>`; }
+function pixLogo(w) { return `<svg class="pixlogo" width="${w}" height="${Math.round(w*7.6/17.8)}" viewBox="-0.2 -0.2 17.8 7.6" shape-rendering="crispEdges" aria-label="BFM"><g fill="#0B110E" transform="translate(.4 .4)">${PIXR}</g><g fill="#0B110E" stroke="#0B110E" stroke-width=".3">${PIXR}</g><g fill="#FFD23F">${PIXR}</g></svg>`; }
 const SPL_TEAM = [[{ skin: 'tan', hair: 'black', style: 'short' }, ['#CD2E3A', '#FFFFFF']], [{ skin: 'fair', hair: 'blond', style: 'sidepart' }, ['#1F3A93', '#FFFFFF']], [{ skin: 'brown', hair: 'dark', style: 'curly' }, ['#F7D117', '#009739']], [{ skin: 'olive', hair: 'brown', style: 'long' }, ['#75AADB', '#FFFFFF']], [{ skin: 'deep', hair: 'black', style: 'buzz' }, ['#0B8F4D', '#F7D117']]];
 function splashSprites() { return SPL_TEAM.map(([lk, kit], i) => `<span class="spr spl-c" style="animation-delay:${i * 0.12}s;width:44px;height:94px;background-image:url(${sprite(lk, kit)})"></span>`).join(''); }
 function splashView() {
