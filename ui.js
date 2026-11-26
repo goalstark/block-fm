@@ -717,6 +717,7 @@ function runOf(key, p, d, atk, sub) {
 }
 function retarget(M) {
   if (MV.pen) { penTargets(M); return; }
+  try { runsUpdate(M); scanUpdate(M); } catch (e) {}
   const b = MV.ball, pos = MV.pos, act = MV.act, kick = MV.kick > 0, hold = MV.holder, D = { m: dM_(M), o: -dM_(M) }, SS = { m: MV.mst, o: MV.ost };
   const line = {};                                       // 오프사이드 라인: 상대 최종 수비수 위치
   for (const pre of ['m', 'o']) { const op = pre === 'm' ? 'o' : 'm'; let mx = 55; SS[op].forEach((p, i) => { const q = pos[op][i]; if (i === 0 || !q || MV.red[op + i]) return; mx = Math.max(mx, uOf(q.x, D[pre])); }); line[pre] = Math.max(mx, uOf(b.x, D[pre])); }
@@ -750,8 +751,10 @@ function retarget(M) {
             if (fin && FTS[sub] && !isH) { const t = FTS[sub]; const ty = t[1] === 0 ? (sub === 'W' ? (cutIn > 10 ? (wideY > 0 ? 17 : 47) : (wideY > 0 ? 9 : 55)) : sub === 'FB' ? (wideY > 0 ? 10 : 54) : f[1] * 0.64) : 32 + (i % 2 ? 1 : -1) * t[1]; u = u * 0.3 + t[0] * 0.7; y = y * 0.3 + ty * 0.7; }
             if (hp && !isH) { const hu = uOf(hp.x, d), dx = hu - u, dy = hp.y - y, dist = Math.hypot(dx, dy);
               if (dist > 9 && (sub === 'AM' || sub === 'CM' || sub === 'DM' || sub === 'W')) { const k = clampN((A('VIS') + A('PAS') - 80) / 260, 0.05, 0.4); u += dx * k; y += dy * k; } }
-            if (isH && (!MV.paused || MV.pg)) { if (MV.pg && hp) { u = Math.max(u + 16, uOf(hp.x, d) + 15); if (!(MV.pg.pp && MV.pg.pp.as)) y = hp.y + (32 - hp.y) * 0.35; else y = hp.y; sprint = true; } else u += MV.pg ? 16 : 7; }                                                     // 공 가진 선수는 드리블로 전진
-            if (!isH) u = Math.min(u, line[pre] + 0.5);                                                  // 오프사이드 라인 지킴
+            if (isH && (!MV.paused || MV.pg)) { if (MV.pg && hp) { u = Math.max(u + 16, uOf(hp.x, d) + 15); if (!(MV.pg.pp && MV.pg.pp.as)) y = hp.y + (32 - hp.y) * 0.35; else y = hp.y; sprint = true; } else { u += MV.pg ? 16 : 7; const cr = MV.carry; if (!MV.pg && cr && cr.s === pre && cr.i === i && cr.until > MV.t) { u += PX_CFG.carry.push; if (ball > 50) y += ((Math.abs(y - 32) > 18 ? (y < 32 ? 21 : 43) : 32) - y) * PX_CFG.carry.inward; } } }                                                     // 공 가진 선수는 드리블로 전진
+            if (!isH) { const pmv = MV.pm && MV.pm[pre + i], rn = MV.runs && MV.runs[pre + i];                       // 패스 앤 무브 / 미리 뛰는 침투
+              if (rn && rn.t0 <= MV.t && rn.until > MV.t) { u = rn.tu; y = rn.ty; sprint = true; } else if (pmv && pmv.until > MV.t) { u = pmv.u; y = pmv.y; sprint = true; } }
+            if (!isH) u = Math.min(u, line[pre] + 0.5);                                                  // 오프사이드 라인 지킴(공이 나에게 나가면 아래 '받으러 감'에서 풀림)
           } else {
             if (sub === 'ST' || sub === 'W') u -= (A('WOR') > 60 ? 8 : 2) * (1 - 0.7 * Math.max(0, Tr)) + (Tr < 0 ? -Tr * 3 : 0);   // 역습 지향이면 공격수가 앞에 남음
             if (sub === 'CB' || sub === 'DM') u += (A('POS') > 62 ? 3 : 0);
@@ -759,7 +762,7 @@ function retarget(M) {
             y += (b.y - y) * 0.12;
           }
           if (atk && Tr > 0 && MV.tOverS === pre && MV.t - (MV.tOver || -99) < 5 && (sub === 'ST' || sub === 'W' || sub === 'AM') && !isH) { u += 7 * Tr; sprint = true; }   // 공 탈취 직후 빠른 역습 침투
-          if (act && act.k === 'pass' && act.to.s === pre && act.to.i === i) { u += (ball - u) * 0.55; y += (b.y - y) * 0.55; sprint = true; }   // 패스 받으러 마중
+          if (act && act.k === 'pass' && act.to.s === pre && act.to.i === i) { if (act.px != null) { const au = uOf(act.px, d), mt = (act.lead || act.thrC) ? 0 : PX_CFG.aim.meet; u = au + (ball - au) * mt; y = act.py + (b.y - act.py) * mt; } else { u += (ball - u) * 0.2; y += (b.y - y) * 0.2; } sprint = true; }   // 도착 지점으로 달려감(공간 패스는 마중 안 함, 발밑 패스는 1~3걸음)
         }
         const tired = clampN((60 - A('STA')) / 120 * (MV.min / 90), 0, 0.35); u = f[0] + (u - f[0]) * (1 - tired);
       } else sprint = true;
@@ -768,7 +771,8 @@ function retarget(M) {
         const ci = near.indexOf(i);
         const pressOn = Pr >= 0 || uOf(b.x, d) < 58;
         const soft = !!(MV.pg && MV.pg.s !== pre);                                                   // 득점 연출 중 수비측은 공을 둘러싸 막지 않고 물러서 대기(공 든 선수가 한 곳에서 제자리 맴돌지 않게)                                                   // 압박 낮음: 자기 진영에서만 압박
-        if (!soft && ci === 0 && pressOn) { x = b.x; y = b.y; sprint = true; }                                                // 가장 가까운 선수는 공 압박
+        if (!soft && ci === 0 && pressOn) { const J = PX_CFG.jockey, me0 = pos[pre][i], hd = me0 ? Math.hypot(me0.x - b.x, me0.y - b.y) : 99;
+          if (hd <= J.dist && hold && hold.s !== pre) { x = b.x - d * J.gap; y = b.y + (32 - b.y > 0 ? 1 : -1) * J.inside; (MV.jk || (MV.jk = {}))[pre + i] = MV.t + 0.3; } else { x = b.x; y = b.y; sprint = true; } }                                                // 가장 가까운 선수는 공 압박
         else if (!soft && ci === 1 && pressOn) { const k = clampN((0.35 + (A('AGG') + A('WOR') - 80) / 220) * (1 + Pr * 0.3), 0.15, 0.9); x += (b.x - x) * k; y += (b.y - y) * k; }
         else if (!soft && ci === 2 && Pr > 0) { const k = clampN(0.3 + (A('AGG') + A('WOR') - 80) / 300, 0.2, 0.6); x += (b.x - x) * k; y += (b.y - y) * k; }   // 높은 압박: 세 번째 선수까지 가담
         else { let best = null, bd = 24; foes.forEach(o => { if (taken.has(o.j)) return; const dd = Math.hypot(o.q.x - x, o.q.y - y); if (dd < bd) { bd = dd; best = o; } });          // 가까운 공격수 마크(골문 쪽에서)
@@ -819,15 +823,40 @@ function pstatOn() { return MV && !MV.pg && !MV.sp && !MV.pen && !MV.so && !MV.l
 function pstatPass(h0, s, i) { if (!h0 || h0.s !== s || !pstatOn()) return; const M = G0().mm, p0 = MV.pos[s][h0.i], p1 = MV.pos[s][i]; if (!M || !p0 || !p1) return;
   const d = s === 'm' ? dM_(M) : -dM_(M), u0 = uOf(p0.x, d), fw = uOf(p1.x, d) - u0, c = MV.cnt || (MV.cnt = {});
   c.passN = (c.passN || 0) + 1; if (fw > 4) c.fwd = (c.fwd || 0) + 1; else if (fw < -4) c.bwd = (c.bwd || 0) + 1;
-  if (u0 > 66) { c.pa3 = (c.pa3 || 0) + 1; if (fw < -4) c.back3 = (c.back3 || 0) + 1; } }
+  if (u0 > 66) { c.pa3 = (c.pa3 || 0) + 1; if (fw < -4) { c.back3 = (c.back3 || 0) + 1; if (u0 >= 84 && uOf(p1.x, d) > 83 && Math.abs(p1.y - 32) < 20) c.cut3 = (c.cut3 || 0) + 1; } } }
 function pstatFrame(M) { const h = MV.holder; if (!h || !pstatOn()) return; const q = MV.pos[h.s][h.i]; if (!q) return; const d = h.s === 'm' ? dM_(M) : -dM_(M), u = uOf(q.x, d), c = MV.cnt || (MV.cnt = {});
   const P = MV.pst; if (P && P.s === h.s) { if (u > P.max) P.max = u; if (!P.f3 && u > 66) { P.f3 = 1; c.f3 = (c.f3 || 0) + 1; } }
   else { if (P) { c.prog = (c.prog || 0) + Math.max(0, P.max - P.u0); c.possN = (c.possN || 0) + 1; } MV.pst = { s: h.s, u0: u, max: u, f3: u > 66 ? 1 : 0 }; }
   const key = h.s + h.i; if (MV.pstH !== key) { MV.pstH = key; if (u > 83 && Math.abs(q.y - 32) < 20) c.box = (c.box || 0) + 1; } }
+function pmChoose(s, pi, ri) { const M = G0().mm; if (!M || !MV.pos) return; const C = PX_CFG.pm, d = s === 'm' ? dM_(M) : -dM_(M), P0 = MV.pos[s][pi], R0 = MV.pos[s][ri], who = sideOf(s)[pi], sub = who.sub, os = s === 'm' ? 'o' : 'm'; if (!P0 || !R0) return;
+  const ru = uOf(R0.x, d), X = (uu) => d > 0 ? uu : 100 - uu, foes = (MV.pos[os] || []).map((q, j) => ({ q, j })).filter(o => o.j && o.q && !MV.red[os + o.j]);
+  const near = (x, y) => foes.reduce((a, o) => Math.min(a, Math.hypot(o.q.x - x, o.q.y - y)), 99), half = sub === 'DM' || sub === 'CB' ? C.defHalf : 1, opts = [];
+  { let fj = null, fd = 3.5; foes.forEach(o => { const dd = Math.hypot(o.q.x - R0.x, o.q.y - R0.y); if (dd < fd) { fd = dd; fj = o; } });
+    if (fj) { const tu = c01(uOf(fj.q.x, d) + 6, 5, 96), ty = c01(fj.q.y + (fj.q.y < 32 ? 2 : -2), 4, 60); opts.push({ k: 'onetwo', u: tu, y: ty, S: (C.onetwo[0] + C.onetwo[1] * nA(who, 'OTB')) * half }); } }
+  const wide = R0.y < 16 || R0.y > 48;
+  if (wide && (sub === 'FB' || sub === 'CM')) opts.push({ k: 'overlap', u: c01(ru + 12, 5, 96), y: R0.y < 32 ? 5 : 59, S: (C.overlap[0] + C.overlap[1] * nA(who, 'WOR') + .08 * (TK(s).ment - 1)) * half });
+  if (wide) opts.push({ k: 'underlap', u: c01(ru + 10, 5, 96), y: R0.y < 32 ? 21 : 43, S: C.underlap[0] + C.underlap[1] * nA(who, 'OTB') });
+  { const a1 = { u: c01(ru + 9, 5, 96), y: c01(R0.y + 10, 4, 60) }, a2 = { u: c01(ru + 9, 5, 96), y: c01(R0.y - 10, 4, 60) }, b = near(X(a1.u), a1.y) >= near(X(a2.u), a2.y) ? a1 : a2; opts.push({ k: 'support', u: b.u, y: b.y, S: C.support }); }
+  opts.push({ k: 'home', u: null, S: C.home - C.homeWOR * nA(who, 'WOR') });
+  opts.forEach(o => { if (o.u != null) o.S += C.free * Math.min(8, near(X(o.u), o.y)); });
+  const pick = softPick(opts, C.tau); if (!pick) return; cntAdd('pm_' + pick.k); if (pick.k === 'home') return;
+  const dur = C.durMin + rnd2() * (C.durMax - C.durMin); (MV.pm || (MV.pm = {}))[s + pi] = { u: pick.u, y: pick.y, until: MV.t + dur, k: pick.k };
+  if (pick.k === 'onetwo') (MV.pmw || (MV.pmw = {}))[s + pi] = MV.t + dur; }
 function passTo(s, i, sp) { const h0 = MV.holder; pstatPass(h0, s, i); if (h0 && MV.st && !MV.pg) { const t0 = MV.st[h0.s]; t0.pa++; if (h0.s !== s) t0.pm++; if (h0.s === 'm' && MV.mst[h0.i] && MV.mst[h0.i].me) { MV.my.pa++; if (s !== 'm') MV.my.pm++; } }
   const ps = h0 && sideOf(h0.s)[h0.i]; MV.act = { k: 'pass', to: { s, i }, sp: sp * 0.78, pas: ps ? PA(ps, 'PAS') : 55, from: h0 ? h0.s : null }; MV.holder = null;
-  if (h0 && h0.s === s && h0.i !== 0 && MV.run && !MV.pg) { try { const dd = s === 'm' ? dM_(G0().mm) : -dM_(G0().mm), q = MV.pos[s][h0.i]; if (q && rnd2() < 0.6) MV.run[s + h0.i] = { dx: 6 + rnd2() * 4, dy: (32 - q.y) * 0.15 + (rnd2() * 2 - 1) * 4, until: MV.t + 2.2 }; } catch (e) {} }   // 패스앤무브: 주고 앞으로 뛰어 들어감
+  if (h0 && h0.s === s && h0.i !== 0 && !MV.pg) { try { pmChoose(s, h0.i, i); } catch (e) {} }   // 패스 앤 무브: 원투·오버랩·언더랩·지원 각도 중 빈 곳으로
 }
+function passAim(A2, q) {                                                                     // 3-1 도착 지점: 받는 선수가 달리는 방향 × 속도 × 공 도착 시간(3번 반복) + 리드
+  const T = PX_CFG.aim, b = MV.ball, sp = Math.max(10, A2.sp || 30), M = G0().mm, d = A2.to.s === 'm' ? dM_(M) : -dM_(M), run = MV.runs && MV.runs[A2.to.s + A2.to.i], thr = !!(A2.lead || A2.thrC);
+  let vx = q.vx || 0, vy = q.vy || 0;
+  if (thr) { const p = sideOf(A2.to.s)[A2.to.i], vm = (8 + PA(p, 'PAC') / 9) * T.runFrac; let dx = d, dy = 0; if (run && run.t0 <= MV.t) { dx = (d > 0 ? run.tu : 100 - run.tu) - q.x; dy = run.ty - q.y; } const L = Math.hypot(dx, dy) || 1; vx = dx / L * vm; vy = dy / L * vm; }
+  else { vx *= .6; vy *= .6; }
+  let px = q.x, py = q.y; for (let k = 0; k < T.iters; k++) { const t = Math.hypot(px - b.x, py - b.y) / sp; px = q.x + vx * t; py = q.y + vy * t; }
+  if (thr) { const L = Math.hypot(vx, vy) || 1, ld = T.leadMin + rnd2() * (T.leadMax - T.leadMin); px += vx / L * ld; py += vy / L * ld; }
+  A2.px = c01(px, 1.5, 98.5); A2.py = c01(py, 1, 63); }
+function passWait(A2, tx, ty, dt) {                                                            // 공이 먼저 도착하면 받는 선수가 올 때까지 그 자리(최대 1.6초)
+  if (A2.k !== 'pass' || A2.px == null) return false; const q = MV.pos[A2.to.s] && MV.pos[A2.to.s][A2.to.i]; if (!q || Math.hypot(q.x - tx, q.y - ty) <= PX_CFG.aim.waitR) return false;
+  A2.wait = (A2.wait || 0) + dt; if (A2.wait > PX_CFG.aim.wait) return false; MV.ball.x = tx; MV.ball.y = ty; MV.bz = 0; return true; }
 function laneCheck(M, A2, tx, ty) {                                                         // 패스 길목 차단: 상대 수비수가 패스 라인 근처에 있으면 인터셉트 가능
   if (!A2.from || A2.to.s !== A2.from || A2.hi || A2.cross || MV.pg || MV.pen || MV.so || MV.sp || MV.lead || MV.momentOpen || MV.talk) return;
   const os = A2.from === 'm' ? 'o' : 'm', x0 = A2.x0, y0 = A2.y0, vx = tx - x0, vy = ty - y0, L2 = vx * vx + vy * vy; if (L2 < 36) return;
@@ -836,7 +865,7 @@ function laneCheck(M, A2, tx, ty) {                                             
     const p = sideOf(os)[j], pr = (1 - dist / 2.6) * 0.26 * (0.5 + (PA(p, 'POS') + PA(p, 'AGI') + PA(p, 'TAK')) / 300) * clampN(44 / A2.sp, 0.7, 1.4) * (1 + (TK(os).press - 1) * 0.12);
     if (rnd2() < pr && (!best || dist < best.dist)) best = { j, dist }; });
   if (best && rnd2() < 0.05 && canStage()) { const q = MV.pos[os][best.j], dA = A2.from === 'm' ? dM_(M) : -dM_(M); if (q && uOf(q.x, dA) < 78) { MV.handReq = { s: os, i: best.j, t: MV.t }; MV.act = null; lbl('핸드볼!'); foulScene(M, { s: A2.from, p: sideOf(os)[best.j] }); return; } }
-  if (best) { const t0 = MV.st && MV.st[A2.from]; if (t0) t0.pm++; A2.to = { s: os, i: best.j }; A2.lane = 1; (MV.cnt || (MV.cnt = {})).lane = ((MV.cnt || {}).lane || 0) + 1; lbl('인터셉트!'); }
+  if (best) { const t0 = MV.st && MV.st[A2.from]; if (t0) t0.pm++; A2.to = { s: os, i: best.j }; A2.lane = 1; { const iq = MV.pos[os][best.j]; if (iq) { A2.px = iq.x; A2.py = iq.y; } } (MV.cnt || (MV.cnt = {})).lane = ((MV.cnt || {}).lane || 0) + 1; lbl('인터셉트!'); }
 }
 function shoot(M, out, sty) {
   const h = MV.holder, s = h.s, d = s === 'm' ? dM_(M) : -dM_(M), os = s === 'm' ? 'o' : 'm', cur = MV.pos[s][h.i], gx = d > 0 ? 99 : 1;
@@ -860,6 +889,63 @@ function shoot(M, out, sty) {
   if (out !== 'goal') { PX.ui.sfx(out === 'save' ? 'save' : 'shot'); const nm = esc(sideOf(s)[h.i].name); MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${({ save: '골키퍼 선방', wide: '골대를 벗어남', block: '수비가 막아냄', post: '골대를 때림' })[out]}` }); }
 }
 const SHOT_STY = { header: { h: 1.0, sp: 60, t: '헤딩슛!' }, volley: { h: 2.0, sp: 68, t: '발리슛!' }, chip: { h: 3.4, sp: 36, t: '칩슛!', cy: 1.6 }, curve: { h: 1.6, sp: 54, t: '감아차기!', dev: 2.8 }, drive: { h: 1.3, sp: 82, t: '중거리 슛!' }, low: { h: 0.5, sp: 58, t: '땅볼 슛!' }, tap: { h: 0.4, sp: 34, t: '밀어 넣기!' }, overhead: { h: 2.6, sp: 56, t: '바이시클 킥!' }, first: { h: 0.7, sp: 66, t: '논스톱 슛!' }, knuckle: { h: 1.0, sp: 92, t: '무회전 슛!', dev: 0.9 } };
+// ===== 공격 전진·개인 행동 설정값(fm-detail-spec.md 출발값). 조정은 이 표의 숫자만 =====
+const PX_CFG = {
+  V: { side: [0, .01, .01, .02, .03, .04, .06, .09, .13, .16], half: [0, .01, .02, .03, .04, .06, .09, .15, .26, .38], mid: [0, .01, .02, .03, .05, .07, .11, .19, .36, .60] },   // 1장 구역 가치표(u 10칸 × 측면·하프스페이스·중앙)
+  press: [[3, 1], [6, .6], [10, .25]],                                                     // 0-2 압박 정도: 가장 가까운 상대 거리 → pr
+  tau: { base: .35, DEC: .12, VIS: .08, pr: .15, COM: .08, min: .08, max: .6, scale: .2 },   // scale: 사양 점수 폭(약 0.1)에 맞춘 온도 배율 — pitch-sim으로 조정            // 0-3 판단 온도(softmax)
+  pass: { gainW: 2.4, riskBase: .25, lossW: .8, recvW: .12, recvR: 6, offside: .4, cutback: .15, midBackPen: .3, f3BackMaxDist: 14, openBackPr: 1, longBuild: .08, oneTwo: .3, backLongMax: 28 },   // 2-1·2-2
+  cut: { react0: .35, POS: .10, DEC: .05, margin: .05, slope: .08, scale: .6, ballSp: 36 },  // 2-3 가로채기(시간 비교, 예측용)
+  carry: { gainW: 2.4, step: 6, Lw: .05, Lcap: 15, prW: .5, DRI: .10, Lmin: 6, prMax: .25, cone: 25, tempo: .04, push: 6, inward: .15, dur: 1.2 },   // 2-4 운반
+  aim: { iters: 3, runFrac: .9, leadMin: .6, leadMax: 1.2, meet: .12, wait: 1.6, waitR: 2.2 },   // 3-1 도착 지점
+  run: { ST: [.30, .25], W: [.20, .20], AM: [.10, .15], FB: [.05, .10], CM: [.05, .10], every: .5, max: 2, angMin: 20, angMax: 35, len: 12, delay0: .4, delayOTB: .3, dur: 1.6, behindMax: 5, spaceMin: 10, faceMax: 60, seeDelay0: .6, seeVIS: .3, thr: .5, thrVIS: .10, thrPAS: .10, thrBase: .15, thrMax: .75, prMax: .25, transMul: 1.5 },   // 3-3 미리 뛰는 침투
+  thrOld: { base: .06, VIS: 150, PAS: 200, max: .35 },                                     // 침투가 없을 때 일반 스루패스(시야 좋은 선수)
+  pm: { onetwo: [.30, .15], overlap: [.25, .15], underlap: [.22, .10], support: .15, home: .10, homeWOR: .15, durMin: 1.5, durMax: 3.0, defHalf: .5, free: .02, tau: .25 },   // 4장 패스 앤 무브
+  scan: { base: .4, VIS: 2.0, DEC: .6, win: 2, dur: .25, reach: 30, mem: 2.2, every: .25, loseBase: .35, loseCOM: .2, loseScale: .3, backR: 4.5 },   // 5-2 스캔
+  align: { base: .12, k: .10, max: .3, prHalf: .6, weakDeg: 45, weakTEC: .3, weakAdd: .08, weakDev: 1.35 },   // 5-3 차기 전 몸 정렬
+  touch: { base: 1.2, TEC: .8, dur: .35 },                                                 // 5-4 첫 터치
+  ask: { free: 6, dur: .6, cd: 3, point: .4 },                                             // 5-5 공 요구·가리키기
+  jockey: { dist: 4, gap: 2.2, inside: .8 },                                               // 5-6 수비 1:1 지연
+  turn: { decel: .5 }                                                                      // 5-7 90° 넘게 꺾을 때 감속
+};
+function nA(p, k) { return clampN((PA(p, k) - 50) / 30, -1, 1); }                            // 능력치 정규화(-1~1)
+function prOf(dist) { for (const [dd, v] of PX_CFG.press) if (dist < dd) return v; return 0; }
+function zoneV(u, y) { const C = PX_CFG.V, fu = c01(u, 0, 99.99) / 10 - .5, i0 = Math.max(0, Math.min(9, Math.floor(fu))), i1 = Math.min(9, i0 + 1), tu = clampN(fu - i0, 0, 1), dy = Math.abs(y - 32);
+  const row = (k) => C[k][i0] + (C[k][i1] - C[k][i0]) * tu, cm = row('mid'), ch = row('half'), cs = row('side');
+  return dy <= 3.5 ? cm : dy <= 13 ? cm + (ch - cm) * (dy - 3.5) / 9.5 : dy <= 25.5 ? ch + (cs - ch) * (dy - 13) / 12.5 : cs; }
+function pCut(x0, y0, x1, y1, os) { const C = PX_CFG.cut, L = Math.hypot(x1 - x0, y1 - y0), k = Math.max(2, Math.min(8, Math.ceil(L / 5))); let keep = 1;   // 패스 길 가로채기 확률(받는 지점 마지막 칸은 받기 경합이라 제외)
+  (MV.pos[os] || []).forEach((q, j) => { if (j === 0 || !q || MV.red[os + j]) return; const p = sideOf(os)[j], re = C.react0 - C.POS * nA(p, 'POS') - C.DEC * nA(p, 'DEC'), vs = 8 + PA(p, 'PAC') / 9; let mx = 0;
+    for (let t = 1; t < k; t++) { const r = t / k, px = x0 + (x1 - x0) * r, py = y0 + (y1 - y0) * r, m = L * r / C.ballSp - (re + Math.hypot(px - q.x, py - q.y) / vs), P = 1 / (1 + Math.exp(-(m + C.margin) / C.slope)); if (P > mx) mx = P; }
+    keep *= 1 - mx * C.scale; }); return 1 - keep; }
+function softPick(opts, tau) { if (!opts.length) return null; const mx = Math.max(...opts.map(o => o.S)), w = opts.map(o => Math.exp((o.S - mx) / tau)); let r = rnd2() * w.reduce((a, b) => a + b, 0); for (let k = 0; k < opts.length; k++) { r -= w[k]; if (r <= 0) return opts[k]; } return opts[opts.length - 1]; }
+function cntAdd(k, v) { if (!pstatOn()) return; const c = MV.cnt || (MV.cnt = {}); c[k] = (c[k] || 0) + (v == null ? 1 : v); }
+// 3-3 미리 뛰는 침투: 0.5초마다 공격 팀에서 조건을 보고 출발(최대 2명). 화면 오프사이드는 만들지 않음(공이 그 선수에게 나가기 전엔 라인을 넘지 않음)
+function runsUpdate(M) { const C = PX_CFG.run, h = MV.holder; if (MV.runsS !== MV.poss) { MV.runs = {}; MV.runsS = MV.poss; }                                 // 공격 팀이 바뀌면 침투 기록 초기화(패스가 날아가는 동안은 유지)
+  if (!h || MV.pg || MV.sp || MV.pen || MV.so || MV.lead || MV.cele || MV.paused) return;
+  if ((MV.runsT || -9) > MV.t - C.every) return; MV.runsT = MV.t; const R = MV.runs || (MV.runs = {});
+  for (const k in R) if (R[k].until < MV.t) delete R[k];
+  const s = h.s, os = s === 'm' ? 'o' : 'm', d = s === 'm' ? dM_(M) : -dM_(M), hp = MV.pos[s][h.i]; if (!hp) return;
+  let nd = 99; (MV.pos[os] || []).forEach((q, j) => { if (j && q && !MV.red[os + j]) nd = Math.min(nd, Math.hypot(q.x - hp.x, q.y - hp.y)); });
+  const T = TK(s), trans = (T.trans - 1) > 0 && MV.tOverS === s && MV.t - (MV.tOver || -99) < 5;
+  if (prOf(nd) > C.prMax && !trans) return;
+  const sp = Math.hypot(hp.vx || 0, hp.vy || 0); if (sp > 1 && Math.acos(clampN(((hp.vx || 0) * d) / sp, -1, 1)) * 180 / Math.PI > C.faceMax) return;   // 공 가진 선수가 앞을 봄
+  let line = 55; (MV.pos[os] || []).forEach((q, j) => { if (j && q && !MV.red[os + j]) line = Math.max(line, uOf(q.x, d)); });
+  if (100 - line < C.spaceMin) return; let active = Object.values(R).filter(r => r.until > MV.t).length;
+  sideOf(s).forEach((p, i) => { if (active >= C.max || i === 0 || i === h.i || MV.red[s + i] || R[s + i]) return; const q = MV.pos[s][i]; if (!q) return; const sub = p.sub, tb = C[sub]; if (!tb) return;
+    if (sub === 'FB' && ((T.ment - 1) < 1 || (q.y < 32) !== (MV.ball.y < 32))) return;            // 풀백은 공격적 멘탈리티 + 공 쪽만
+    const cu = uOf(q.x, d), gap = line - cu; if (gap < 0 || gap > C.behindMax) return;
+    const pr = (tb[0] + tb[1] * nA(p, 'OTB')) * (.8 + .2 * T.tempo) * (trans ? C.transMul : 1); if (rnd2() >= pr) return;
+    const a = (C.angMin + rnd2() * (C.angMax - C.angMin)) * Math.PI / 180, inward = q.y < 32 ? 1 : -1, sg = sub === 'W' && Math.abs(q.y - 32) < 14 ? -inward : inward;
+    const tu = c01(cu + C.len * Math.cos(a), 5, 97), ty = c01(q.y + sg * C.len * Math.sin(a), 4, 60), t0 = MV.t + Math.max(0, C.delay0 - C.delayOTB * nA(p, 'OTB'));
+    R[s + i] = { t0, until: t0 + C.dur, tu, ty }; active++; cntAdd('runN'); (MV.point || (MV.point = {}))[s + i] = t0 + PX_CFG.ask.point; }); }
+// 5-2 받기 전 스캔: 공 가진 동료 30 안에서 2초당 1~3회 고개를 돌려 주변 확인(시야·판단력). 스캔한 선수만 몸을 열고 받음
+function scanUpdate(M) { const C = PX_CFG.scan, h = MV.holder; if (!h || MV.pg || MV.sp || MV.pen || MV.so) return; if ((MV.scanT0 || -9) > MV.t - C.every) return; const dtS = MV.t - (MV.scanT0 || MV.t); MV.scanT0 = MV.t;
+  const s = h.s, hp = MV.pos[s][h.i]; if (!hp) return; const L = MV.scanL || (MV.scanL = {}), V = MV.scanV || (MV.scanV = {});
+  sideOf(s).forEach((p, i) => { if (i === 0 || i === h.i || MV.red[s + i]) return; const q = MV.pos[s][i]; if (!q || Math.hypot(q.x - hp.x, q.y - hp.y) > C.reach) return; const key = s + i;
+    const cnt = Math.round(C.base + C.VIS * (nA(p, 'VIS') + 1) / 2 + C.DEC * (nA(p, 'DEC') + 1) / 2), iv = C.win / Math.max(1, cnt), vis = PA(p, 'VIS');
+    if (vis >= 62) cntAdd('scanTHi', dtS); else if (vis <= 42) cntAdd('scanTLo', dtS);
+    if (MV.t - (L[key] || -9) >= iv) { L[key] = MV.t; V[key] = MV.t + C.dur; cntAdd('scanN'); if (vis >= 62) cntAdd('scanHi'); else if (vis <= 42) cntAdd('scanLo'); } }); }
+function scanned(s, i) { return MV.t - ((MV.scanL || {})[s + i] || -99) <= PX_CFG.scan.mem; }
 function decide(M) {
   const h = MV.holder; if (!h) return;
   const s = h.s, d = s === 'm' ? dM_(M) : -dM_(M), st = sideOf(s), arr = MV.pos[s], cur = arr[h.i], who = st[h.i], os = s === 'm' ? 'o' : 'm', oarr = MV.pos[os]; if (!cur) return;
@@ -934,10 +1020,15 @@ function decide(M) {
     if (t) { passTo(s, t.i, long ? 55 : 38); if (long) { MV.act.hi = true; lbl('롱킥'); } } else MV.dec = 0.5; return; }
   const Bd = TK(s).build - 1, R = who.sub, pm = c01(0.5 + (M.mine.strength - M.opp.strength) / 160, 0.3, 0.7), press = nd < 6 ? 1 : nd < 12 ? 0.5 : 0.15, foe = ni >= 0 ? sideOf(os)[ni] : null;
   const lose = clampN(0.032 + press * 0.115 + (s === 'm' ? -(pm - 0.5) * 0.2 : (pm - 0.5) * 0.2) - (PA(who, 'DRI') - 50) / 700 + (PA(foe, 'TAK') - 50) / 500 + (PA(foe, 'AGG') - 50) / 900 + (TK(os).press - 1) * 0.035, 0.03, 0.42);
-  const pass = (t, sp, lead, tag) => { const err = clampN((55 - PA(who, 'PAS')) / 220 + press * 0.08 + (t.dist > 30 ? 0.05 : 0) + (lead ? 0.04 : 0), 0, 0.3);   // 패스 정확도: 능력치/압박/거리
+  const pass = (t, sp, lead, tag) => aimThen(t, () => pass0(t, sp, lead, tag));            // B3: 차기 전 몸 정렬 시간 뒤에 찬다
+  const aimThen = (t, fn) => { const A = PX_CFG.align, fx = Math.hypot(cur.vx || 0, cur.vy || 0) > 1 ? Math.atan2(cur.vy, cur.vx) : (d > 0 ? 0 : Math.PI), tx2 = Math.atan2(t.q.y - cur.y, t.q.x - cur.x);
+    let da = tx2 - fx; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2; let at = Math.min(A.max, A.base + A.k * Math.abs(da) / Math.PI); if (prOf(nd) >= A.prHalf) at *= .5;
+    const ft = footOf(who), weakSide = (ft === 'L' ? da < 0 : da > 0) && Math.abs(da) * 180 / Math.PI >= A.weakDeg; let weak = false; if (weakSide) { if (nA(who, 'TEC') >= A.weakTEC) at += A.weakAdd; else weak = true; }
+    MV.aim = { s, i: h.i, x: t.q.x, y: t.q.y, at: MV.t + at, fn: () => { fn(); if (weak && MV.act) MV.act.weak = 1; } }; MV.dec = at + 0.05; cntAdd('aimN'); };
+  const pass0 = (t, sp, lead, tag) => { const err = clampN((55 - PA(who, 'PAS')) / 220 + press * 0.08 + (t.dist > 30 ? 0.05 : 0) + (lead ? 0.04 : 0), 0, 0.3);   // 패스 정확도: 능력치/압박/거리
     if (rnd2() < err && ni >= 0) { let bi = -1, bd = 1e9; oarr.forEach((q, i) => { if (i && q && !MV.red[os + i]) { const dd = Math.hypot(q.x - t.q.x, q.y - t.q.y); if (dd < bd) { bd = dd; bi = i; } } }); if (bi >= 0) { passTo(os, bi, sp); return; } }
     if (!lead && !tag && Math.abs(t.q.y - 32) > 23 && rnd2() < 0.07 + err * 0.5 && canStage() && !MV.pg) { const ty = t.q.y < 32 ? 0.6 : 63.4; MV.act = { k: 'out', tx: t.q.x + d * 2, ty, sp: sp * 0.78, s: os, kind: 'th' }; MV.holder = null; return; }
-    passTo(s, t.i, sp); if (lead) MV.act.lead = d * lead; if (tag) { MV.act.tag = tag; lbl(tag); if (tag === '스루패스' && pstatOn()) { const c = MV.cnt || (MV.cnt = {}); c.thr = (c.thr || 0) + 1; MV.act.thrC = 1; } } if (tag === '크로스' || tag === '얼리 크로스' || tag === '롱패스' || tag === '걷어내기' || tag === '대지를 가르는 롱패스' || tag === '헤딩 걷어내기') MV.act.hi = true; };
+    passTo(s, t.i, sp); if (lead) MV.act.lead = d * lead; if (tag) { MV.act.tag = tag; lbl(tag); if (tag === '스루패스' && pstatOn()) { const c = MV.cnt || (MV.cnt = {}); c.thr = (c.thr || 0) + 1; MV.act.thrC = 1; } } if (tag === '크로스' || tag === '얼리 크로스' || tag === '롱패스' || tag === '걷어내기' || tag === '대지를 가르는 롱패스' || tag === '사이드 체인지' || tag === '헤딩 걷어내기') MV.act.hi = true; };
   if (ni >= 0 && nd < 2.4 && rnd2() < 0.22 && !(MV.duelT && MV.t - MV.duelT < 2)) {        // 몸싸움: 바짝 붙었을 때 힘 대결
     MV.duelT = MV.t; MV.duel = { a: { s, i: h.i }, b: { s: os, i: ni }, t: MV.t };
     if (PA(foe, 'STR') + rnd2() * 30 > PA(who, 'STR') + PA(who, 'BAL') * 0.2 + rnd2() * 30) { lbl('몸싸움에서 이겼다'); passTo(os, ni, 30); return; }
@@ -947,6 +1038,7 @@ function decide(M) {
   if (MV.finS !== s) { MV.finS = s; MV.fin = 0; } if (u < 60) MV.fin = 0;
   const wide = cur.y < 16 || cur.y > 48;
   const spaceAhead = (() => { let ok = true; oarr.forEach((q, j) => { if (!j || !q || MV.red[os + j]) return; const qu = uOf(q.x, d); if (qu > u + 1 && qu < u + 15 && Math.abs(q.y - cur.y) < 9) ok = false; }); return ok; })();   // 앞에 공간이 있는가
+  const spaceAhead2 = (() => { let ok = true; oarr.forEach((q, j) => { if (!j || !q || MV.red[os + j]) return; const qu = uOf(q.x, d); if (qu > u + 1 && qu < u + 20 && Math.abs(q.y - cur.y) < 12) ok = false; }); return ok; })();   // P1 넓힌 '앞이 비었나'
   const laneF = (m) => { let md = 1e9; const vx = m.q.x - cur.x, vy = m.q.y - cur.y, L2 = vx * vx + vy * vy || 1; oarr.forEach((q, j) => { if (!j || !q || MV.red[os + j]) return; const t = ((q.x - cur.x) * vx + (q.y - cur.y) * vy) / L2; if (t < 0.1 || t > 0.95) return; md = Math.min(md, Math.hypot(cur.x + vx * t - q.x, cur.y + vy * t - q.y)); }); return md < 1.6 ? 0.05 : md < 3 ? 0.35 : 1; };   // 패스 길목에 수비가 있으면 피함
   const backF = (fw) => fw < -4 ? (spaceAhead ? 0.05 : u > 66 ? (press >= 1 ? 0.55 : 0.25) : press >= 1 ? 1.2 : 0.85) : 1;   // 공격 3분의 1 지역에선 막혀도 뒤로는 덜(옆·컷백 우선)   // 앞이 비면 백패스 거의 안 함, 막혔고 압박받으면 뒤로 돌려 볼 소유
   if (MV.reb && MV.t - MV.reb.t < 3 && h.i !== 0 && !MV.pg) {                                                   // 튕긴 공을 받은 직후
@@ -973,15 +1065,35 @@ function decide(M) {
   if (u > 72 && h.i !== 0 && nd > 3 && gd > 9 && rnd2() < 0.45 + (PA(who, 'DRI') - 50) / 200) { MV.dec = 0.3 + rnd2() * 0.3; return; }   // 문전: 뒤로 돌리지 않고 골문 쪽으로 몰고 들어감
   if (u < 26 && MV.rcvHi > 0 && MV.t - MV.rcvHi < 0.6 && R !== 'GK') { MV.rcvHi = -9; const t = pickBy(mates.filter(m => m.i && m.pu > 40), m => 1 + m.open); if (t) { pass(t, 50, 0, '헤딩 걷어내기'); return; } }
   if (u < 30 && press > 0.5 && rnd2() < (u < 18 ? 0.7 : 0.35)) { const t = pickBy(mates.filter(m => m.i), m => m.sub === 'ST' || m.sub === 'W' || m.sub === 'AM' ? 1 + m.open : 0.15); if (t) { pass(t, 54 + (R === 'CB' ? (PA(who, 'STR') - 50) / 10 : 0), 0, '걷어내기'); return; } }   // 위험 지역 걷어내기
-  if ((R === 'CM' || R === 'AM' || R === 'DM') && PA(who, 'VIS') > 55 && rnd2() < (PA(who, 'VIS') - 40) / 140) {   // 시야 좋은 미드필더: 수비 뒷공간 스루패스
-    const t = pickBy(mates.filter(m => m.i && m.pu > u + 8 && m.pu <= line + 4 && (m.sub === 'ST' || m.sub === 'W' || m.sub === 'AM')), m => m.open * laneF(m) * (1 + (PA(m.who, 'OTB') - 50) / 60)); if (t && laneF(t) > 0.3) { pass(t, 46 + PA(who, 'PAS') / 10, 6, '스루패스'); return; } }
-  if (R === 'ST' && (PA(who, 'STR') + PA(who, 'HEA')) / 2 > PA(who, 'PAC') + 4 && gd > 16 && rnd2() < 0.35) {          // 타깃맨: 등지고 받아 내려주기
+  { const RC = PX_CFG.run, TO = PX_CFG.thrOld, runners = mates.filter(m => m.i && MV.runs && MV.runs[s + m.i] && MV.runs[s + m.i].t0 <= MV.t && MV.t - MV.runs[s + m.i].t0 >= RC.seeDelay0 - RC.seeVIS * nA(who, 'VIS') && MV.runs[s + m.i].until > MV.t);   // 스루패스(3-3)
+    const pool = runners.length ? runners : mates.filter(m => m.i && m.pu > u + 8 && m.pu <= line + 4 && (m.sub === 'ST' || m.sub === 'W' || m.sub === 'AM'));
+    const pThr = runners.length ? clampN(RC.thrBase + RC.thr + RC.thrVIS * nA(who, 'VIS') + RC.thrPAS * nA(who, 'PAS'), 0, RC.thrMax) : (R !== 'GK' && R !== 'CB' ? clampN(TO.base + (PA(who, 'VIS') - 50) / TO.VIS + (PA(who, 'PAS') - 50) / TO.PAS, 0.02, TO.max) : 0);
+    if (pool.length && prOf(nd) < 0.6 && rnd2() < pThr) {
+      const t = pickBy(pool, m => m.open * laneF(m) * (1 + (PA(m.who, 'OTB') - 50) / 60)); if (t && laneF(t) > 0.3) { pass(t, 46 + PA(who, 'PAS') / 10, 6, '스루패스'); return; } } }
+  if (R === 'ST' && (PA(who, 'STR') + PA(who, 'HEA')) / 2 > PA(who, 'PAC') + 4 && gd > 16 && (u < 66 || nd < 3.5) && rnd2() < 0.35) {   // 상대 진영 3분의1에선 압박받을 때만 내려줌(2-2)          // 타깃맨: 등지고 받아 내려주기
     const t = pickBy(mates.filter(m => m.i && m.pu < u && m.pu > u - 14 && m.dist < 16 && (m.sub === 'AM' || m.sub === 'CM' || m.sub === 'W')), m => m.open); if (t) { pass(t, 38); return; } }
   if (PA(who, 'VIS') > 58 && (R === 'CM' || R === 'DM' || R === 'CB') && rnd2() < 0.18) {                                // 사이드 체인지
-    const t = pickBy(mates.filter(m => m.i && Math.abs(m.q.y - cur.y) > 26 && m.pu >= u - 4), m => m.open); if (t) { pass(t, 46, 0, t.dist > 40 && PA(who, 'PAS') > 60 ? '대지를 가르는 롱패스' : '사이드 체인지'); MV.act.hi = true; return; } }
-  if ((nd > 8 || (spaceAhead && nd > 4)) && u < 76 && rnd2() < 0.12 + (spaceAhead ? 0.22 : 0) + (PA(who, 'DRI') - 50) / 300 + (R === 'W' ? 0.15 : R === 'AM' ? 0.08 : R === 'CB' || R === 'DM' ? -0.1 : 0)) { MV.dec = 0.5 + rnd2() * 0.5; return; }   // 드리블 전진
+    const t = pickBy(mates.filter(m => m.i && Math.abs(m.q.y - cur.y) > 26 && m.pu >= u - 4), m => m.open); if (t) { pass(t, 46, 0, t.dist > 40 && PA(who, 'PAS') > 60 ? '대지를 가르는 롱패스' : '사이드 체인지'); return; } }
+  // (P5) 드리블 전진은 아래 선택지 점수제의 '운반'으로 옮김
   if (Bd > 0 && u < 56 && R !== 'ST' && rnd2() < 0.1 * Bd) { const t = pickBy(mates.filter(m => m.i && m.pu > u + 18 && (m.sub === 'ST' || m.sub === 'W')), m => m.open); if (t) { pass(t, 52, 0, '롱패스'); return; } }   // 직선 빌드업: 전방으로 길게
-  const t = pickBy(mates, m => { if (m.i === 0 && (u > 25 || rnd2() < 0.85)) return 0; const fw = m.pu - u; return Math.exp(-m.dist / (22 + Bd * 7)) * (fw > 4 ? 1.5 + Bd * 0.45 : fw < -8 ? 0.45 - Bd * 0.1 : 1) * backF(fw) * (fw < -4 ? (m.dist > 28 ? 0 : m.dist > 20 ? 0.06 : m.dist > 14 ? 0.45 : 1) : 1) * laneF(m) * (m.dist < 5 ? 0.1 : 1) * m.open * (m.pu > line + 1 ? 0.15 : 1) * (1 + (PA(who, 'VIS') - 50) / 150) * (fw > 4 && (m.sub === 'ST' || m.sub === 'W') ? 1 + (PA(m.who, 'OTB') - 50) / 100 : 1) * (R === 'CB' || R === 'FB' ? (m.sub === 'DM' || m.sub === 'CM' || m.sub === 'FB' || m.sub === 'CB' ? 1.3 : 0.8) : 1); });
+  const pr = prOf(nd), Pc = PX_CFG.pass, V0 = zoneV(u, cur.y), Tk = TK(s), sc = [];                                    // P1: 패스 점수 = 전진 가치 − 뺏길 위험 + 받는 여유
+  for (const m of mates) { if (m.i === 0 && (u > 25 || rnd2() < 0.85)) continue; if (m.dist < 5) continue;
+    const fw = m.pu - u, cutb = u >= 84 && m.pu > 83 && Math.abs(m.q.y - 32) < 20 && fw < -4, back = fw < -4 && !cutb; if (back && m.dist > Pc.backLongMax) continue;
+    const gain = zoneV(m.pu, m.q.y) - V0, risk = pCut(cur.x, cur.y, m.q.x, m.q.y, os), loss = zoneV(100 - m.pu, m.q.y) * Pc.lossW, recv = Math.min(1, m.open * 10 / Pc.recvR);
+    let S2 = Pc.gainW * gain - risk * (Pc.riskBase + loss) + Pc.recvW * recv + (m.pu > line + 1 ? -Pc.offside : 0) + (cutb ? Pc.cutback : 0) + (m.dist > 30 ? Pc.longBuild * (Tk.build - 1) : 0) + (MV.pmw && MV.pmw[s + m.i] > MV.t ? Pc.oneTwo : 0);
+    const RC = PX_CFG.run, rn = MV.runs && MV.runs[s + m.i], seen = rn && rn.t0 <= MV.t && rn.until > MV.t && MV.t - rn.t0 >= RC.seeDelay0 - RC.seeVIS * nA(who, 'VIS') && prOf(nd) < 0.6;   // 3-3 침투 중인 동료: 스루패스 가산
+    if (seen) S2 += RC.thr + RC.thrVIS * nA(who, 'VIS') + RC.thrPAS * nA(who, 'PAS');
+    sc.push({ m, S: S2, back, fw, run: !!seen }); }
+  const bestF = sc.filter(o => !o.back).reduce((a, o) => Math.max(a, o.S), -9), zone = u >= 66 ? 3 : u >= 33 ? 2 : 1;      // 2-2 백패스 규칙(구역별)
+  const opts = sc.filter(o => { if (!o.back) return true; if ((spaceAhead || spaceAhead2) && pr < Pc.openBackPr) return false; if (zone === 3) return pr >= 0.6 && bestF < 0 && o.m.dist <= Pc.f3BackMaxDist; if (zone === 2) { if (!(pr >= 0.25 || bestF < 0.02)) return false; if (spaceAhead2) o.S -= Pc.midBackPen * (1 - 0.25 * (1 - Tk.build)); } return true; });
+  { const Cc = PX_CFG.carry; let L = 99; oarr.forEach((q, j) => { if (!j || !q || MV.red[os + j]) return; const du = uOf(q.x, d) - u; if (du <= 0) return; if (Math.atan2(Math.abs(q.y - cur.y), du) * 180 / Math.PI <= Cc.cone) L = Math.min(L, Math.hypot(du, q.y - cur.y)); });   // P5 운반(2-4)
+    if (L >= Cc.Lmin && pr <= Cc.prMax && u < 92) { const y2 = cur.y + (32 - cur.y) * Cc.inward; opts.push({ carry: true, S: Cc.gainW * (zoneV(u + Cc.step, y2) - V0) + Cc.Lw * Math.min(L, Cc.Lcap) - Cc.prW * pr + Cc.DRI * nA(who, 'DRI') - Cc.tempo * (1 - Tk.tempo) }); } }
+  const Tc = PX_CFG.tau, tau = clampN(Tc.base - Tc.DEC * nA(who, 'DEC') - Tc.VIS * nA(who, 'VIS') + Tc.pr * pr - Tc.COM * nA(who, 'COM') * pr, Tc.min, Tc.max) * Tc.scale;
+  { const A = PX_CFG.ask, top = sc.filter(o => o.m.open * 10 >= A.free).sort((a, c) => c.S - a.S).slice(0, 2); top.forEach(o => { const k = s + o.m.i, AK = MV.ask || (MV.ask = {}), CD = MV.askCd || (MV.askCd = {}); if ((CD[k] || -9) <= MV.t) { AK[k] = MV.t + A.dur; CD[k] = MV.t + A.cd; } }); }   // B5 공 요구
+  const ch = softPick(opts, tau);
+  if (ch && ch.carry) { MV.carry = { s, i: h.i, until: MV.t + PX_CFG.carry.dur }; cntAdd('carryN'); MV.dec = 0.5 + rnd2() * 0.4; return; }
+  if (ch && ch.run) { pass(ch.m, 46 + PA(who, 'PAS') / 10, 6, '스루패스'); return; }
+  const t = ch ? ch.m : null;
   if (t && t.pu < u - 4) { const c = MV.cnt || (MV.cnt = {}); c.back = (c.back || 0) + 1; if (t.dist > 20) c.backLong = (c.backLong || 0) + 1; if (spaceAhead) c.backOpen = (c.backOpen || 0) + 1; }   // 화면 통계(백패스·앞이 빈데 백패스)
   if (t) pass(t, 34 + PA(who, 'PAS') / 4); else MV.dec = 0.5;
 }
@@ -1084,7 +1196,7 @@ function frame(ts) {
     const c = MV.pos[pre][i], g = MV.tgt[pre][i]; if (!c || !g) return;
     if (MV.red[pre + i] || (MV.frz && MV.frz[pre + i] > MV.t)) { c.vx = c.vy = 0; return; }
     const dx = g.x - c.x, dy = g.y - c.y, dist = Math.hypot(dx, dy) || 1e-6, tired = clampN((60 - PA(p, 'STA')) / 200 * (MV.min / 90), 0, 0.2);
-    const carry = MV.holder && MV.holder.s === pre && MV.holder.i === i ? 0.86 + PA(p, 'DRI') / 700 + PA(p, 'AGI') / 1400 : 1, vmax = carry * (8 + PA(p, 'PAC') / 9) * (g.sprint || dist > 12 ? 1 : 0.72) * (1 - tired) * (MV.kick > 0 ? 1.15 : 1) * (MV.lead || MV.regroup > 0 ? 2.3 : MV.cele || MV.sp ? 1.5 : 1), want = Math.min(vmax, dist * 3.2), acc = (30 + PA(p, 'AGI') / 2) * pdt;
+    const carry = MV.holder && MV.holder.s === pre && MV.holder.i === i ? 0.86 + PA(p, 'DRI') / 700 + PA(p, 'AGI') / 1400 : 1, vmax = carry * (8 + PA(p, 'PAC') / 9) * (g.sprint || dist > 12 ? 1 : 0.72) * (1 - tired) * (MV.kick > 0 ? 1.15 : 1) * (MV.lead || MV.regroup > 0 ? 2.3 : MV.cele || MV.sp ? 1.5 : 1), want = Math.min(vmax, dist * 3.2) * ((Math.hypot(c.vx, c.vy) > vmax * 0.5 && (c.vx * dx + c.vy * dy) < 0) ? PX_CFG.turn.decel : 1), acc = (30 + PA(p, 'AGI') / 2) * pdt;
     c.vx += clampN(dx / dist * want - c.vx, -acc, acc); c.vy += clampN(dy / dist * want - c.vy, -acc, acc);
     if (hold) { c.vx = c.vy = 0; if (!MV.over) { const ph = MV.t * 0.0 + (nowR() / 1000) * (1.1 + (i % 5) * 0.13) + i * 1.9 + (pre === 'o' ? 1.3 : 0); c.x += Math.cos(ph) * 0.55 * realDt; c.y += Math.sin(ph * 0.87) * 0.55 * realDt; } } c.x += c.vx * pdt; c.y += c.vy * pdt; all.push(c);   // 선택 대기 중에도 선수들이 제자리에서 살짝 움직여 멈춘 것처럼 보이지 않게
   });
@@ -1103,19 +1215,22 @@ function frame(ts) {
     const s = MV.pg.s, arr = MV.pos[s]; let bi = -1, bd = 1e9; arr.forEach((q, i) => { if (!q || i === 0 || MV.red[s + i]) return; const dd = Math.hypot(q.x - b.x, q.y - b.y); if (dd < bd) { bd = dd; bi = i; } }); if (bi >= 0) passTo(s, bi, 52); }
   if (MV.act) {
     const A2 = MV.act; let tx, ty;
-    if (A2.k === 'pass') { const q = MV.pos[A2.to.s][A2.to.i]; if (!q) { MV.act = null; return; } tx = c01(q.x + (A2.lead || 0), 1.5, 98.5); ty = q.y; }
+    if (A2.k === 'pass') { const q = MV.pos[A2.to.s][A2.to.i]; if (!q) { MV.act = null; return; } if (A2.px == null) passAim(A2, q); tx = A2.px; ty = A2.py; }
     else if (A2.k === 'shot' && (A2.out === 'save' || A2.out === 'block')) { const tt = A2.out === 'save' ? { s: A2.s === 'm' ? 'o' : 'm', i: 0 } : A2.to, q = tt && MV.pos[tt.s][tt.i]; tx = q ? q.x : A2.tx; ty = q ? q.y : A2.ty; }
     else { tx = A2.tx; ty = A2.ty; }
     let dx = tx - b.x, dy = ty - b.y, d = Math.hypot(dx, dy), step = A2.sp * dt;
     if (A2.d0 == null) { A2.d0 = Math.max(d, 1); A2.x0 = b.x; A2.y0 = b.y; A2.h = A2.h0 != null ? A2.h0 : A2.k === 'shot' ? 1.4 : A2.hi ? (A2.tag === '얼리 크로스' ? 3.0 : 3.8) : A2.tag === '땅볼 크로스' ? 0.05 : A2.d0 > 34 ? 2.4 : A2.d0 > 24 ? 0.45 : 0.05;
-      if (A2.k === 'pass') { A2.dev = (rnd2() + rnd2() - 1) * clampN((62 - (A2.pas || 55)) / 14 + 0.7, 0.35, 3.4) * clampN(A2.d0 / 30, 0.3, 1.4); laneCheck(M, A2, tx, ty); if (MV.act !== A2) return; } }
+      if (A2.k === 'pass') { A2.dev = (rnd2() + rnd2() - 1) * clampN((62 - (A2.pas || 55)) / 14 + 0.7, 0.35, 3.4) * clampN(A2.d0 / 30, 0.3, 1.4) * (A2.weak ? PX_CFG.align.weakDev : 1); laneCheck(M, A2, tx, ty); if (MV.act !== A2) return; } }
     if (A2.k === 'pass' && !A2.hi && !A2.cross) step *= 1.2 - 0.4 * clampN(1 - d / A2.d0, 0, 1);                       // 땅볼 패스: 처음엔 빠르고 굴러가며 감속(마찰)
     { const pr = clampN(1 - d / A2.d0, 0, 1); MV.bz = A2.h * Math.sin(Math.PI * pr) + (A2.eh || 0) * pr; } MV.ln = { x0: A2.x0, y0: A2.y0, x1: tx, y1: ty };
-    if (d <= step + 0.9) { b.x = tx; b.y = ty; MV.act = null;
+    if (d <= step + 0.9 && passWait(A2, tx, ty, dt)) { /* 받는 선수 기다림 */ }
+    else if (d <= step + 0.9) { b.x = tx; b.y = ty; MV.act = null; if (A2.k === 'pass' && A2.from === A2.to.s && MV.runs && MV.runs[A2.to.s + A2.to.i]) cntAdd('runRecv');
       if (A2.k === 'pass' && !A2.lane && A2.to.i !== 0 && !MV.pg && !MV.pen && !MV.so && !MV.sp && !MV.lead && !MV.momentOpen && !MV.talk) {            // 퍼스트터치: 기술이 낮고 압박받으면 공을 흘림
         const rs = A2.to.s, ro = rs === 'm' ? 'o' : 'm', rq = MV.pos[rs][A2.to.i], rp = sideOf(rs)[A2.to.i]; let nj = -1, nd2 = 6; MV.pos[ro].forEach((q, j) => { if (j && q && !MV.red[ro + j] && rq) { const dd = Math.hypot(q.x - rq.x, q.y - rq.y); if (dd < nd2) { nd2 = dd; nj = j; } } });
-        if (nj >= 0 && rp && rnd2() < clampN((58 - PA(rp, 'TEC')) / 600, 0, 0.07) + (nd2 < 3.5 ? 0.015 : 0)) { MV.holder = { s: ro, i: nj }; MV.poss = ro; MV.tOver = MV.t; MV.tOverS = ro; MV.dec = 0.5; lbl('퍼스트터치 실수'); (MV.cnt || (MV.cnt = {})).touch = ((MV.cnt || {}).touch || 0) + 1; const t1 = MV.st && MV.st[rs]; if (t1) t1.pm++; retarget(M); return; } }
+        const Sc = PX_CFG.scan, blind = !scanned(rs, A2.to.i) && nj >= 0 && nd2 < Sc.backR; if (blind) cntAdd('blindRecv');
+        if (nj >= 0 && rp && rnd2() < clampN((58 - PA(rp, 'TEC')) / 600, 0, 0.07) + (nd2 < 3.5 ? 0.015 : 0) + (blind ? clampN(Sc.loseBase - Sc.loseCOM * nA(rp, 'COM'), 0.05, 0.6) * Sc.loseScale : 0)) { MV.holder = { s: ro, i: nj }; MV.poss = ro; MV.tOver = MV.t; MV.tOverS = ro; MV.dec = 0.5; lbl('퍼스트터치 실수'); (MV.cnt || (MV.cnt = {})).touch = ((MV.cnt || {}).touch || 0) + 1; const t1 = MV.st && MV.st[rs]; if (t1) t1.pm++; retarget(M); return; } }
       if (A2.k === 'pass' && A2.thrC && A2.from === A2.to.s) { const c = MV.cnt || (MV.cnt = {}); c.thrOK = (c.thrOK || 0) + 1; }
+      if (A2.k === 'pass' && A2.from === A2.to.s && A2.to.i !== 0) { const rq = MV.pos[A2.to.s][A2.to.i], rp2 = sideOf(A2.to.s)[A2.to.i], dd2 = A2.to.s === 'm' ? dM_(M) : -dM_(M); if (rq && rp2) { const T = PX_CFG.touch, op = scanned(A2.to.s, A2.to.i), len = T.base + T.TEC * (1 - nA(rp2, 'TEC')) / 2; MV.ft = { s: A2.to.s, i: A2.to.i, until: MV.t + T.dur, dx: op ? dd2 : 0, dy: op ? (32 - rq.y) * 0.02 : (rq.y < 32 ? -1 : 1), len: op ? len : 0.6 }; } }
       if (A2.k === 'pass') { MV.lastPassFrom = A2.from === A2.to.s ? A2.from : null; MV.rcvHi = (A2.hi || A2.cross || (A2.h || 0) > 2) ? MV.t : -9; if (MV.poss !== A2.to.s) { MV.tOver = MV.t; MV.tOverS = A2.to.s; } if (MV.holder === null && MV.poss !== A2.to.s) MV.fin = 0; MV.holder = A2.to; MV.poss = A2.to.s; MV.dec = A2.to.i === 0 ? 1.1 + rnd2() * 0.5 : (MV.pg && MV.pg.deliv && A2.to.i === MV.pg.si) ? 0.06 : 0.45 + rnd2() * 0.7; retarget(M); }
       else if (A2.k === 'out') outDone(M, A2);
       else if (A2.k === 'shot') { const os = A2.s === 'm' ? 'o' : 'm';
@@ -1138,7 +1253,8 @@ function frame(ts) {
     MV.bz = 0; MV.ln = null;
     const hp = MV.pos[MV.holder.s][MV.holder.i], dd = MV.holder.s === 'm' ? dM_(M) : -dM_(M), k = Math.min(1, dt * 16);
     b.x += (c01(hp.x + dd * 1.7, 1.5, 98.5) - b.x) * k; b.y += (hp.y - b.y) * k;
-    if ((!MV.paused || MV.pg) && !MV.over && !MV.momentOpen) { MV.dec -= dt * (1 + 0.14 * (TK((MV.holder && MV.holder.s) || MV.poss).tempo - 1)); if (MV.dec <= 0) decide(M); }
+    if (MV.aim) { const A = MV.aim; if (!MV.holder || MV.holder.s !== A.s || MV.holder.i !== A.i || MV.act || MV.sp || MV.pen || MV.so || MV.over) MV.aim = null; else if (MV.t >= A.at && (!MV.paused || MV.pg)) { MV.aim = null; try { A.fn(); } catch (e) {} } }   // B3 차기 전 몸 정렬 → 그 뒤 패스
+    if ((!MV.paused || MV.pg) && !MV.over && !MV.momentOpen && !MV.aim) { MV.dec -= dt * (1 + 0.14 * (TK((MV.holder && MV.holder.s) || MV.poss).tempo - 1)); if (MV.dec <= 0) decide(M); }
   }
   if (MV.goalRes && !MV.paused && !MV.act && !MV.momentOpen) {
     const s = MV.goalRes, st = sideOf(s); MV.goalRes = null; MV.cele = null; MV.regroup = 0; b.x = 50; b.y = 32; MV.holder = { s, i: Math.min(6, st.length - 1) }; MV.poss = s; MV.dec = 0.45; MV.kick = 0.7; MV.fin = 0; retarget(M); }

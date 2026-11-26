@@ -368,12 +368,26 @@ const V3D = (() => {
     r.root.position.set(x, 0, z);
     const toBall = Math.atan2(wx(bx) - x, wz(by) - z), moveYaw = Math.atan2(vx * WS, vy * WZ);
     const yaw = wantYaw != null ? wantYaw : (sp < .6 ? toBall : moveYaw);
-    st.yaw = angLerp(st.yaw, yaw, Math.min(1, dt * (extra && extra.quick ? 12 : 8))); r.root.rotation.y = st.yaw;
+    { let dl = yaw - st.yaw; while (dl > Math.PI) dl -= Math.PI * 2; while (dl < -Math.PI) dl += Math.PI * 2;                                       // B7 회전 속도: 빠를수록 천천히, 민첩할수록 빨리
+      const om = 7 * (.75 + .25 * ((extra && extra.agi) || 0)) * (1 - .5 * Math.min(1, sp / 14)) * (extra && extra.quick ? 1.6 : 1), stp = Math.min(Math.abs(dl) * Math.min(1, dt * 10), om * dt);
+      st.yaw += Math.sign(dl) * stp; } r.root.rotation.y = st.yaw;
     let dot = 1, side = 0; if (sp > .6) { let d = moveYaw - st.yaw; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; dot = Math.cos(d); side = Math.abs(Math.sin(d)); }
     const back = dot < -.3, sideStep = !back && side > .65;
     st.ph += dt * (2 + sp * (back ? 1.3 : 1.7));
     for (const k of ['kick', 'dive', 'touch', 'head', 'catch', 'slide', 'duel', 'hand', 'punch', 'tip', 'catchHi']) st[k] = Math.max(0, (st[k] || 0) - dt);
     animateRig(r, Object.assign({ speed: sp, phase: st.ph, seed: st.seed, kick: st.kick, kind: st.kind, dive: st.dive, diveSide: st.diveSide, foot: st.foot, touch: st.touch, head: st.head, catch: st.catch, slide: st.slide, duel: st.duel, duelS: st.duelS, hand: st.hand, punch: st.punch, tip: st.tip, catchHi: st.catchHi, diveH: st.diveH, back, side: sideStep ? .8 : 0 }, extra || {}), R.t);
+    if (!(extra && (extra.celeb || extra.down)) && !(st.dive > 0) && !(st.slide > 0) && !(extra && extra.ready)) {
+      let rel = toBall - st.yaw; while (rel > Math.PI) rel -= Math.PI * 2; while (rel < -Math.PI) rel += Math.PI * 2;
+      const key = extra && extra.key, H = 1.22, U = .44; let hy = 0, uy = 0;
+      if (key && MV.scanV && MV.scanV[key] > MV.t) hy = (rel > 0 ? -1 : 1) * 1.05;                                   // B2 스캔: 공 반대쪽으로 고개
+      else if (Math.abs(rel) > 1.92 && sp > 2) { st.chk = (st.chk == null ? 0 : st.chk) - dt; if (st.chk <= -.35) st.chk = 1.2 + Math.random() * .8; if (st.chk < 0) { hy = Math.sign(rel) * H; uy = Math.sign(rel) * U; } }   // 공을 등지고 뛸 땐 1.2~2초마다 어깨 너머
+      else { hy = clamp(rel, -H, H); if (Math.abs(rel) > H) uy = clamp(rel - Math.sign(rel) * H, -U, U); }       // B1 기본: 고개로 공을 봄, 넘치면 상체를 비틀어
+      st.hy = (st.hy || 0) + clamp(hy - (st.hy || 0), -7 * dt, 7 * dt); st.uy = (st.uy || 0) + clamp(uy - (st.uy || 0), -4 * dt, 4 * dt);
+      r.head.rotation.y = st.hy; r.upper.rotation.y += st.uy;
+      if (key && MV.ask && MV.ask[key] > MV.t) { r.armR.rotation.x = -2.7; r.armR.rotation.z = -.25; }               // B5 공 요구(팔 들기)
+      if (key && MV.point && MV.point[key] > MV.t && sp > 1) { r.armL.rotation.x = -1.5; r.armL.rotation.z = .1; }    // B5 침투 방향 가리키기
+      if (extra && extra.jockey) { r.body.position.y -= .07; r.upper.rotation.x += .25; r.legL.rotation.z = .16; r.legR.rotation.z = -.16; }   // B6 낮은 자세
+    }
   }
   const angTo = (x1, z1, x2, z2) => Math.atan2(x2 - x1, z2 - z1);
   const angMix = (a, b, k) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d * k; };
@@ -445,6 +459,9 @@ const V3D = (() => {
         want = (defending && sp < 6 && Math.abs(dd) > 1.2) || (sp < 3.5 && Math.abs(dd) > .9) ? toBall : moveYaw;
       } else want = toBall;
       if (MV.intro && MV.intro.ph === 'line' && sp < 1) want = 0;
+      extra.key = pre + i; try { extra.agi = typeof nA === 'function' ? nA(playerOf(pre, i), 'AGI') : 0; } catch (e) { extra.agi = 0; }
+      { const A = MV.aim; if (isHold && A && A.s === pre && A.i === i) { want = angTo(x, z, wx(A.x), wz(A.y)); extra.quick = 1; } }                // B3 차기 전: 차는 방향으로 몸 정렬
+      if (!isHold && MV.jk && MV.jk[pre + i] > MV.t) { const sg = (wz(by) - z) * (atkDir(pre) > 0 ? 1 : -1) > 0 ? 1 : -1; want = toBall + sg * Math.PI / 4; extra.jockey = 1; }   // B6 옆으로 선 지연 자세(터치라인 쪽을 열어 줌)
       if (thr && thr.s === pre && thr.tk === i) { extra.throw = true; extra.throwT = clamp((thr.t || 0) / (thr.dur || 1.5), 0, 1); want = toBall; }
       place(r, c.x, c.y, c.vx || 0, c.vy || 0, dt, bx, by, extra, want); if (r.me) meR = r;
     });
@@ -453,7 +470,8 @@ const V3D = (() => {
     const hr = hold && R.pl[hold.s] && R.pl[hold.s][hold.i];
     const tr = thr && R.pl[thr.s] && R.pl[thr.s][thr.tk];
     if (tr && tr.root.visible && (thr.t || 0) < (thr.dur || 1.5) * .8) { const p = tr.root.position; bp = new THREE.Vector3(p.x, 2.55, p.z); }
-    else if (hr && hr.root.visible) { const y = hr.st.yaw, p = hr.root.position; bp = new THREE.Vector3(p.x + Math.sin(y) * .5, BR, p.z + Math.cos(y) * .5); }
+    else if (hr && hr.root.visible) { const y = hr.st.yaw, p = hr.root.position; bp = new THREE.Vector3(p.x + Math.sin(y) * .5, BR, p.z + Math.cos(y) * .5);
+      const ft = MV.ft; if (ft && ft.s === hold.s && ft.i === hold.i && ft.until > MV.t) { const k = (ft.until - MV.t) / PX_CFG.touch.dur, vx2 = ft.dx * WS, vz2 = ft.dy * WZ, L2 = Math.hypot(vx2, vz2) || 1; bp.x += vx2 / L2 * ft.len * WS * k; bp.z += vz2 / L2 * ft.len * WZ * k; } }
     else {
       bp = new THREE.Vector3(wx(bx), BR + bz * .85, wz(by));
       const rr = recv && R.pl[recv.s] && R.pl[recv.s][recv.i];
