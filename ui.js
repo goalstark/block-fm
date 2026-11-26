@@ -1049,7 +1049,7 @@ function frame(ts) {
     if (!(MV.settle > 0) && !MV.skipping) { MV.moT -= realDt; const te = document.getElementById('mvt'); if (te) { const v = String(Math.max(0, Math.ceil(MV.moT))); if (te.textContent !== v) te.textContent = v; } { const t2 = document.getElementById('mvt2'); if (t2) { const v = String(Math.max(0, Math.ceil(MV.moT))); if (t2.textContent !== v) t2.textContent = v; } }
       if (MV.moT <= 0) { MV.moT = 10; const os = Core.momentOptions(MV.momentOpen); const pk = os[Math.floor(Math.random() * os.length)], bt = pk && document.querySelector(`[data-act="mv"][data-id="${pk.id}"]`); if (bt) { toast('시간 초과 — 무작위 선택'); bt.click(); } } } } else MV.moFor = null;
   if (MV.cele) { MV.cele.t += realDt; if (MV.cele.t > 2.0) { MV.cele = null; MV.regroup = 1.0; MV.rt = 0; } }
-  if (MV.rpWant && !MV.cele) { if (MV.over || MV.skipping || MV.fast || MV.hlFast) MV.rpWant = null; else if (performance.now() > (MV.fxUntil || 0) + 80 && !MV.momentOpen && !MV.lead && !MV.pg && !MV.talk && !MV.mgrPanel) { MV.rp = { f: MV.rpWant.f, t: 0 }; MV.rpWant = null; } } else if (MV.regroup > 0) MV.regroup -= realDt;
+  if (MV.rpWant && !MV.cele) { if (MV.over || MV.skipping || MV.fast || MV.hlFast || (typeof V3D !== 'undefined' && V3D.active && V3D.active())) MV.rpWant = null; else if (performance.now() > (MV.fxUntil || 0) + 80 && !MV.momentOpen && !MV.lead && !MV.pg && !MV.talk && !MV.mgrPanel) { MV.rp = { f: MV.rpWant.f, t: 0 }; MV.rpWant = null; } } else if (MV.regroup > 0) MV.regroup -= realDt;   // 3D 화면에선 2D 리플레이가 안 보여 멈춘 것처럼 보이므로 건너뜀
   if (!MV.over && MV.min > 0 && !hold) { if (MV.poss && MV.st[MV.poss]) MV.st[MV.poss].pt += dt; const mi0 = MV.myI == null ? (MV.myI = MV.mst.findIndex(p => p.me)) : MV.myI, mc = mi0 >= 0 && MV.pos.m[mi0]; if (mc) { const uu = uOf(mc.x, dM_(M)); MV.heat[Math.min(5, Math.floor(mc.y / 64 * 6)) * 10 + Math.min(9, Math.max(0, Math.floor(uu / 10)))] += dt; } }
   if (MV.sp) { MV.sp.t += realDt; if (!MV.sp.wh && MV.sp.kind !== 'th' && MV.sp.t > (MV.sp.dur || 1.9) - 0.6) { MV.sp.wh = 1; sfx('whistle'); lbl('휘슬'); retarget(M); } if (MV.sp && MV.sp.t > (MV.sp.dur || 1.9)) endSp(M); }
   MV.t += dt; MV.rt -= dt; if (MV.kick > 0) MV.kick -= dt; if (MV.pg) MV.pg.t += dt; if (MV.rt <= 0) { retarget(M); MV.rt = 0.22; }
@@ -1694,7 +1694,10 @@ function matchMeView(M) {
   const my = MV.my, pc = my.pa ? Math.round((my.pa - my.pm) / my.pa * 100) : 0;
   return `<div class="sec">내 평점</div><div class="merate ${r >= 7.5 ? 'hi' : r < 6 ? 'lo' : ''}"><b>${r.toFixed(1)}</b><span>골 ${M.myGoals} · 도움 ${M.myAssists} · 슈팅 ${M.sh || 0}${my.pa ? ' · 패스 ' + pc + '% (' + my.pa + ')' : ''}</span></div><div class="sec">내 활동 위치 (히트맵, 오른쪽이 상대 골문)</div><svg class="heat" viewBox="0 0 100 64" preserveAspectRatio="none"><rect width="100" height="64" fill="#1d3a26"/>${cells}<g fill="none" stroke="#fff" stroke-opacity=".35" stroke-width=".4"><rect x=".5" y=".5" width="99" height="63"/><line x1="50" y1=".5" x2="50" y2="63.5"/><circle cx="50" cy="32" r="8"/><rect x=".5" y="14" width="14" height="36"/><rect x="85.5" y="14" width="14" height="36"/></g></svg>`;
 }
-function renderMatch() { renderMatch0(); try { mvOverlay(); } catch (e) {} }
+function renderMatch() { renderMatch0(); try { mvOverlay(); } catch (e) {} try { vfullNeed(); } catch (e) {} }
+function vfullNeed() {                                                                        // 전체화면에서 하프타임 지시·경기 종료처럼 메뉴에서 골라야 할 때는 서랍을 자동으로 연다
+  const dr = document.getElementById('vdrawer'); if (!dr || !MV) return; const need = !!(MV.talk || MV.over || MV.mgrPanel);
+  if (need && !dr.classList.contains('open')) { vfullMenu(); dr.dataset.auto = '1'; } else if (!need && dr.dataset.auto === '1' && dr.classList.contains('open')) { dr.dataset.auto = ''; vfullMenu(); } }
 function mvOverlay() {                                                                        // 선수 모드 골 장면 선택: 경기 영상 위에 큰 버튼으로(가로 전체화면에서도 보임)
   const pw = document.querySelector('#pitchbox .pwrap'); if (!pw) return; let ov = document.getElementById('mvov');
   if (!(MV && MV.momentOpen && !MV.over && !MV.skipping)) { if (ov) ov.remove(); return; }
@@ -1794,7 +1797,14 @@ function vfullToggle(off) {
   w.classList.toggle('vfull', on); document.body.classList.toggle('vfull-on', on);
   try { if (on) { const de = document.documentElement; if (de.requestFullscreen && !document.fullscreenElement) de.requestFullscreen().then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} setTimeout(vfullFit, 300); }).catch(() => {}); }
         else { try { screen.orientation.unlock(); } catch (e) {} if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); } } catch (e) {}
-  if (!w.classList.contains('vfull')) w.classList.remove('rot'); vfullFit(); }
+  if (!w.classList.contains('vfull')) w.classList.remove('rot'); vfullDrawer(on); vfullFit(); }
+function vfullDrawer(on) {                                                                    // 전체화면: 오른쪽 메뉴(경기 흐름·통계·버튼)를 경기 화면 위 서랍으로 — 버튼으로 펼치고 접음
+  const w = document.querySelector('#pitchbox .pwrap'), mb = document.getElementById('mb'), mf = document.getElementById('mf'), mt = document.getElementById('match'); if (!w || !mb || !mf || !mt) return;
+  let dr = document.getElementById('vdrawer'), tb = document.getElementById('vmtab');
+  if (on) { if (!dr) { dr = document.createElement('div'); dr.id = 'vdrawer'; w.appendChild(dr); } if (!tb) { tb = document.createElement('button'); tb.id = 'vmtab'; tb.type = 'button'; tb.dataset.act = 'vmenu'; w.appendChild(tb); }
+    dr.appendChild(mb); dr.appendChild(mf); dr.classList.remove('open'); tb.textContent = '◀ 메뉴'; }
+  else { mt.appendChild(mb); mt.appendChild(mf); if (dr) dr.remove(); if (tb) tb.remove(); } }
+function vfullMenu() { const dr = document.getElementById('vdrawer'), tb = document.getElementById('vmtab'); if (!dr) return; const o = dr.classList.toggle('open'); if (tb) { tb.textContent = o ? '▶ 닫기' : '◀ 메뉴'; tb.classList.toggle('open', o); } }
 window.addEventListener('resize', () => { try { vfullFit(); } catch (e) {} });
 function msetOpen() {
   if (!MV || MV.over || !G0().mm || MV.exitAsk || MV.setOpen) return;
@@ -2252,6 +2262,7 @@ document.addEventListener('click', (e) => {
   if (a==='mintro') { introSkip(); return; }
   if (a==='mcam') { try { V3D.setCam(id); } catch (e) {} msetSync(); return; }
   if (a==='mfull') { vfullToggle(); return; }
+  if (a==='vmenu') { vfullMenu(); return; }
   if (a==='mball') { try { V3D.setBall(id); } catch (e) {} msetSync(); return; }
   if (a==='mment') { const M = G0().mm; if (!M || !MV || MV.over) return; Core.mgrSetInstr('ment', +id); MV.tk.m = tkOf(M.mine); M.segDirty = true; const nx = segNext(MV.min); MV.log.unshift({ min: MV.min, ic: '📋', cls: '', t: `<b>감독 지시</b> ${['수비적', '균형', '공격적'][+id]}으로 전환${nx ? ` <span class="dim">· ${nx}분 구간부터 결과에 반영</span>` : ''}` }); toast(nx ? `${['수비적', '균형', '공격적'][+id]} 전환 — ${nx}분부터 결과에 반영` : '남은 구간이 없어 결과에는 반영되지 않습니다'); renderMatch(); return; }
   if (a==='mpinstr') { Core.mgrSetInstr(t.dataset.k, +id); if (MV) MV.mgrDirty = true; renderMatch(); return; }
