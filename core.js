@@ -417,7 +417,7 @@ function compResult(comp, ctx, h, a, gh, ga) {
   if (t.legs.filter(Boolean).length < t.n) return;
   let sa = 0, sb = 0; for (const L of t.legs) { if (L.h===t.a) { sa += L.gh; sb += L.ga; } else { sb += L.gh; sa += L.ga; } }
   t.sa = sa; t.sb = sb;
-  if (sa===sb && (comp.kind==='wc' || comp.kind==='nc') && !ctx.xt) {                                      // 월드컵: 90분 무승부 → 연장전(30분) → 승부차기
+  if (sa===sb && (comp.kind==='wc' || comp.kind==='nc' || comp.kind==='cup' || comp.kind==='cont') && !ctx.xt) {   // 토너먼트(월드컵·국내 컵·대륙 대회): 무승부(합산) → 연장전(30분) → 승부차기
     const dA = clubOf(t.a).strength - clubOf(t.b).strength, poi = (l) => { let L = Math.exp(-l), k = 0, p = 1; do { k++; p *= rnd(); } while (p > L); return k - 1; };
     const ea = poi(0.36 * Math.exp(dA * 0.012)), eb = poi(0.36 * Math.exp(-dA * 0.012)); t.et = [ea, eb]; sa += ea; sb += eb; t.sa = sa; t.sb = sb;
   }
@@ -1330,7 +1330,14 @@ function mvpOf(M) {
   return (M.mvp = cand[0] || null);
 }
 // 월드컵 토너먼트 90분 무승부 → 경기장에서 연장전(91~120분) 진행: 연장 득점 생성 + 승부차기 승자 결정
-function wcKO(M) { return !!(M && M.ctx && (M.ctx.t === 'wc' || M.ctx.t === 'nc') && M.ctx.ti !== undefined && M.ctx.g === undefined); }
+function wcKO(M) {                                                                   // 토너먼트 승부가 이 경기에서 갈리는가(월드컵·국내 컵·대륙 대회; 2차전 방식이면 마지막 경기만)
+  if (!(M && M.ctx && M.ctx.ti !== undefined && M.ctx.g === undefined)) return false; const k = M.ctx.t;
+  if (k === 'wc' || k === 'nc') return true; if (k !== 'cup' && k !== 'cont') return false;
+  const comp = compById(M.ctx.id), t = comp && comp.ties && comp.ties[M.ctx.ti]; if (!t) return false; return (M.ctx.leg || 0) === (t.n || 1) - 1; }
+function koTied(M, gh, ga) {                                                          // 이 경기 점수를 더했을 때 합산 동점인가(단판이면 그 경기 점수)
+  const comp = M && M.ctx && compById(M.ctx.id), t = comp && comp.ties && comp.ties[M.ctx.ti]; if (!t) return gh === ga;
+  let sa = 0, sb = 0; (t.legs || []).forEach((L, i) => { if (!L || i === M.ctx.leg) return; if (L.h === t.a) { sa += L.gh; sb += L.ga; } else { sb += L.gh; sa += L.ga; } });
+  if (M.h.id === t.a) { sa += gh; sb += ga; } else { sb += gh; sa += ga; } return sa === sb; }
 function wcExtra(M) {
   if (M.xt) return M.xt;
   const dA = M.mine.strength - M.opp.strength, poi = (l) => { let L = Math.exp(-l), k = 0, p = 1; do { k++; p *= rnd(); } while (p > L); return k - 1; };
@@ -2179,6 +2186,6 @@ function mgrReplan(min) {                                                  // �
 }
 
 const NATFLAG = (c) => DD.FLAG[c] || (WCN[c] && WCN[c][1]) || '';
-const API2 = { mgrAbil, wcKO, wcExtra, wcAutoPick, wcSquadCheck, wcSquadSet, mgrK, SP_SLOT, mgrSponsorGen, mgrSponsorSign, mgrPreGen, mgrCerPress, renamePlayer, renameClub, NATFLAG, mgrTrophy, mgrX, STAFF, mgrStaffUp, mgrStaffCost, mgrStaffLv, mgrWage, mgrFanText, mgrPressGen, mgrPressPick, rivalOf, wcStart, wcInfo, wcRank, WCN, Eng, isMgr, mgrWin, createMgr, mgrOffers, mgrJobs, mgrGoal, mgrSquad, mgrLineup, mgrSetXi, mgrSetRole, mgrSetFormation, mgrSetInstr, mgrAutoXi, mgrMarket, mgrBuy, mgrSell, mgrValue, mgrStanding, mgrTakeJob, mgrTalkInfo, mgrTalkPick, mgrSub, mgrReplan, talkInfo, talkPick, posKinds: (sub) => POSK[sub] || POSK.ST, optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, normStats, BOOTS, GEAR, AGENTS, shopBuy, shopOf, adAccept, adDecline, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
+const API2 = { mgrAbil, wcKO, koTied, wcExtra, wcAutoPick, wcSquadCheck, wcSquadSet, mgrK, SP_SLOT, mgrSponsorGen, mgrSponsorSign, mgrPreGen, mgrCerPress, renamePlayer, renameClub, NATFLAG, mgrTrophy, mgrX, STAFF, mgrStaffUp, mgrStaffCost, mgrStaffLv, mgrWage, mgrFanText, mgrPressGen, mgrPressPick, rivalOf, wcStart, wcInfo, wcRank, WCN, Eng, isMgr, mgrWin, createMgr, mgrOffers, mgrJobs, mgrGoal, mgrSquad, mgrLineup, mgrSetXi, mgrSetRole, mgrSetFormation, mgrSetInstr, mgrAutoXi, mgrMarket, mgrBuy, mgrSell, mgrValue, mgrStanding, mgrTakeJob, mgrTalkInfo, mgrTalkPick, mgrSub, mgrReplan, talkInfo, talkPick, posKinds: (sub) => POSK[sub] || POSK.ST, optInfo, nextEvent, plansOf, normPlan, mvpOf, get G() { return G; }, newWorld, newWorldGen, createMe, me, clubOf, leagueOf, compById, step, prepareMine, momentOptions, resolveMoment, finishMine, autoMine, sortedTable, topList, ratingList, acceptOffer, declineOffer, acceptRenewal, serialize, load, fmtDate, dateOf, dayOf, POS_KO, PLANS, price, MEET, answerMeeting, scoutOf, marketInfo, coachOf, PREFS, PREF_POS, momentText, negotiate, cancelPending, inWindow, nextWindowDay, pitchOf, finOf, sponsorAccept, sponsorDecline, setInv, INV, normStats, BOOTS, GEAR, AGENTS, shopBuy, shopOf, adAccept, adDecline, TRAITS, STYLE_KO, STYLE_DESC, ROLES, roleOf, setCust, setRoleTraining, mentorOf, pickMentor, ACH, flushFinish, startersOf, stageOf, lvl, seasonLabel, COUNTRIES: DD.COUNTRIES, NAT_KO: DD.NAT_KO, FLAG: DD.FLAG, NAT_CODES: DD.NAT_CODES, CODES: DD.CODES, NATK, matchTitle, mineIn, NT_WIN };
 Object.assign(API2, { rivalP, rivalInfo, agentNote, FAC, facLv, facCost, facUp, EVTS, evtInfo, evtPick, legendCheck, qTable, ntNext, confOf, NC_NAME, awayNT, offInfo, offStart, OFF_ACTS, tourPick, preDays, mePush, ORDERS, mgrSegment, OPT_N: (id) => (OPT[id] && OPT[id].n) || id, susOf, ovrSnap, hallList, careerOf, meRetire, retireOffers, meToMgr });
 if (typeof module !== 'undefined') module.exports = API2;

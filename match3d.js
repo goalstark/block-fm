@@ -261,7 +261,7 @@ const V3D = (() => {
       if (!R.lp) { const glow = new THREE.Sprite(gm); glow.scale.set(34, 34, 1); glow.position.set(0, 0, 1.5); head.add(glow); }
     }
     R.ball = buildBall(); sc.add(R.ball); R.bPrev = null;
-    if (R.lp) { R.ballSh = new THREE.Mesh(new THREE.CircleGeometry(BR * 1.1, 16), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .35, depthWrite: false })); R.ballSh.rotation.x = -Math.PI / 2; sc.add(R.ballSh); }
+    R.ballSh = new THREE.Mesh(new THREE.CircleGeometry(BR * 1.3, 18), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .4, depthWrite: false })); R.ballSh.rotation.x = -Math.PI / 2; sc.add(R.ballSh);
     // 내 선수 표시
     R.ring = new THREE.Mesh(new THREE.RingGeometry(.8, .98, 32), new THREE.MeshBasicMaterial({ color: col('#FFD23F'), transparent: true, opacity: .95, depthWrite: false, toneMapped: false })); R.ring.rotation.x = -Math.PI / 2; R.ring.visible = false; sc.add(R.ring);
     R.arrow = new THREE.Mesh(new THREE.ConeGeometry(.3, .5, 4), new THREE.MeshBasicMaterial({ color: col('#FFD23F'), toneMapped: false })); R.arrow.rotation.x = Math.PI; R.arrow.visible = false; sc.add(R.arrow);
@@ -272,10 +272,13 @@ const V3D = (() => {
     R.ref.forEach((r, i) => { if (i) { const f = new THREE.Mesh(box(.04, .45, .55), mat('flat', '#ff5a2e')); f.position.set(0, -.7, .3); r.armR.add(f); } });
     R.card = new THREE.Mesh(box(.32, .45, .04), new THREE.MeshBasicMaterial({ color: col('#F2D21B'), toneMapped: false })); R.card.visible = false; sc.add(R.card);
   }
-  function buildBall() {                                                           // 공: 로우폴리 정이십면체(하이브리드는 광택 코팅)
+  const BALLS = [['classic', '클래식', '#ffffff', '#1b1d22'], ['neon', '형광', '#E8FF3A', '#14161a'], ['orange', '오렌지', '#FF8A1F', '#ffffff'], ['red', '레드', '#ffffff', '#E0262F'], ['blue', '블루', '#ffffff', '#1F5FD6'], ['gold', '골드', '#F5C542', '#7A5A10']];
+  function ballSkin() { try { const v = localStorage.getItem('bfm_ball'); if (BALLS.some(b => b[0] === v)) return v; } catch (e) {} return 'neon'; }
+  function setBall(v) { if (!BALLS.some(b => b[0] === v)) return; try { localStorage.setItem('bfm_ball', v); } catch (e) {} if (R && R.ball) { const sc = R.ball.parent, nb = buildBall(); nb.position.copy(R.ball.position); if (sc) { sc.remove(R.ball); sc.add(nb); } R.ball.geometry.dispose(); R.ball = nb; } }
+  function buildBall() {                                                           // 공: 로우폴리 정이십면체(하이브리드는 광택 코팅) — 스킨 색 적용
     const g = new THREE.IcosahedronGeometry(BR, R.lp ? 1 : 2), p = g.attributes.position, cols = [], v = new THREE.Vector3(), dirs = [], g0 = new THREE.IcosahedronGeometry(1, 0), p0 = g0.attributes.position;
     for (let i = 0; i < p0.count; i++) { const d = new THREE.Vector3().fromBufferAttribute(p0, i).normalize(); if (!dirs.some(o => o.distanceTo(d) < 1e-3)) dirs.push(d); } g0.dispose();
-    const blk = col('#1b1d22'), wh = col('#ffffff');
+    const bs = BALLS.find(b => b[0] === ballSkin()) || BALLS[0], blk = col(bs[3]), wh = col(bs[2]); R.ballId = bs[0];
     for (let f = 0; f < p.count; f += 3) { let dk = false; for (let k = 0; k < 3; k++) { v.fromBufferAttribute(p, f + k).normalize(); if (dirs.some(d => d.distanceTo(v) < (R.lp ? .3 : 1e-3))) dk = true; } const c = dk ? blk : wh; for (let k = 0; k < 3; k++) cols.push(c.r, c.g, c.b); }
     g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
     const m = new THREE.Mesh(g, R.lp ? new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: .75 }) : new THREE.MeshPhysicalMaterial({ vertexColors: true, flatShading: true, roughness: .32, clearcoat: .9, clearcoatRoughness: .15 }));
@@ -456,7 +459,8 @@ const V3D = (() => {
     }
     R.ballZ = bp.y - BR;
     if (R.bPrev) { const dx = bp.x - R.bPrev.x, dz = bp.z - R.bPrev.z, d = Math.hypot(dx, dz); if (d > 1e-4 && d < 5) R.ball.rotateOnWorldAxis(new THREE.Vector3(dz, 0, -dx).normalize(), d / BR); }
-    R.bPrev = bp.clone(); R.ball.position.copy(bp); if (R.ballSh) R.ballSh.position.set(bp.x, .03, bp.z);
+    R.bPrev = bp.clone(); R.ball.position.copy(bp);
+    { const hgt = Math.max(0, bp.y - BR), s = 1.5 * (1 + Math.min(hgt, 8) * .09); R.ball.scale.setScalar(s); if (R.ballSh) { R.ballSh.position.set(bp.x, .03, bp.z); const k = 1 / (1 + hgt * .35); R.ballSh.scale.setScalar(1.2 * (.5 + .5 * k)); R.ballSh.material.opacity = .45 * k + .08; } }
     R.ring.visible = false; R.arrow.visible = !!(meR && meR.root.visible);
     if (meR) { const p = meR.root.position, s = 1 + Math.sin(R.t * 5) * .08; R.ring.position.set(p.x, .03, p.z); R.ring.scale.set(s, s, s); R.arrow.position.set(p.x, 2.75 + Math.sin(R.t * 4) * .12, p.z); R.arrow.rotation.y += dt * 2; }
     const rf = MV.ref || { x: 44, y: 40, a1: 50, a2: 50 };
@@ -480,7 +484,11 @@ const V3D = (() => {
   function camUpdate(gbx, gby, dt) {
     const m = R.cm || (R.cm = camMode()), asp = R.cam.aspect, b = { x: wx(gbx), z: wz(gby) }, pos = new THREE.Vector3(), look = new THREE.Vector3(); let fov = 34, rate = 3;
     const cele = MV.cele, cr = cele && R.pl[cele.s] && R.pl[cele.s][cele.si], narrow = asp < 1.4;
-    if (cele && cr && m !== 'far') { const s = cr.root.position, d = s.x > 0 ? 1 : -1; pos.set(s.x - d * 8, 2.8, s.z * .85 + (s.z > 0 ? -4.5 : 4.5)); look.set(s.x, 1.3, s.z); fov = 34; rate = 2.2; }
+    const IN = MV.intro && (MV.intro.ph === 'walk' || MV.intro.ph === 'line');
+    if (IN) {                                                                                  // 입장: 선수들을 따라가며 비추고, 일렬로 서면 정면에서 전체를 담음
+      let cx = 0, cz = 0, nn = 0; for (const pre of ['m', 'o']) (R.pl[pre] || []).forEach(r => { if (r && r.root.visible) { cx += r.root.position.x; cz += r.root.position.z; nn++; } }); if (nn) { cx /= nn; cz /= nn; }
+      const ln = MV.intro.ph === 'line', dz = ln ? (narrow ? 44 : 36) : (narrow ? 24 : 18); pos.set(cx * .4, ln ? 7.5 : 6, cz + dz); look.set(cx * .4, ln ? 3.2 : 1.1, cz); fov = ln ? 40 : 40; rate = 1.6; }
+    else if (cele && cr && m !== 'far') { const s = cr.root.position, d = s.x > 0 ? 1 : -1; pos.set(s.x - d * 8, 2.8, s.z * .85 + (s.z > 0 ? -4.5 : 4.5)); look.set(s.x, 1.3, s.z); fov = 34; rate = 2.2; }
     else if (m === 'far') { const zf = narrow ? 1.35 : 1; pos.set(b.x * .12, 88 * zf, 72 * zf + b.z * .05); look.set(b.x * .12, 0, 2); fov = 38; rate = 2; }
     else if (m === 'near') { const zf = narrow ? 1.2 : 1; pos.set(clamp(b.x * .96, -L, L), 11 * zf, b.z + 19 * zf); look.set(clamp(b.x, -L, L), .5, b.z - 1); fov = 40; rate = 3.2; }
     else if (m === 'gh' || m === 'ga') {
@@ -495,7 +503,7 @@ const V3D = (() => {
   function hudMake(pw) {
     let h = pw.querySelector('.v3hud'); if (h) return h;
     h = document.createElement('div'); h.className = 'v3hud';
-    h.innerHTML = `<div class="v3sb"><i class="hc"></i><b class="hn"></b><span class="sc0"></span><b class="an"></b><i class="ac"></i><span class="mn"></span></div><div class="v3cap"><span class="cm"></span><span class="ct"></span></div><button type="button" class="v3gear" data-act="mset" aria-label="경기 설정">⚙</button>`;
+    h.innerHTML = `<div class="v3sb"><i class="hc"></i><b class="hn"></b><span class="sc0"></span><b class="an"></b><i class="ac"></i><span class="mn"></span></div><div class="v3cap"><span class="cm"></span><span class="ct"></span></div><button type="button" class="v3gear" data-act="mset" aria-label="경기 설정">⚙</button><button type="button" class="v3full" data-act="mfull" aria-label="가로 전체화면">⛶</button>`;
     pw.appendChild(h); return h;
   }
   function hudUpdate(dt) {
@@ -579,8 +587,8 @@ const V3D = (() => {
     } catch (e) { R = prev; disposeCtx(ctx); return null; }
     R = prev; PR = ctx; return PR;
   }
-  function portrait(look, kit) {
-    const key = JSON.stringify([look, kit, gfx()]); if (pcache.has(key)) return pcache.get(key);
+  function portrait(look, kit, k) {                                               // k: 확대 배율(기본 1, 아이콘 등 고화질용)
+    k = Math.max(1, Math.min(6, k || 1)); const key = JSON.stringify([look, kit, gfx(), k]); if (pcache.has(key)) return pcache.get(key);
     const ctx = portraitCtx(); if (!ctx) return null;
     const prev = R; R = ctx; let url = null, rig = null;
     try {
@@ -588,12 +596,14 @@ const V3D = (() => {
       const main = (kit && kit[0]) || '#1E8F4E', sec = (kit && kit[1]) || '#F3F3F3', gk = false;
       rig = buildRig(kitObj('pt' + main + sec, main, sec, gk), '', lk); rig.root.position.set(0, -.02, 0); rig.root.rotation.y = 0;
       rig.armL.rotation.z = .1; rig.armR.rotation.z = -.1; ctx.sc.add(rig.root);
+      if (k > 1) ctx.rd.setSize(192 * k, 408 * k, false);
       ctx.rd.render(ctx.sc, ctx.cam); url = ctx.rd.domElement.toDataURL('image/png');
     } catch (e) { url = null; }
+    if (k > 1) { try { ctx.rd.setSize(192, 408, false); } catch (e) {} }
     if (rig) { ctx.sc.remove(rig.root); rig.root.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
     R = prev; if (url) pcache.set(key, url); return url;
   }
   function setCam(v) { if (!CAMS.some(c => c[0] === v)) return; try { localStorage.setItem('bfm_cam3d', v); } catch (e) {} if (R) { R.cm = v; R.hudK = ''; } }
   function camNow() { return (R && R.cm) || camMode(); }
-  return { sync, stop, active: () => !!R, glOK, splash, CAMS, setCam, camNow, portrait };
+  return { sync, stop, active: () => !!R, glOK, splash, CAMS, setCam, camNow, portrait, BALLS, ballSkin, setBall };
 })();
