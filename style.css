@@ -337,3 +337,4 @@ input,select{background:#0A0D12;border:1.5px solid #2A3446}
 /* 3D 경기장 위 ⚙ 버튼 (작게) */
 .v3gear{position:absolute;right:2.2%;top:3%;pointer-events:auto;width:2.4em;height:2.4em;border-radius:.6em;border:1px solid #2A3446;background:rgba(14,19,26,.85);color:#F1F4F8;font-size:1.05em;line-height:1;box-shadow:0 .2em 0 rgba(0,0,0,.45)}
 .v3cap{right:2.2%}
+.spr{image-rendering:auto}                                   /* 선수 그림이 3D 블록 캐릭터 이미지가 되어 부드럽게 표시 */

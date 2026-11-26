@@ -9,6 +9,7 @@ const POS_ORDER = ['GK','CB','FB','DM','CM','AM','W','ST'];
 const AT_KO = { FIN:'마무리',PAS:'패스',CRS:'크로스',DRI:'드리블',TEC:'테크닉',HEA:'헤딩',TAK:'태클',MAR:'마크',VIS:'시야',OTB:'오프더볼',POS:'위치선정',DEC:'판단력',COM:'침착성',WOR:'활동량',AGG:'적극성',PAC:'스피드',STA:'스태미나',STR:'몸싸움',AGI:'민첩성',JUM:'점프',REF:'반사신경',HAN:'캐칭',KIC:'킥',AER:'공중볼' };
 const spriteCache = {};
 function sprite(look, kit, num) {
+  try { if (typeof V3D !== 'undefined' && V3D.portrait) { const u = V3D.portrait(look, kit); if (u) return u; } } catch (e) {}   // 선수 그림: 3D 블록 캐릭터(경기 화면과 같은 모습). 3D를 못 쓰면 아래 픽셀 그림
   const key = JSON.stringify([look, kit]); if (spriteCache[key]) return spriteCache[key];
   const cv = document.createElement('canvas'); cv.width = 16; cv.height = 34; const g = cv.getContext('2d');
   let seed = 7; const rn = () => { seed = (seed*1664525 + 1013904223) % 4294967296; return seed/4294967296; };

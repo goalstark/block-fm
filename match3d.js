@@ -546,7 +546,38 @@ const V3D = (() => {
     R = prev;
     return { stop() { alive = false; if (sraf) cancelAnimationFrame(sraf); disposeCtx(ctx); } };
   }
+  // ---------- 선수 초상(프로필·MVP·명단 등): 블록 캐릭터를 3/4 각도로 찍은 이미지, 한 번 찍으면 저장해 두고 재사용 ----------
+  let PR = null; const pcache = new Map();
+  function portraitCtx() {
+    const style = gfx(); if (PR && PR.style === style) return PR;
+    if (PR) { const r = PR; PR = null; disposeCtx(r); pcache.clear(); }
+    if (!loadLib()) return null; const rd = makeRenderer(style, true); if (!rd) return null;
+    rd.shadowMap.enabled = false; const ctx = newCtx(rd, style); ctx.pr = 1; rd.setPixelRatio(1); rd.setSize(192, 408, false);
+    const prev = R; R = ctx;
+    try {
+      const sc = new THREE.Scene(); ctx.sc = sc;
+      if (ctx.lp) { sc.add(new THREE.HemisphereLight(col('#dfe8ff'), col('#3a3a3a'), 1.0)); const k = new THREE.DirectionalLight(col('#fff4e0'), 1.3); k.position.set(2, 4, 5); sc.add(k); }
+      else { ctx.env = makeEnv(); sc.environment = ctx.env.texture; const k = new THREE.DirectionalLight(col('#fff4e8'), 2.0); k.position.set(-2, 4, 5); sc.add(k); const rim = new THREE.DirectionalLight(col('#9fdcff'), 1.2); rim.position.set(3, 3, -4); sc.add(rim); sc.add(new THREE.HemisphereLight(col('#cfe0ff'), col('#20262e'), .3)); }
+      const cam = new THREE.OrthographicCamera(-.64, .64, 2.74, -.06, .1, 20); cam.position.set(1.15, 1.45, 3.4); cam.lookAt(0, 1.34, 0);
+      const h = 2.8, w = h * 192 / 408; cam.left = -w / 2; cam.right = w / 2; cam.top = h / 2; cam.bottom = -h / 2; cam.updateProjectionMatrix(); ctx.cam = cam;
+    } catch (e) { R = prev; disposeCtx(ctx); return null; }
+    R = prev; PR = ctx; return PR;
+  }
+  function portrait(look, kit) {
+    const key = JSON.stringify([look, kit, gfx()]); if (pcache.has(key)) return pcache.get(key);
+    const ctx = portraitCtx(); if (!ctx) return null;
+    const prev = R; R = ctx; let url = null, rig = null;
+    try {
+      const lk = { skin: '#' + ((typeof SKIN_C !== 'undefined' && SKIN_C[look && look.skin]) || 'E0A67A'), hair: '#' + ((typeof HAIR_C !== 'undefined' && HAIR_C[look && look.hair]) || '3A2A22'), hairStyle: HAIR_MAP[look && look.style] || 'crop', boot: '#111317', back: '' };
+      const main = (kit && kit[0]) || '#1E8F4E', sec = (kit && kit[1]) || '#F3F3F3', gk = false;
+      rig = buildRig(kitObj('pt' + main + sec, main, sec, gk), '', lk); rig.root.position.set(0, -.02, 0); rig.root.rotation.y = 0;
+      rig.armL.rotation.z = .1; rig.armR.rotation.z = -.1; ctx.sc.add(rig.root);
+      ctx.rd.render(ctx.sc, ctx.cam); url = ctx.rd.domElement.toDataURL('image/png');
+    } catch (e) { url = null; }
+    if (rig) { ctx.sc.remove(rig.root); rig.root.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+    R = prev; if (url) pcache.set(key, url); return url;
+  }
   function setCam(v) { if (!CAMS.some(c => c[0] === v)) return; try { localStorage.setItem('bfm_cam3d', v); } catch (e) {} if (R) { R.cm = v; R.hudK = ''; } }
   function camNow() { return (R && R.cm) || camMode(); }
-  return { sync, stop, active: () => !!R, glOK, splash, CAMS, setCam, camNow };
+  return { sync, stop, active: () => !!R, glOK, splash, CAMS, setCam, camNow, portrait };
 })();
