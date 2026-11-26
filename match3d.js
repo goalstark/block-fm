@@ -327,6 +327,7 @@ const V3D = (() => {
     if (a.kick > 0 && a.kind === 'volley') { r.legR.rotation.x = Math.min(r.legR.rotation.x, 0) - .6; r.body.rotation.z = -.35; r.upper.rotation.z = -.25; }
     if (a.kick > 0 && a.kind === 'chip') { const p = 1 - a.kick / .35; r.legR.rotation.x = p < .5 ? .5 * p / .5 : .5 - 1.6 * (p - .5) / .5; r.upper.rotation.x = -.2; }
     if (a.kick > 0 && a.kind === 'curve') { r.upper.rotation.y = .35; r.legR.rotation.z = -.25; }
+    if (a.kick > 0 && a.foot === 'L') { const t1 = r.legR.rotation.x; r.legR.rotation.x = r.legL.rotation.x; r.legL.rotation.x = t1; r.legL.rotation.z = -r.legR.rotation.z; r.legR.rotation.z = 0; r.upper.rotation.y = -r.upper.rotation.y; }   // 왼발잡이는 왼발로
     if (a.duel > 0) { const k = Math.sin(clamp(a.duel / .7, 0, 1) * Math.PI); r.upper.rotation.z = (a.duelS || 1) * .32 * k; r.armL.rotation.z = .45 * k; r.armR.rotation.z = -.45 * k; }
     if (a.hand > 0) { r.armR.rotation.x = -2.4; r.armR.rotation.z = -.2; }
     if (a.punch > 0) { const k = Math.sin(clamp((.5 - a.punch) / .5, 0, 1) * Math.PI); r.armL.rotation.x = r.armR.rotation.x = -2.0 * k; r.body.position.y = .45 * k; r.upper.rotation.x = -.15 * k; }
@@ -350,8 +351,8 @@ const V3D = (() => {
   function rebuildPlayers() {
     for (const pre of ['m', 'o']) { R.pl[pre].forEach(f => f && R.sc.remove(f.root)); R.pl[pre] = []; }
     for (const pre of ['m', 'o']) (pre === 'm' ? MV.mst : MV.ost).forEach((p, i) => {
-      const r = buildRig(kitOf(pre, p.sub === 'GK'), String(i === 0 ? 1 : i + 1), lookFor(p)); r.me = !!p.me; if (r.me) r.root.scale.setScalar(1.1);
-      r.st = { ph: Math.random() * 6, yaw: pre === 'm' ? Math.PI / 2 : -Math.PI / 2, seed: Math.random() * 6, kick: 0, dive: 0 }; R.sc.add(r.root); R.pl[pre][i] = r;
+      const r = buildRig(kitOf(pre, p.sub === 'GK'), String(i === 0 ? 1 : i + 1), lookFor(p)); r.me = !!p.me;
+      r.st = { ph: Math.random() * 6, yaw: pre === 'm' ? Math.PI / 2 : -Math.PI / 2, seed: Math.random() * 6, kick: 0, dive: 0, foot: (typeof footOf === 'function' ? footOf(p) : 'R') }; R.sc.add(r.root); R.pl[pre][i] = r;
     });
   }
 
@@ -367,7 +368,7 @@ const V3D = (() => {
     const back = dot < -.3, sideStep = !back && side > .65;
     st.ph += dt * (2 + sp * (back ? 1.3 : 1.7));
     for (const k of ['kick', 'dive', 'touch', 'head', 'catch', 'slide', 'duel', 'hand', 'punch', 'tip', 'catchHi']) st[k] = Math.max(0, (st[k] || 0) - dt);
-    animateRig(r, Object.assign({ speed: sp, phase: st.ph, seed: st.seed, kick: st.kick, kind: st.kind, dive: st.dive, diveSide: st.diveSide, touch: st.touch, head: st.head, catch: st.catch, slide: st.slide, duel: st.duel, duelS: st.duelS, hand: st.hand, punch: st.punch, tip: st.tip, catchHi: st.catchHi, diveH: st.diveH, back, side: sideStep ? .8 : 0 }, extra || {}), R.t);
+    animateRig(r, Object.assign({ speed: sp, phase: st.ph, seed: st.seed, kick: st.kick, kind: st.kind, dive: st.dive, diveSide: st.diveSide, foot: st.foot, touch: st.touch, head: st.head, catch: st.catch, slide: st.slide, duel: st.duel, duelS: st.duelS, hand: st.hand, punch: st.punch, tip: st.tip, catchHi: st.catchHi, diveH: st.diveH, back, side: sideStep ? .8 : 0 }, extra || {}), R.t);
   }
   const angTo = (x1, z1, x2, z2) => Math.atan2(x2 - x1, z2 - z1);
   const angMix = (a, b, k) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d * k; };
@@ -438,6 +439,7 @@ const V3D = (() => {
         const defending = MV.poss && MV.poss !== pre; let dd = moveYaw - toBall; while (dd > Math.PI) dd -= Math.PI * 2; while (dd < -Math.PI) dd += Math.PI * 2;
         want = (defending && sp < 6 && Math.abs(dd) > 1.2) || (sp < 3.5 && Math.abs(dd) > .9) ? toBall : moveYaw;
       } else want = toBall;
+      if (MV.intro && MV.intro.ph === 'line' && sp < 1) want = 0;
       if (thr && thr.s === pre && thr.tk === i) { extra.throw = true; extra.throwT = clamp((thr.t || 0) / (thr.dur || 1.5), 0, 1); want = toBall; }
       place(r, c.x, c.y, c.vx || 0, c.vy || 0, dt, bx, by, extra, want); if (r.me) meR = r;
     });
@@ -455,10 +457,11 @@ const V3D = (() => {
     R.ballZ = bp.y - BR;
     if (R.bPrev) { const dx = bp.x - R.bPrev.x, dz = bp.z - R.bPrev.z, d = Math.hypot(dx, dz); if (d > 1e-4 && d < 5) R.ball.rotateOnWorldAxis(new THREE.Vector3(dz, 0, -dx).normalize(), d / BR); }
     R.bPrev = bp.clone(); R.ball.position.copy(bp); if (R.ballSh) R.ballSh.position.set(bp.x, .03, bp.z);
-    R.ring.visible = R.arrow.visible = !!(meR && meR.root.visible);
+    R.ring.visible = false; R.arrow.visible = !!(meR && meR.root.visible);
     if (meR) { const p = meR.root.position, s = 1 + Math.sin(R.t * 5) * .08; R.ring.position.set(p.x, .03, p.z); R.ring.scale.set(s, s, s); R.arrow.position.set(p.x, 2.75 + Math.sin(R.t * 4) * .12, p.z); R.arrow.rotation.y += dt * 2; }
     const rf = MV.ref || { x: 44, y: 40, a1: 50, a2: 50 };
     place(R.ref[0], rf.x, rf.y, 0, 0, dt, bx, by); place(R.ref[1], rf.a1, 64.2, 0, 0, dt, bx, by); place(R.ref[2], rf.a2, -.2, 0, 0, dt, bx, by);
+    { const of = MV.offFlag; if (of && MV.t - of.t < 1.8) { const ar = of.y > 32 ? R.ref[1] : R.ref[2]; if (ar) { ar.armR.rotation.x = -2.9; ar.armR.rotation.z = -.15; } } }
     const rc = MV.refCard, on = !!(rc && rc.until > MV.t); R.card.visible = on;
     if (on) { const p = R.ref[0].root.position; R.card.position.set(p.x + .45, 2.45, p.z); R.card.material.color.copy(col(rc.c === 'r' ? '#E0262F' : '#F2D21B')); R.ref[0].armR.rotation.x = -2.9; }
     // 관중: 평소 살짝 들썩, 골이면 그 팀 관중이 점프
@@ -544,12 +547,12 @@ const V3D = (() => {
       const turf = new THREE.Mesh(new THREE.CircleGeometry(4.6, ctx.lp ? 6 : 6), new THREE.MeshStandardMaterial({ map: grassTex({ base: '#2E8B4A', a: '#319550', b: '#2A8445', pat: 'v' }), roughness: .95 })); turf.rotation.x = -Math.PI / 2; turf.rotation.z = Math.PI / 6; turf.receiveShadow = !ctx.lp; sc.add(turf);
       const ring = new THREE.Mesh(new THREE.TorusGeometry(4.7, .05, 6, 6), new THREE.MeshBasicMaterial({ color: col('#ffd23f'), toneMapped: false })); ring.rotation.x = Math.PI / 2; ring.rotation.z = Math.PI / 6; ring.position.y = .02; sc.add(ring);
       const rigs = team.map(([look, kit], i) => { const k = kitObj('spl' + i, kit[0], kit[1] || '#ffffff', false); const lk = { skin: '#' + ((typeof SKIN_C !== 'undefined' && SKIN_C[look.skin]) || 'E0A67A'), hair: '#' + ((typeof HAIR_C !== 'undefined' && HAIR_C[look.hair]) || '3A2A22'), hairStyle: HAIR_MAP[look.style] || 'crop', boot: BOOTS[i % BOOTS.length], back: '' };
-        const r = buildRig(k, String([7, 10, 9, 8, 11][i] || i + 1), lk); const a = i / team.length * Math.PI * 2 + Math.PI / 2; r.root.position.set(Math.cos(a) * 2.6, 0, Math.sin(a) * 2.6); r.root.rotation.y = Math.atan2(-r.root.position.x, -r.root.position.z); r.st = { ph: i, kick: 0 }; sc.add(r.root); return r; });
+        const r = buildRig(k, String(team[i][2] || i + 1), lk); if (i === 0) r.root.position.set(0, 0, .3); else { const a = (i - 1) / (team.length - 1) * Math.PI * 2 + Math.PI / 4; r.root.position.set(Math.cos(a) * 2.9, 0, Math.sin(a) * 2.9); } r.root.rotation.y = Math.atan2(-r.root.position.x, -r.root.position.z); r.st = { ph: i, kick: 0 }; sc.add(r.root); return r; });
       const ball = buildBall(); sc.add(ball);
       let from = 0, to = 1, t = 0, last = 0;
       const frame = (ts) => { if (!alive) return; sraf = requestAnimationFrame(frame); const dt = last ? Math.min(.05, (ts - last) / 1000) : .016; last = ts;
         const w = el.clientWidth, h = el.clientHeight; if (w && h && (w !== ctx.w || h !== ctx.h)) { ctx.w = w; ctx.h = h; rd.setPixelRatio(ctx.pr); rd.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
-        t += dt / .9; if (t >= 1) { t = 0; from = to; to = (to + 1 + Math.floor(Math.random() * (team.length - 2))) % team.length; rigs[from].st.kick = .35; }
+        t += dt / .9; if (t >= 1) { t = 0; from = to; to = from === 0 ? 1 + Math.floor(Math.random() * (team.length - 1)) : 0; rigs[from].st.kick = .35; }
         const A = rigs[from].root.position, B2 = rigs[to].root.position; ball.position.set(A.x + (B2.x - A.x) * t, .22 + Math.sin(t * Math.PI) * 1.6, A.z + (B2.z - A.z) * t); ball.rotation.x += dt * 8;
         rigs.forEach((r, i) => { r.st.kick = Math.max(0, r.st.kick - dt); const tgt = Math.atan2(ball.position.x - r.root.position.x, ball.position.z - r.root.position.z); r.root.rotation.y = angLerp(r.root.rotation.y, tgt, Math.min(1, dt * 6)); animateRig(r, { speed: 0, phase: 0, seed: i, kick: r.st.kick, celeb: i === to && t > .85 ? 0 : 0 }, ts / 1000); r.body.position.y = Math.abs(Math.sin(ts / 260 + i)) * .06; });
         const a = ts / 4200, cd = cam.aspect < 1.3 ? 13.5 : 11; cam.position.set(Math.cos(a) * cd, 5.6, Math.sin(a) * cd); cam.lookAt(0, 1, 0);
