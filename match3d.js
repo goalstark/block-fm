@@ -81,7 +81,7 @@ const V3D = (() => {
       if (side === 'front') { x.beginPath(); x.moveTo(84, 0); x.lineTo(128, 48); x.lineTo(172, 0); x.lineTo(152, 0); x.lineTo(128, 26); x.lineTo(104, 0); x.closePath(); x.fill(); } else x.fillRect(80, 0, 96, 14);
       x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
       if (side === 'front') {
-        if (num !== '') { rr(x, 46, 66, 46, 54, 12); x.fillStyle = kit.second; x.fill(); x.lineWidth = 4; x.strokeStyle = kit.trim; x.stroke(); x.font = `700 50px ${NUMFONT}`; x.lineWidth = 4; x.strokeStyle = kit.trim; x.strokeText(num, 190, 94); x.fillStyle = kit.numCol; x.fillText(num, 190, 94); }
+        if (num !== '') { x.font = `800 118px ${NUMFONT}`; x.lineWidth = 7; x.strokeStyle = kit.trim; x.strokeText(num, 128, 150); x.fillStyle = kit.numCol; x.fillText(num, 128, 150); }   // 앞면: 가운데 큰 번호
       } else if (num !== '') {
         x.font = '700 24px sans-serif'; x.fillStyle = kit.numCol; x.fillText(name, 128, 48);
         x.font = `700 154px ${NUMFONT}`; x.lineWidth = 6; x.strokeStyle = kit.trim; x.strokeText(num, 128, 160); x.fillStyle = kit.numCol; x.fillText(num, 128, 160);
