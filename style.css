@@ -260,3 +260,30 @@ a[data-act]:active{opacity:.6}
 .card.sqr{flex-direction:row}.card.sqr>.grow{flex:1}
 
 .ddak{display:flex;align-items:center;justify-content:center;gap:8px;margin:18px 0 6px;opacity:.85;font-size:12px;color:var(--dim,#9fb3a6)}.ddak.l{justify-content:flex-start;margin:0 0 8px;opacity:1;font-size:14px;color:inherit}
+
+/* --- 경기 화면: 하이브리드 2D · 3D (그림만 바뀜, 글꼴은 폰 기본 글꼴) --- */
+#match.hy{background:#0B0F14}
+#match.hy .mh{background:linear-gradient(180deg,#161C26,#0E131A);border-bottom:1px solid #263142}
+#match.hy .sc b{color:#FFD23F;background:#0A0D12;border:1px solid #2A3446;border-radius:8px;padding:0 12px;font-variant-numeric:tabular-nums;letter-spacing:1px;text-shadow:0 2px 0 rgba(0,0,0,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+#match.hy .bar{background:#0A0D12}#match.hy .bar i{background:linear-gradient(90deg,#FFB020,#FFD23F)}
+#match.hy .mb,#match.hy .mf{background:#0F141B;border-color:#202938}
+#match.hy .li.ev{background:#161D27}#match.hy .li.ev.g.mine{background:#1D2A1E;border-left-color:#FFD23F}#match.hy .li.ev.g.opp{background:#2E1A1D}
+#match.hy .pwrap{background:#070A0E;box-shadow:inset 0 0 0 1px #1E2735}
+#match.hy .fxb.goal{background:rgba(8,12,18,.74)}#match.hy .fxb .gt{color:#FFD23F;letter-spacing:4px;text-shadow:0 3px 0 #000,0 0 18px rgba(255,210,63,.55)}
+#match.hy .fxb.card,#match.hy .fxb.save{background:rgba(10,14,20,.78);border:1px solid #2A3446}
+.pwrap canvas.v3c{position:absolute;left:0;top:0;width:100%;height:100%;display:block}
+.pwrap.v3d #pitch{position:relative;z-index:1}
+.pwrap.v3d #pitch>*:not(#blbl):not(#rpl){visibility:hidden}
+.pwrap.v3d #blbl{transform:translate(50px,8px)}
+.pwrap.v3d #fx{z-index:2}
+.v3hud{position:absolute;inset:0;z-index:3;pointer-events:none;font-size:clamp(9px,1.6vw,13px)}
+.v3sb{position:absolute;left:2.2%;top:3%;display:flex;align-items:stretch;background:#0E131A;border:1px solid #2A3446;border-radius:.6em;overflow:hidden;box-shadow:0 .3em .8em rgba(0,0,0,.45);font-weight:900;color:#F1F4F8;line-height:2.2em}
+.v3sb i{width:.7em;margin:.75em .45em;border-radius:.15em;display:block}.v3sb b{padding:0 .4em;letter-spacing:.03em}
+.v3sb .sc0{background:#FFD23F;color:#0E131A;padding:0 .7em;font-variant-numeric:tabular-nums;letter-spacing:.08em}
+.v3sb .mn{color:#FFD23F;padding:0 .7em;border-left:1px solid #2A3446;font-variant-numeric:tabular-nums}
+.v3cap{position:absolute;left:2.2%;right:19%;bottom:4%;display:flex;gap:.7em;align-items:center;background:rgba(14,19,26,.86);border:1px solid #2A3446;border-radius:.7em;padding:.45em .8em;color:#F1F4F8;font-weight:700;line-height:1.35}
+.v3cap .cm{flex:none;background:#FFD23F;color:#0E131A;border-radius:.4em;padding:0 .45em;font-weight:900}
+.v3cap .ct{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.v3cams{position:absolute;right:2.2%;bottom:4%;display:flex;flex-direction:column;gap:.45em;pointer-events:auto}
+.v3cams button{min-width:5.6em;height:2.5em;border-radius:.6em;border:1px solid #2A3446;background:#151B24;color:#F1F4F8;font:inherit;font-weight:900;box-shadow:0 .2em 0 rgba(0,0,0,.45)}
+.v3cams button.on{background:#FFD23F;color:#0E131A;border-color:#FFD23F}

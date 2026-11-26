@@ -35,6 +35,7 @@ jobs:
           name: football-sim-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
       - uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'   # 정식 릴리스(latest)는 main에서만. 다른 브랜치는 위 artifact로만 APK를 받음
         with:
           tag_name: latest
           name: Block FM APK (latest)
