@@ -1264,6 +1264,8 @@ function frame(ts) {
     el.setAttribute('transform', `translate(${c.x.toFixed(2)} ${(c.y - bob - jmp).toFixed(2)})${MV.frz && MV.frz[pre + i] > MV.t ? ' rotate(86)' : ''}`); if (MV.red[pre + i]) el.style.opacity = 0.12; });
   try { refStep(M, realDt); } catch (e) {}
   try { pstatFrame(M); } catch (e) {}
+  if (MV.pg && !MV.holder && !MV.act && !MV.sp && !MV.pen && !MV.so && !MV.lead && !MV.goalRes && !MV.cele) { MV.pgIdle = (MV.pgIdle || 0) + realDt;   // 안전장치: 골 연출 중 공 주인이 1초 넘게 없으면 득점 팀 가장 가까운 선수에게
+    if (MV.pgIdle > 1) { MV.pgIdle = 0; const s2 = MV.pg.s; let bi = -1, bd = 1e9; (MV.pos[s2] || []).forEach((q, j) => { if (j && q && !MV.red[s2 + j]) { const dd = Math.hypot(q.x - MV.ball.x, q.y - MV.ball.y); if (dd < bd) { bd = dd; bi = j; } } }); if (bi > 0) { MV.holder = { s: s2, i: bi }; MV.poss = s2; MV.dec = 0.3; (MV.cnt || (MV.cnt = {})).pgRescue = ((MV.cnt || {}).pgRescue || 0) + 1; } } } else MV.pgIdle = 0;
   if (!hold && !MV.rp) { MV.rbT = (MV.rbT || 0) + dt; if (MV.rbT >= 0.1) { MV.rbT = 0; const rb = MV.rb || (MV.rb = []); rb.push({ b: [MV.ball.x, MV.ball.y, MV.act ? (MV.bz || 0) : 0], m: MV.pos.m.map(c => c ? [c.x, c.y] : null), o: MV.pos.o.map(c => c ? [c.x, c.y] : null) }); if (rb.length > 90) rb.shift(); } }
   const bz = MV.act ? (MV.bz || 0) : 0, be = document.getElementById('ball'); let cvx = 0, cvy = 0;
   if (MV.act && (MV.act.k === 'pass' || MV.act.k === 'shot') && MV.act.dev && MV.ln) { const A3 = MV.act, ex = MV.ln.x1 - A3.x0, ey = MV.ln.y1 - A3.y0, el2 = Math.hypot(ex, ey) || 1, pr = clampN(1 - Math.hypot(MV.ln.x1 - b.x, MV.ln.y1 - b.y) / A3.d0, 0, 1), o2 = A3.dev * Math.sin(Math.PI * pr); cvx = -ey / el2 * o2; cvy = ex / el2 * o2; }   // 부정확한 패스는 휘어서 날아감
@@ -1621,7 +1623,7 @@ function vizIdx(st, sd, p) {                                                    
 function emitAt(M, min, anim) {
   const out = []; const dM = dM_(M);
   for (const e of M.evMine.concat(M.evOpp)) if (e.min <= min && !e.shown) {             // 재계산(감독 교체 등)으로 이미 지난 분에 생긴 골도 놓치지 않고 표시
-    if (anim && (MV.pg || MV.goalRes) && MV.pos && MV.pos.m.length) continue;                 // 앞 골 연출 중이거나 킥오프 대기 중이면 다음 분에(킥오프 전 골 연출이 멈추던 문제)                            // 같은 분에 골이 둘이면 앞 골 연출이 끝난 뒤 다음 분에 이어서(덮어써서 사라지던 문제)
+    if (anim && (MV.pg || MV.goalRes || MV.regWalk || MV.htWait) && MV.pos && MV.pos.m.length) continue;                 // 앞 골 연출 중이거나 킥오프 대기 중이면 다음 분에(킥오프 전 골 연출이 멈추던 문제)                            // 같은 분에 골이 둘이면 앞 골 연출이 끝난 뒤 다음 분에 이어서(덮어써서 사라지던 문제)
     e.shown = true; const ms = M.evMine.includes(e), team = ms ? M.mine : M.opp;
     if (!e.mine && !e.pen && min <= 90 && !MV.etOn && !MV.so && rnd2() < 0.06) e.varOff = pick3(['off', 'off', 'off', 'foul', 'foul', 'hand']);
     const lg = [{ min: e.min, ic: IC.ball, cls: 'g ' + (ms ? 'mine' : 'opp'), t: `<b>골! ${esc(e.sc.name)}</b>${e.pen ? ' <span class="tag">PK</span>' : ''} <span class="dim">${esc(team.name)}</span>` }];
