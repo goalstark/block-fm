@@ -30,9 +30,13 @@ jobs:
       - name: APK 서명 지문·최소 안드로이드 버전 확인
         run: |
           APK=android/app/build/outputs/apk/debug/app-debug.apk
-          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          BT=$(ls -d ${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools/* | sort -V | tail -1)
+          echo "build-tools: $BT"
           echo "== APK 서명 지문 (폰의 앱과 같아야 덮어 설치됨) =="
-          "$BT/apksigner" verify --print-certs "$APK" | tee certs.txt
+          "$BT/apksigner" verify --print-certs "$APK" > certs.txt 2>&1 || true
+          "$BT/aapt2" dump badging "$APK" 2>&1 | grep -E "^sdkVersion|^targetSdkVersion|^package" > sdk.txt || true
+          { echo '### APK 확인'; echo '```'; echo "build-tools: $BT"; cat certs.txt; cat sdk.txt; grep -n "minSdkVersion" android/variables.gradle; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          cat certs.txt sdk.txt
           # 최소 버전 7.0부터는 v2 서명만 들어가서 keytool -printcert 로는 못 읽음 → apksigner 사용
           grep -qi "365952c4f3799e5136acf3b2d8c3bd3e6dbbcbdb076f26a0315c5920a4b520a8" certs.txt || { echo "서명 키가 기존 앱과 다름 — 배포 중단"; exit 1; }
           echo "== 최소 안드로이드 버전 =="
