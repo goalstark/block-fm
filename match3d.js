@@ -10,7 +10,7 @@ const V3D = (() => {
   const K = L / 35;                                                        // 시안(70×45)에서 커진 비율 — 경기장 주변 구조물 배치에 사용
   const wx = (g) => (g - 50) * (L / 49), wz = (g) => (g - 32) * (W / 31), WS = L / 49, WZ = W / 31;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const ADS = [{ t: '블록 풋볼 매니저', c: '#FFD23F', w: 300 }, { t: '딱알 솔루션', c: '#9fdcff', w: 240 }, { t: '딱펫', c: '#ff8fb1', w: 160 }, { t: 'BLOCK FOOTBALL MANAGER', c: '#ffffff', w: 324 }];   // 경기장 LED 광고판 문구(나중에 광고 자리로 사용)
+  const ADS = [{ t: '블록 풋볼 매니저', c: '#FFD23F', w: 600 }, { t: '딱알 솔루션', c: '#9fdcff', w: 460 }, { t: '딱펫', c: '#ff8fb1', w: 300 }, { t: 'BLOCK FOOTBALL MANAGER', c: '#ffffff', w: 688 }];   // 경기장 LED 광고판 문구(나중에 광고 자리로 사용)
   const col = (h) => new THREE.Color(h).convertSRGBToLinear();
   const lum = (h) => { const n = parseInt(String(h).slice(1, 7), 16); return ((n >> 16 & 255) * .299 + (n >> 8 & 255) * .587 + (n & 255) * .114) / 255; };
 
@@ -144,11 +144,13 @@ const V3D = (() => {
     });
   }
   function netTex() { return cached('net', () => { const c = mkCanvas(64, 64), x = c.getContext('2d'); x.strokeStyle = '#fff'; x.lineWidth = 3; x.strokeRect(0, 0, 64, 64); const t = toTex(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(10, 4); return t; }); }
-  function boardTex() {                                                            // LED 광고판(모두 가상의 이름)
-    return cached('board', () => { const c = mkCanvas(1024, 64), x = c.getContext('2d');
-      const items = ADS.map(a => ['#05080e', a.c, a.t]), wseg = ADS.map(a => a.w); let px = 0;
-      items.forEach((it, i) => { x.fillStyle = it[0]; x.fillRect(px, 0, wseg[i], 64); x.fillStyle = it[1]; x.font = `700 ${i ? 30 : 32}px ${NUMFONT}`; x.textAlign = 'center'; x.textBaseline = 'middle'; if (!R.lp) { x.shadowColor = it[1]; x.shadowBlur = 10; } x.fillText(it[2], px + wseg[i] / 2, 33); x.shadowBlur = 0; px += wseg[i]; });
-      const t = toTex(c); t.wrapS = THREE.RepeatWrapping; return t; });
+  function boardTex() {                                                            // LED 광고판(모두 가상의 이름) — 글씨가 칸을 꽉 채우게 크게
+    return cached('board', () => { const W2 = ADS.reduce((a, b) => a + b.w, 0), c = mkCanvas(W2, 128), x = c.getContext('2d'); let px = 0;
+      ADS.forEach(a => { x.fillStyle = '#05080e'; x.fillRect(px, 0, a.w, 128); x.fillStyle = a.c; x.textAlign = 'center'; x.textBaseline = 'middle';
+        let fs = 92; x.font = `900 ${fs}px ${NUMFONT}`; const mw = x.measureText(a.t).width, lim = a.w - 44; if (mw > lim) { fs = Math.floor(fs * lim / mw); x.font = `900 ${fs}px ${NUMFONT}`; }
+        if (!R.lp) { x.shadowColor = a.c; x.shadowBlur = 14; } x.fillText(a.t, px + a.w / 2, 66); x.shadowBlur = 0;
+        x.fillStyle = 'rgba(255,255,255,.08)'; x.fillRect(px + a.w - 3, 0, 3, 128); px += a.w; });
+      const t = toTex(c); t.wrapS = THREE.RepeatWrapping; t.anisotropy = 8; return t; });
   }
   function glowTex() { return cached('glow', () => { const c = mkCanvas(128, 128), x = c.getContext('2d'), g = x.createRadialGradient(64, 64, 0, 64, 64, 64); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.2, 'rgba(255,250,235,.55)'); g.addColorStop(1, 'rgba(255,250,235,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); return toTex(c); }); }
 
@@ -215,10 +217,10 @@ const V3D = (() => {
     // LED 광고판
     const bt = boardTex(); R.boards = [];
     for (const [x, z, len, ry] of [[0, W + 3.2, 2 * L + 4, Math.PI], [0, -(W + 3.2), 2 * L + 4, 0], [L + 3.2, 0, 2 * W + 2, -Math.PI / 2], [-(L + 3.2), 0, 2 * W + 2, Math.PI / 2]]) {
-      const t = bt.clone(); t.needsUpdate = true; t.repeat.set(len / 16, 1); R.tex.set('board' + x + z, t); R.boards.push(t);
+      const t = bt.clone(); t.needsUpdate = true; t.repeat.set(len / 30, 1); R.tex.set('board' + x + z, t); R.boards.push(t);
       const m = R.lp ? new THREE.MeshBasicMaterial({ map: t, toneMapped: false }) : new THREE.MeshStandardMaterial({ map: t, emissive: col('#ffffff'), emissiveMap: t, emissiveIntensity: 1.15, roughness: .4 });
-      const pl = new THREE.Mesh(new THREE.PlaneGeometry(len, 1), m); pl.position.set(x, .55, z); pl.rotation.y = ry; sc.add(pl);
-      const bk = new THREE.Mesh(box(len, 1.1, .25), mat('flat', '#0c0f14')); bk.position.set(x, .55, z); bk.rotation.y = ry; bk.translateZ(-.14); sc.add(bk);
+      const pl = new THREE.Mesh(new THREE.PlaneGeometry(len, 1.6), m); pl.position.set(x, .85, z); pl.rotation.y = ry; sc.add(pl);
+      const bk = new THREE.Mesh(box(len, 1.72, .25), mat('flat', '#0c0f14')); bk.position.set(x, .86, z); bk.rotation.y = ry; bk.translateZ(-.14); sc.add(bk);
     }
     // 관중석(계단식) + 지붕·기둥·조명띠 + 관중(인스턴스, 홈/원정 색)
     const crowd = [], KT = MV.kit || { m: ['#C8202F', '#fff'], o: ['#2B5BD7', '#fff'] }, home = G0() && G0().mm && G0().mm.mineHome ? KT.m : KT.o, away = home === KT.m ? KT.o : KT.m;
