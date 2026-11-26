@@ -1,4 +1,8 @@
 // ===== UI =====
+// 화면 호출 묶음(단계 A-0): 경기 로직은 이것만 불러 화면을 바꾼다. 화면 없는 측정 도구(node)는 이 함수들을 빈 함수로 바꿔 쓴다.
+const PX = { ui: {
+  render: () => renderMatch(), move: () => movePitch(), sfx: (k) => sfx(k), toast: (t, ms) => toast(t, ms),
+  banner: (html, cls, ms) => { const el = $('#fx'); if (!el) return false; el.innerHTML = `<div class="fxb ${cls}">${html}</div>`; clearTimeout(PX.fxT); PX.fxT = setTimeout(() => { const e = $('#fx'); if (e) e.innerHTML = ''; }, ms); return true; } } };
 const Core = API2;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
@@ -810,7 +814,17 @@ function swapEnds(M, walk) {                                                    
   if (!MV || !MV.pos) return; MV.flip = !MV.flip; MV.act = null; MV.rs = null; MV.sp = null; MV.ln = null; MV.holder = null; MV.lbl = null;
   if (walk && !MV.fast && !MV.hlFast && !MV.skipping) walkToKickoff(M); else resetPos(M); MV.ball.x = 50; MV.ball.y = 32; if (MV.ref) { MV.ref.x = 50 - dM_(M) * 6; MV.ref.y = 40; } }
 function sideOf(s) { return s === 'm' ? MV.mst : MV.ost; }
-function passTo(s, i, sp) { const h0 = MV.holder; if (h0 && MV.st && !MV.pg) { const t0 = MV.st[h0.s]; t0.pa++; if (h0.s !== s) t0.pm++; if (h0.s === 'm' && MV.mst[h0.i] && MV.mst[h0.i].me) { MV.my.pa++; if (s !== 'm') MV.my.pm++; } }
+// ===== 경기 화면 측정 카운터(MV.cnt, 판단에는 쓰지 않음) =====
+function pstatOn() { return MV && !MV.pg && !MV.sp && !MV.pen && !MV.so && !MV.lead && !MV.over; }
+function pstatPass(h0, s, i) { if (!h0 || h0.s !== s || !pstatOn()) return; const M = G0().mm, p0 = MV.pos[s][h0.i], p1 = MV.pos[s][i]; if (!M || !p0 || !p1) return;
+  const d = s === 'm' ? dM_(M) : -dM_(M), u0 = uOf(p0.x, d), fw = uOf(p1.x, d) - u0, c = MV.cnt || (MV.cnt = {});
+  c.passN = (c.passN || 0) + 1; if (fw > 4) c.fwd = (c.fwd || 0) + 1; else if (fw < -4) c.bwd = (c.bwd || 0) + 1;
+  if (u0 > 66) { c.pa3 = (c.pa3 || 0) + 1; if (fw < -4) c.back3 = (c.back3 || 0) + 1; } }
+function pstatFrame(M) { const h = MV.holder; if (!h || !pstatOn()) return; const q = MV.pos[h.s][h.i]; if (!q) return; const d = h.s === 'm' ? dM_(M) : -dM_(M), u = uOf(q.x, d), c = MV.cnt || (MV.cnt = {});
+  const P = MV.pst; if (P && P.s === h.s) { if (u > P.max) P.max = u; if (!P.f3 && u > 66) { P.f3 = 1; c.f3 = (c.f3 || 0) + 1; } }
+  else { if (P) { c.prog = (c.prog || 0) + Math.max(0, P.max - P.u0); c.possN = (c.possN || 0) + 1; } MV.pst = { s: h.s, u0: u, max: u, f3: u > 66 ? 1 : 0 }; }
+  const key = h.s + h.i; if (MV.pstH !== key) { MV.pstH = key; if (u > 83 && Math.abs(q.y - 32) < 20) c.box = (c.box || 0) + 1; } }
+function passTo(s, i, sp) { const h0 = MV.holder; pstatPass(h0, s, i); if (h0 && MV.st && !MV.pg) { const t0 = MV.st[h0.s]; t0.pa++; if (h0.s !== s) t0.pm++; if (h0.s === 'm' && MV.mst[h0.i] && MV.mst[h0.i].me) { MV.my.pa++; if (s !== 'm') MV.my.pm++; } }
   const ps = h0 && sideOf(h0.s)[h0.i]; MV.act = { k: 'pass', to: { s, i }, sp: sp * 0.78, pas: ps ? PA(ps, 'PAS') : 55, from: h0 ? h0.s : null }; MV.holder = null;
   if (h0 && h0.s === s && h0.i !== 0 && MV.run && !MV.pg) { try { const dd = s === 'm' ? dM_(G0().mm) : -dM_(G0().mm), q = MV.pos[s][h0.i]; if (q && rnd2() < 0.6) MV.run[s + h0.i] = { dx: 6 + rnd2() * 4, dy: (32 - q.y) * 0.15 + (rnd2() * 2 - 1) * 4, until: MV.t + 2.2 }; } catch (e) {} }   // 패스앤무브: 주고 앞으로 뛰어 들어감
 }
@@ -843,7 +857,7 @@ function shoot(M, out, sty) {
   if (MV.st) { const u0 = uOf(cur.x, d), gd0 = Math.hypot(100 - u0, cur.y - 32) * 1.05, xg0 = clampN(0.85 * Math.exp(-gd0 / 11) * (1 - 0.35 * Math.min(1, Math.abs(cur.y - 32) / 30)), 0.02, 0.8), S0 = MV.st[s]; S0.sh++; S0.xg += out === 'goal' ? Math.max(xg0, 0.08) : xg0; if (out === 'goal' || out === 'save') S0.sot++; }
   MV.act = { k: 'shot', tx: t.x, ty: t.y, sp: 56, out, s, to, eh, sty: sty || 'drive' }; MV.holder = null; lbl('슛!');
   const SY = SHOT_STY[sty]; if (SY) { MV.act.h0 = SY.h; MV.act.sp = SY.sp; if (SY.dev) MV.act.dev = SY.dev * (footOf(sideOf(s)[h.i]) === 'L' ? 1 : -1) * d; if (SY.cy != null && out === 'goal') MV.act.ty = 32 + (t.y > 32 ? 1 : -1) * SY.cy; lbl(SY.t); }
-  if (out !== 'goal') { sfx(out === 'save' ? 'save' : 'shot'); const nm = esc(sideOf(s)[h.i].name); MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${({ save: '골키퍼 선방', wide: '골대를 벗어남', block: '수비가 막아냄', post: '골대를 때림' })[out]}` }); }
+  if (out !== 'goal') { PX.ui.sfx(out === 'save' ? 'save' : 'shot'); const nm = esc(sideOf(s)[h.i].name); MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${({ save: '골키퍼 선방', wide: '골대를 벗어남', block: '수비가 막아냄', post: '골대를 때림' })[out]}` }); }
 }
 const SHOT_STY = { header: { h: 1.0, sp: 60, t: '헤딩슛!' }, volley: { h: 2.0, sp: 68, t: '발리슛!' }, chip: { h: 3.4, sp: 36, t: '칩슛!', cy: 1.6 }, curve: { h: 1.6, sp: 54, t: '감아차기!', dev: 2.8 }, drive: { h: 1.3, sp: 82, t: '중거리 슛!' }, low: { h: 0.5, sp: 58, t: '땅볼 슛!' }, tap: { h: 0.4, sp: 34, t: '밀어 넣기!' }, overhead: { h: 2.6, sp: 56, t: '바이시클 킥!' }, first: { h: 0.7, sp: 66, t: '논스톱 슛!' }, knuckle: { h: 1.0, sp: 92, t: '무회전 슛!', dev: 0.9 } };
 function decide(M) {
@@ -923,7 +937,7 @@ function decide(M) {
   const pass = (t, sp, lead, tag) => { const err = clampN((55 - PA(who, 'PAS')) / 220 + press * 0.08 + (t.dist > 30 ? 0.05 : 0) + (lead ? 0.04 : 0), 0, 0.3);   // 패스 정확도: 능력치/압박/거리
     if (rnd2() < err && ni >= 0) { let bi = -1, bd = 1e9; oarr.forEach((q, i) => { if (i && q && !MV.red[os + i]) { const dd = Math.hypot(q.x - t.q.x, q.y - t.q.y); if (dd < bd) { bd = dd; bi = i; } } }); if (bi >= 0) { passTo(os, bi, sp); return; } }
     if (!lead && !tag && Math.abs(t.q.y - 32) > 23 && rnd2() < 0.07 + err * 0.5 && canStage() && !MV.pg) { const ty = t.q.y < 32 ? 0.6 : 63.4; MV.act = { k: 'out', tx: t.q.x + d * 2, ty, sp: sp * 0.78, s: os, kind: 'th' }; MV.holder = null; return; }
-    passTo(s, t.i, sp); if (lead) MV.act.lead = d * lead; if (tag) { MV.act.tag = tag; lbl(tag); } if (tag === '크로스' || tag === '얼리 크로스' || tag === '롱패스' || tag === '걷어내기' || tag === '대지를 가르는 롱패스' || tag === '헤딩 걷어내기') MV.act.hi = true; };
+    passTo(s, t.i, sp); if (lead) MV.act.lead = d * lead; if (tag) { MV.act.tag = tag; lbl(tag); if (tag === '스루패스' && pstatOn()) { const c = MV.cnt || (MV.cnt = {}); c.thr = (c.thr || 0) + 1; MV.act.thrC = 1; } } if (tag === '크로스' || tag === '얼리 크로스' || tag === '롱패스' || tag === '걷어내기' || tag === '대지를 가르는 롱패스' || tag === '헤딩 걷어내기') MV.act.hi = true; };
   if (ni >= 0 && nd < 2.4 && rnd2() < 0.22 && !(MV.duelT && MV.t - MV.duelT < 2)) {        // 몸싸움: 바짝 붙었을 때 힘 대결
     MV.duelT = MV.t; MV.duel = { a: { s, i: h.i }, b: { s: os, i: ni }, t: MV.t };
     if (PA(foe, 'STR') + rnd2() * 30 > PA(who, 'STR') + PA(who, 'BAL') * 0.2 + rnd2() * 30) { lbl('몸싸움에서 이겼다'); passTo(os, ni, 30); return; }
@@ -1005,17 +1019,17 @@ function goalFx(M) {
     later(() => { if (!MV || MV.pg !== pg) return; fxShow('<div class="gb">📺</div><div class="gs">VAR 판독 중…</div>', 'save', 1600, true);
       later(() => { if (!MV || MV.pg !== pg) return; const lg = []; varOverturn(M, pg.ev, pg.ms, lg, MV.min); MV.pg = null; lg.slice().reverse().forEach(o => MV.log.unshift(o));
         const os = pg.s === 'm' ? 'o' : 'm'; MV.act = null; MV.rs = null; MV.holder = { s: os, i: 0 }; MV.poss = os; MV.dec = 1.0; MV.cele = null; MV.regroup = 0.6;
-        fxShow(`<div class="gb">🚫</div><div class="gs">골 취소 · ${VAR_WHY[pg.ev.varOff]}</div>`, 'card', 1800, true); renderMatch(); }, 1600); }, 900); return; }
+        fxShow(`<div class="gb">🚫</div><div class="gs">골 취소 · ${VAR_WHY[pg.ev.varOff]}</div>`, 'card', 1800, true); PX.ui.render(); }, 1600); }, 900); return; }
   if (!pg.varDone) { pg.varDone = true; if (rnd2() < 0.22 && !MV.skipping) { MV.paused = true; fxShow('<div class="gb">📺</div><div class="gs">VAR 판독 중…</div>', 'save', 1500, true); pg.logs.unshift({ min: MV.min, ic: '📺', cls: '', t: '<b>VAR 판독</b> — 득점 인정' }); later(() => { if (MV && MV.pg === pg) goalFx(M); }, 1500); return; } }
   if (pg.off && MV.skipping) { const lg = pg.logs.slice(); varOverturn(M, pg.ev, pg.ms, lg, MV.min); MV.pg = null; lg.slice().reverse().forEach(o => MV.log.unshift(o)); return; }
   MV.pg = null;
   pg.logs.slice().reverse().forEach(o => MV.log.unshift(o)); MV.goalRes = pg.ms ? 'o' : 'm';
   { const stt = sideOf(pg.s), outf = stt.map((_, i) => i).filter(i => i > 0 && MV.pos[pg.s][i]); const si = pg.si > 0 && MV.pos[pg.s][pg.si] ? pg.si : outf[outf.length - 1], c = MV.pos[pg.s][si], dd = pg.s === 'm' ? dM_(M) : -dM_(M);
     MV.cele = { s: pg.s, si, t: 0, cx: dd > 0 ? 91 : 9, cy: c && c.y < 32 ? 6 : 58 }; MV.regroup = 0; }
-  sfx(pg.ms ? 'goal' : 'goalopp'); if (MV.big) setTimeout(() => sfx('crowd'), 250); fxShow(pg.html, pg.ms ? 'goal' : 'goal opp', 3100, true);
+  PX.ui.sfx(pg.ms ? 'goal' : 'goalopp'); if (MV.big) setTimeout(() => PX.ui.sfx('crowd'), 250); fxShow(pg.html, pg.ms ? 'goal' : 'goal opp', 3100, true);
   if (MV.big && MV.big.k === 'derby') MV.log.unshift({ min: MV.min, ic: '🔥', cls: '', t: pg.ms ? pick3(['라이벌을 상대로 한 골! 홈 관중석이 폭발합니다!', '더비의 주인공이 나왔습니다! 서포터즈가 열광합니다!', '라이벌의 골문을 열었습니다! 관중석이 들썩입니다!']) : pick3(['라이벌에게 실점… 원정석만 환호합니다.', '더비에서 뼈아픈 실점입니다. 경기장이 조용해집니다.', '라이벌 서포터즈의 함성이 경기장을 뒤덮습니다.']) });
   if (!MV.skipping && !MV.fast && !MV.hlFast && MV.rb && MV.rb.length > 20) MV.rpWant = { f: MV.rb.slice(-42), ms: pg.ms, nm: pg.ev && pg.ev.sc ? pg.ev.sc.name : '' };
-  renderMatch();
+  PX.ui.render();
 }
 function rpStep(M, realDt) {                                                                  // 골 리플레이: 직전 약 7초를 슬로모션으로 다시 보여 줌(탭하면 건너뜀)
   const R = MV.rp; MV.paused = true; R.t += realDt * 0.75 * 10; const i = Math.floor(R.t), F = R.f;
@@ -1038,31 +1052,32 @@ function laterClear(id) { const q = MV && MV.tq; if (!q || !id) return; const i 
 function laterRun(sec) { if (!MV) return; MV.clk = (MV.clk || 0) + sec; const q = MV.tq; if (!q) return; const mv0 = MV;
   for (let g = 0; g < 400; g++) { let bi = -1; for (let i = 0; i < q.length; i++) if (q[i].at <= MV.clk && (bi < 0 || q[i].at < q[bi].at || (q[i].at === q[bi].at && q[i].id < q[bi].id))) bi = i; if (bi < 0) break;
     const t = q.splice(bi, 1)[0]; try { t.fn(); } catch (e) { try { console.error(e); } catch (e2) {} } if (MV !== mv0) break; } }
-function matchSeed(M) { const h = (x) => (typeof x === 'number' ? x : String(x || '').split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7)); return ((h(G0().day) * 2654435761) ^ (h(M && M.h && M.h.id) * 40503) ^ (h(M && M.a && M.a.id) * 9973)) >>> 0; }
+function newMatchSeed(M) { return (Math.random() * 4294967296) >>> 0; }   // 경기 시작 때 무작위 시드(다시 불러오면 VAR·시간 초과 선택·승부차기가 달라질 수 있음). 검증 도구만 이 함수를 바꿔 고정
+function mvPick(id) { if (!MV || !G0().mm || !MV.momentOpen) return; const M = G0().mm, mo = MV.momentOpen; const r = Core.resolveMoment(id); if (r.goal || r.assist) { MV.ballFree = false; } MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: esc(r.text) }); MV.momentOpen = null; MV.paused = false; try { playOutcome(M, mo, r); } catch (e) { MV.holder = MV.holder || null; } stepBall(M); emitAt(M, mo ? mo.min : MV.min, true); PX.ui.move(); PX.ui.render(); }   // 선수 모드 골 장면 선택 처리(버튼·시간 초과 공통)
 function frame(ts) {
   if (!MV) return; MV.raf = requestAnimationFrame(frame);
   if (MV.exitAsk || MV.setOpen) { MV.last = 0; MV.lastL = 0; return; }
-  { const e = MV.lastL ? Math.min(1, Math.max(0, (ts - MV.lastL) / 1000)) : 0; MV.lastL = ts; laterRun(e); if (!MV) return; }   // 장면 타이머: 실제 경과 시간(배속 무시)                                                          // 나가기 확인 창이 떠 있는 동안은 경기 완전 정지
+  { const raw = MV.lastL ? Math.max(0, (ts - MV.lastL) / 1000) : 0; MV.lastL = ts; MV.rawE = raw; laterRun(Math.min(1, raw)); if (!MV) return; }   // 실제 경과 시간을 한 번만 구함: 장면 타이머(배속 무시, 상한 1초)                                                          // 나가기 확인 창이 떠 있는 동안은 경기 완전 정지
   const M = G0().mm; if (!M || !MV.pos) return;
   if (MV.pzUntil && MV.paused && !MV.regWalk && !MV.over && !MV.talk && !MV.momentOpen && !MV.pen && !MV.so && !MV.lead && !MV.pg && !MV.sp && !MV.mgrPanel && !MV.wantPanel && MV.min > 0) {       // 창을 닫은 직후 12초 동안: 이유 없이 멈춘 경기를 자동으로 재개(안전장치)
     const nw = nowR(); if (nw > (MV.fxUntil || 0) + 1200) { MV.paused = false; MV.pzUntil = 0; } else if (nw > MV.pzUntil) MV.pzUntil = 0; }
   if (MV.wantPanel && !MV.over && !MV.pg && !MV.lead && !MV.sp && !MV.momentOpen && !MV.pen && !MV.so && !MV.cele && !MV.mgrPanel) { MV.wantPanel = false; mgrPanelOpen(); }
   if (MV.over) {                                                                          // 경기 종료: 선수·공 정지 + 가운데 종료 표시
     if (!MV.endShown) { MV.endShown = true; MV.lbl = null; { const lb0 = document.getElementById('blbl'); if (lb0) lb0.textContent = ''; } MV.act = null; MV.rs = null; MV.pg = null; MV.ln = null; MV.bz = 0; for (const pre of ['m', 'o']) (MV.pos[pre] || []).forEach(c => { if (c) c.vx = c.vy = 0; });
-      const [eh, ea] = scoreAt(MV.etOn ? 120 : 90), pks = MV.so ? `<div class="endt" style="font-size:14px">승부차기 ${M.mineHome ? MV.so.sm : MV.so.so} : ${M.mineHome ? MV.so.so : MV.so.sm}</div>` : ''; fxShow(`<div class="endt">경기 종료</div><div class="ends">${eh} : ${ea}</div>${pks}`, 'end', 3600000, false); movePitch(); }
+      const [eh, ea] = scoreAt(MV.etOn ? 120 : 90), pks = MV.so ? `<div class="endt" style="font-size:14px">승부차기 ${M.mineHome ? MV.so.sm : MV.so.so} : ${M.mineHome ? MV.so.so : MV.so.sm}</div>` : ''; fxShow(`<div class="endt">경기 종료</div><div class="ends">${eh} : ${ea}</div>${pks}`, 'end', 3600000, false); PX.ui.move(); }
     return; }
-  let dt = MV.last ? Math.min(0.05, (ts - MV.last) / 1000) : 0.016; MV.last = ts; const realDt = dt; dt *= tsOf();
+  let dt = MV.last ? Math.min(0.05, MV.rawE || 0) : 0.016; MV.last = ts; const realDt = dt; dt *= tsOf();   // 연출 시간(같은 시계, 상한 0.05초) → 경기 시간은 배속 적용
   if (MV.rp) { if (rpStep(M, realDt)) return; }
   if (MV.momentOpen && MV.settle > 0) MV.settle -= realDt; const hold = !!MV.momentOpen && !(MV.settle > 0), pdt = hold ? 0 : dt;
   if (MV.momentOpen && !MV.over) {                                                                  // 내 선택 장면: 선택하기 전에는 상대도 절대 진행하지 않는다 + 10초 제한(초과 시 무작위 선택)
     MV.paused = true; MV.sp = null;
     if (MV.moFor !== MV.momentOpen) { MV.moFor = MV.momentOpen; MV.moT = 10; }
     if (!(MV.settle > 0) && !MV.skipping) { MV.moT -= realDt; const te = document.getElementById('mvt'); if (te) { const v = String(Math.max(0, Math.ceil(MV.moT))); if (te.textContent !== v) te.textContent = v; } { const t2 = document.getElementById('mvt2'); if (t2) { const v = String(Math.max(0, Math.ceil(MV.moT))); if (t2.textContent !== v) t2.textContent = v; } }
-      if (MV.moT <= 0) { MV.moT = 10; const os = Core.momentOptions(MV.momentOpen); const pk = os[Math.floor(rnd2() * os.length)], bt = pk && document.querySelector(`[data-act="mv"][data-id="${pk.id}"]`); if (bt) { toast('시간 초과 — 무작위 선택'); bt.click(); } } } } else MV.moFor = null;
+      if (MV.moT <= 0) { MV.moT = 10; const os = Core.momentOptions(MV.momentOpen); const pk = os[Math.floor(rnd2() * os.length)]; if (pk) { PX.ui.toast('시간 초과 — 무작위 선택'); mvPick(pk.id); } } } } else MV.moFor = null;
   if (MV.cele) { MV.cele.t += realDt; if (MV.cele.t > 2.0) { MV.cele = null; MV.regroup = 1.0; MV.rt = 0; } }
   if (MV.rpWant && !MV.cele) { if (MV.over || MV.skipping || MV.fast || MV.hlFast || (typeof V3D !== 'undefined' && V3D.active && V3D.active())) MV.rpWant = null; else if (nowR() > (MV.fxUntil || 0) + 80 && !MV.momentOpen && !MV.lead && !MV.pg && !MV.talk && !MV.mgrPanel) { MV.rp = { f: MV.rpWant.f, t: 0 }; MV.rpWant = null; } } else if (MV.regroup > 0) MV.regroup -= realDt;   // 3D 화면에선 2D 리플레이가 안 보여 멈춘 것처럼 보이므로 건너뜀
   if (!MV.over && MV.min > 0 && !hold) { if (MV.poss && MV.st[MV.poss]) MV.st[MV.poss].pt += dt; const mi0 = MV.myI == null ? (MV.myI = MV.mst.findIndex(p => p.me)) : MV.myI, mc = mi0 >= 0 && MV.pos.m[mi0]; if (mc) { const uu = uOf(mc.x, dM_(M)); MV.heat[Math.min(5, Math.floor(mc.y / 64 * 6)) * 10 + Math.min(9, Math.max(0, Math.floor(uu / 10)))] += dt; } }
-  if (MV.sp) { MV.sp.t += realDt; if (!MV.sp.wh && MV.sp.kind !== 'th' && MV.sp.t > (MV.sp.dur || 1.9) - 0.6) { MV.sp.wh = 1; sfx('whistle'); lbl('휘슬'); retarget(M); } if (MV.sp && MV.sp.t > (MV.sp.dur || 1.9)) endSp(M); }
+  if (MV.sp) { MV.sp.t += realDt; if (!MV.sp.wh && MV.sp.kind !== 'th' && MV.sp.t > (MV.sp.dur || 1.9) - 0.6) { MV.sp.wh = 1; PX.ui.sfx('whistle'); lbl('휘슬'); retarget(M); } if (MV.sp && MV.sp.t > (MV.sp.dur || 1.9)) endSp(M); }
   MV.t += dt; MV.rt -= dt; if (MV.kick > 0) MV.kick -= dt; if (MV.pg) MV.pg.t += dt; if (MV.rt <= 0) { retarget(M); MV.rt = 0.22; }
   const all = [];
   for (const pre of ['m', 'o']) sideOf(pre).forEach((p, i) => {
@@ -1100,6 +1115,7 @@ function frame(ts) {
       if (A2.k === 'pass' && !A2.lane && A2.to.i !== 0 && !MV.pg && !MV.pen && !MV.so && !MV.sp && !MV.lead && !MV.momentOpen && !MV.talk) {            // 퍼스트터치: 기술이 낮고 압박받으면 공을 흘림
         const rs = A2.to.s, ro = rs === 'm' ? 'o' : 'm', rq = MV.pos[rs][A2.to.i], rp = sideOf(rs)[A2.to.i]; let nj = -1, nd2 = 6; MV.pos[ro].forEach((q, j) => { if (j && q && !MV.red[ro + j] && rq) { const dd = Math.hypot(q.x - rq.x, q.y - rq.y); if (dd < nd2) { nd2 = dd; nj = j; } } });
         if (nj >= 0 && rp && rnd2() < clampN((58 - PA(rp, 'TEC')) / 600, 0, 0.07) + (nd2 < 3.5 ? 0.015 : 0)) { MV.holder = { s: ro, i: nj }; MV.poss = ro; MV.tOver = MV.t; MV.tOverS = ro; MV.dec = 0.5; lbl('퍼스트터치 실수'); (MV.cnt || (MV.cnt = {})).touch = ((MV.cnt || {}).touch || 0) + 1; const t1 = MV.st && MV.st[rs]; if (t1) t1.pm++; retarget(M); return; } }
+      if (A2.k === 'pass' && A2.thrC && A2.from === A2.to.s) { const c = MV.cnt || (MV.cnt = {}); c.thrOK = (c.thrOK || 0) + 1; }
       if (A2.k === 'pass') { MV.lastPassFrom = A2.from === A2.to.s ? A2.from : null; MV.rcvHi = (A2.hi || A2.cross || (A2.h || 0) > 2) ? MV.t : -9; if (MV.poss !== A2.to.s) { MV.tOver = MV.t; MV.tOverS = A2.to.s; } if (MV.holder === null && MV.poss !== A2.to.s) MV.fin = 0; MV.holder = A2.to; MV.poss = A2.to.s; MV.dec = A2.to.i === 0 ? 1.1 + rnd2() * 0.5 : (MV.pg && MV.pg.deliv && A2.to.i === MV.pg.si) ? 0.06 : 0.45 + rnd2() * 0.7; retarget(M); }
       else if (A2.k === 'out') outDone(M, A2);
       else if (A2.k === 'shot') { const os = A2.s === 'm' ? 'o' : 'm';
@@ -1131,6 +1147,7 @@ function frame(ts) {
     const jmp = MV.cele && pre === MV.cele.s && i > 0 && sp < 4 ? Math.abs(Math.sin(MV.t * 9 + i * 0.7)) * (i === MV.cele.si ? 2.4 : 1.5) : 0;
     el.setAttribute('transform', `translate(${c.x.toFixed(2)} ${(c.y - bob - jmp).toFixed(2)})${MV.frz && MV.frz[pre + i] > MV.t ? ' rotate(86)' : ''}`); if (MV.red[pre + i]) el.style.opacity = 0.12; });
   try { refStep(M, realDt); } catch (e) {}
+  try { pstatFrame(M); } catch (e) {}
   if (!hold && !MV.rp) { MV.rbT = (MV.rbT || 0) + dt; if (MV.rbT >= 0.1) { MV.rbT = 0; const rb = MV.rb || (MV.rb = []); rb.push({ b: [MV.ball.x, MV.ball.y, MV.act ? (MV.bz || 0) : 0], m: MV.pos.m.map(c => c ? [c.x, c.y] : null), o: MV.pos.o.map(c => c ? [c.x, c.y] : null) }); if (rb.length > 90) rb.shift(); } }
   const bz = MV.act ? (MV.bz || 0) : 0, be = document.getElementById('ball'); let cvx = 0, cvy = 0;
   if (MV.act && (MV.act.k === 'pass' || MV.act.k === 'shot') && MV.act.dev && MV.ln) { const A3 = MV.act, ex = MV.ln.x1 - A3.x0, ey = MV.ln.y1 - A3.y0, el2 = Math.hypot(ex, ey) || 1, pr = clampN(1 - Math.hypot(MV.ln.x1 - b.x, MV.ln.y1 - b.y) / A3.d0, 0, 1), o2 = A3.dev * Math.sin(Math.PI * pr); cvx = -ey / el2 * o2; cvy = ex / el2 * o2; }   // 부정확한 패스는 휘어서 날아감
@@ -1218,7 +1235,7 @@ function beginLead(M, mo) {
   MV.ball.x = old.ball.x; MV.ball.y = old.ball.y;
   let h = fin.holder; if (!h) { const sd = fin.poss; let bi = -1, bd = 1e9; fin[sd].forEach((f, i) => { if (!f) return; const dd = Math.hypot(f.x - fin.ball.x, f.y - fin.ball.y); if (dd < bd) { bd = dd; bi = i; } }); h = bi >= 0 ? { s: sd, i: bi } : null; }
   MV.act = null; MV.rs = null; MV.holder = h; MV.poss = fin.poss; MV.stage = fin.stage; MV.force = force; MV.lead = { mo, fin, force, t: 0, max: 2.8 }; MV.dec = 99;
-  const txt = leadText(mo.kind, prev); lbl(prev !== fin.poss ? (fin.poss === 'm' ? '공 탈취!' : '빼앗김!') : '전개'); fxShow(`<div class="gs">${txt}</div>`, 'save', 1500, false); movePitch();
+  const txt = leadText(mo.kind, prev); lbl(prev !== fin.poss ? (fin.poss === 'm' ? '공 탈취!' : '빼앗김!') : '전개'); fxShow(`<div class="gs">${txt}</div>`, 'save', 1500, false); PX.ui.move();
 }
 function endLead(M) {
   const L = MV.lead; if (!L) return; MV.lead = null; MV.force = null;
@@ -1227,7 +1244,7 @@ function endLead(M) {
   { const fb = L.fin.ball, bd = Math.hypot(MV.ball.x - fb.x, MV.ball.y - fb.y);
     if (bd > 7 && MV.holder) { MV.act = { k: 'pass', to: { s: MV.holder.s, i: MV.holder.i }, sp: 110, pas: 99, from: MV.holder.s }; MV.holder = null; } else { MV.ball.x = fb.x; MV.ball.y = fb.y; } }
   MV.paused = true; MV.momentOpen = L.mo; MV.dec = 99;
-  retarget(M); fxShow(`<div class="gs">⚡ 내 차례!</div>`, 'save', 900, false); bringMeTop(); renderMatch();
+  retarget(M); fxShow(`<div class="gs">⚡ 내 차례!</div>`, 'save', 900, false); bringMeTop(); PX.ui.render();
 }
 function nearestOf(s, x, y, skipGK) { const arr = MV.pos[s]; let bi = -1, bd = 1e9; arr.forEach((c, i) => { if (!c || (skipGK && i === 0) || MV.red[s + i]) return; const dd = Math.hypot(c.x - x, c.y - y); if (dd < bd) { bd = dd; bi = i; } }); return bi; }
 function playOutcome(M, mo, r) {                                                      // 내 선택 결과대로 장면을 이어 간다
@@ -1253,10 +1270,9 @@ function playOutcome(M, mo, r) {                                                
 }
 function bringMeTop() { const e = document.querySelector('#pitch .dot.me'); if (e && e.parentNode) { e.parentNode.appendChild(e); const b = document.getElementById('ball'); if (b) e.parentNode.appendChild(b); } }
 function fxShow(html, cls, ms, pause) {
-  const el = $('#fx'); if (!el) return; el.innerHTML = `<div class="fxb ${cls}">${html}</div>`;
+  if (!PX.ui.banner(html, cls, ms)) return;                                               // 화면이 있으면 배너 표시(node에선 표시 없이 true)
   if (pause) { MV.paused = true; MV.fxUntil = nowR() + ms; }
   if (pause) { laterClear(MV.fxP); MV.fxP = later(() => { if (MV && !MV.regWalk && !MV.momentOpen && !MV.pg && !MV.lead && !MV.talk && !MV.mgrPanel && !MV.pen && !MV.so) MV.paused = false; }, ms); }   // 일시정지 해제는 배너가 덮어써져도 반드시 실행
-  clearTimeout(MV.fxT); MV.fxT = setTimeout(() => { const e = $('#fx'); if (e) e.innerHTML = ''; }, ms);
 }
 // ===== 데드볼(코너킥·프리킥·간접프리킥·스로인) + 파울 장면 =====
 function canStage() { return !!MV && !(MV.sp || MV.pg || MV.momentOpen || MV.lead || MV.goalRes || MV.talk || MV.cele || MV.over || MV.skipping || MV.fast || MV.hlFast || MV.pen || MV.so); }
@@ -1276,7 +1292,7 @@ function deadBall(M, o) {
   const wall = (type === 'fk' && gd < 30) ? (gd < 22 ? 5 : 4) : 0;
   MV.act = null; MV.rs = null; MV.holder = null; MV.dec = 99; MV.paused = true; MV.ball.x = sx; MV.ball.y = sy; MV.poss = s;
   MV.sp = { s, tk, sx, sy, type: type === 'ifk' ? 'fk' : type, kind: type, gx, d, t: 0, wall, pgd: !!o.pgd, dur: type === 'th' ? 1.5 : wall ? 3.0 : 2.5, foot: footOf(sideOf(s)[tk]) };
-  MV.nsp = (MV.nsp || 0) + 1; (MV.cnt || (MV.cnt = {}))[type] = ((MV.cnt || {})[type] || 0) + 1; sfx('whistle'); lbl(DB_NM[type]); retarget(M);
+  MV.nsp = (MV.nsp || 0) + 1; (MV.cnt || (MV.cnt = {}))[type] = ((MV.cnt || {})[type] || 0) + 1; PX.ui.sfx('whistle'); lbl(DB_NM[type]); retarget(M);
 }
 function applySp(M) {
   const P = MV.sp, os = P.s === 'm' ? 'o' : 'm', u0 = uOf(P.sx, P.d), box = P.kind === 'cn' || (P.kind !== 'th' && u0 > 58); let k = 0;
@@ -1401,7 +1417,7 @@ function pkBuild(M, s, ki, go) {
   MV.force = {}; MV.force[s + fi] = { x: X(88), y: gy }; if (di >= 0) MV.force[os + di] = { x: X(90), y: gy + (Q.y < 32 ? 1.6 : -1.6) };
   MV.act = { k: 'pass', to: { s, i: fi }, sp: 66, pas: 80, from: s, lead: d * 5 }; MV.holder = null; MV.rs = null; MV.dec = 99; MV.paused = true; MV.pkb = { s, fi };
   fxShow(`<div class="gb">⚠️</div><div class="gs">박스 안 침투!</div>`, 'save', 1100, false);
-  later(() => { if (!MV || MV.over) return; MV.act = null; MV.force = null; MV.pkb = null; sfx('whistle'); if (di >= 0) { const Q2 = MV.pos[s][fi], D2 = MV.pos[os][di]; if (Q2 && D2 && Math.hypot(Q2.x - D2.x, Q2.y - D2.y) > 2.4) { D2.x = Q2.x - d * 1.3; D2.y = Q2.y + 0.6; } MV.slideReq = { s: os, i: di, t: MV.t }; } (MV.frz || (MV.frz = {}))[s + fi] = MV.t + 3.2; MV.holder = null;
+  later(() => { if (!MV || MV.over) return; MV.act = null; MV.force = null; MV.pkb = null; PX.ui.sfx('whistle'); if (di >= 0) { const Q2 = MV.pos[s][fi], D2 = MV.pos[os][di]; if (Q2 && D2 && Math.hypot(Q2.x - D2.x, Q2.y - D2.y) > 2.4) { D2.x = Q2.x - d * 1.3; D2.y = Q2.y + 0.6; } MV.slideReq = { s: os, i: di, t: MV.t }; } (MV.frz || (MV.frz = {}))[s + fi] = MV.t + 3.2; MV.holder = null;
     fxShow(`<div class="gb">📣</div><div class="gs">반칙 — 페널티킥!</div>`, 'card', 1000, false);
     later(() => { if (MV && !MV.over) go(); }, 1000); }, 1500);
 }
@@ -1414,11 +1430,11 @@ function penScene(M, o) {
   const sgn = rnd2() < 0.5 ? -1 : 1, shotY = o.res === 'goal' ? 32 + sgn * (3.2 + rnd2() * 1.3) : o.res === 'save' ? 32 + sgn * (2.5 + rnd2() * 2) : o.res === 'post' ? 32 + sgn * 4.2 : 32 + sgn * (9 + rnd2() * 4);
   let t = 0; const lead = o.so ? 900 : (o.intro || []).reduce((a, x) => a + x[2], 0) + 1400;
   if (o.intro) { let u = 0; o.intro.forEach(([h, c, ms]) => { at(u, () => fxShow(h, c, ms, false)); u += ms; }); }
-  at(lead - 1000, () => { if (!o.so) { sfx('whistle'); lbl('휘슬'); } });
+  at(lead - 1000, () => { if (!o.so) { PX.ui.sfx('whistle'); lbl('휘슬'); } });
   at(lead - 450, () => { P.run = true; retarget(M); });
   at(lead, () => {                                                                       // 슛: 골키퍼 다이빙 방향 결정
     P.dive = o.res === 'save' ? (shotY - 32) * 1.1 : (rnd2() < 0.6 ? -(shotY - 32) : (rnd2() < 0.5 ? -4 : 4)); retarget(M);
-    MV.act = { k: 'shot', tx: sp.gx, ty: shotY, sp: 62, out: o.res === 'goal' ? 'goal' : o.res, s: o.s, to: null }; sfx(o.res === 'save' ? 'save' : 'shot'); lbl('페널티킥!'); });
+    MV.act = { k: 'shot', tx: sp.gx, ty: shotY, sp: 62, out: o.res === 'goal' ? 'goal' : o.res, s: o.s, to: null }; PX.ui.sfx(o.res === 'save' ? 'save' : 'shot'); lbl('페널티킥!'); });
   if (o.res !== 'goal' || o.so) at(lead + 1700, () => { MV.pen = null; if (o.done) o.done(); else if (!MV.pg && !MV.momentOpen && !MV.lead && !MV.talk) MV.paused = false; });
 }
 // 승부차기 계획: 승자(myWin)는 core가 결정, 킥 순서·성패는 규칙대로 생성
@@ -1440,7 +1456,7 @@ function soText(k, M) { const p = (k.sd === 'm' ? MV.mst : MV.ost)[k.ki], tm = k
 function startShootout(M) {
   const plan = soPlan(MV.mst, MV.ost, M.xt.mineWins); MV.so = { plan, i: 0, sm: 0, so: 0 }; M.xt.so = plan; MV.paused = true; MV.regroup = 0;
   MV.log.unshift({ min: 120, ic: '🥅', cls: '', t: `<b>승부차기</b> <span class="dim">${esc(plan.first === 'm' ? M.mine.name : M.opp.name)} 선축</span>` });
-  fxShow('<div class="endt">승부차기</div><div class="ends">' + esc(plan.first === 'm' ? M.mine.name : M.opp.name) + ' 선축</div>', 'end', 1700, false); renderMatch();
+  fxShow('<div class="endt">승부차기</div><div class="ends">' + esc(plan.first === 'm' ? M.mine.name : M.opp.name) + ' 선축</div>', 'end', 1700, false); PX.ui.render();
   later(() => soNext(M), 1900);
 }
 function soNext(M) {
@@ -1453,11 +1469,11 @@ function soNext(M) {
     MV.pg = null; if (k.ok) { k.sd === 'm' ? S0.sm++ : S0.so++; }
     MV.log.unshift({ min: 120, ic: k.ok ? '✅' : '❌', cls: '', t: `<b>${x.nm}</b> <span class="dim">${x.tm} · ${x.r}</span> — 승부차기 ${S0.sm} : ${S0.so}` });
     fxShow(`<div class="gb">${k.ok ? '✅' : k.kind === 'save' ? '🧤' : '❌'}</div><div class="gs">${x.nm} · ${x.r}<br><span class="gsa">승부차기 ${S0.sm} : ${S0.so}</span></div>`, k.ok ? 'goal' : 'save', 1200, false);
-    S0.i++; renderMatch(); later(() => soNext(M), 1300); } });
+    S0.i++; PX.ui.render(); later(() => soNext(M), 1300); } });
 }
 function soEnd(M) {
-  const S0 = MV.so; MV.pen = null; MV.pg = null; MV.paused = false; clearInterval(MV.timer); MV.over = true; sfx('whistle');
-  MV.log.unshift({ min: 120, ic: '🏆', cls: '', t: `<b>승부차기 ${S0.sm} : ${S0.so}</b> — ${esc(S0.sm > S0.so ? M.mine.name : M.opp.name)} 승리` }); finishLog(M); movePitch(); renderMatch();
+  const S0 = MV.so; MV.pen = null; MV.pg = null; MV.paused = false; clearInterval(MV.timer); MV.over = true; PX.ui.sfx('whistle');
+  MV.log.unshift({ min: 120, ic: '🏆', cls: '', t: `<b>승부차기 ${S0.sm} : ${S0.so}</b> — ${esc(S0.sm > S0.so ? M.mine.name : M.opp.name)} 승리` }); finishLog(M); PX.ui.move(); PX.ui.render();
 }
 // 90분(또는 120분) 종료 처리. true = 경기 완전 종료
 function fullTime(M, skip) {
@@ -1465,13 +1481,13 @@ function fullTime(M, skip) {
   if (!MV.etOn && Core.wcKO(M) && (Core.koTied ? Core.koTied(M, h, a) : h === a)) {   // 토너먼트 무승부(2차전이면 합산) → 연장전 30분
     Core.wcExtra(M); MV.etOn = true; swapEnds(M, !skip); (M.evMine.concat(M.evOpp)).forEach(e => { if (e.min > 90 && MV.keys) MV.keys.push(e.min); });
     MV.log.unshift({ min: 90, ic: '⏱️', cls: '', t: `<b>90분 종료 ${h} : ${a} — 연장전 돌입</b>` });
-    if (!skip) { MV.goalRes = 'o'; MV.regroup = 2; fxShow(`<div class="endt">연장전</div><div class="ends">${h} : ${a} · 30분</div>`, 'end', 2400, true); renderMatch(); }
+    if (!skip) { MV.goalRes = 'o'; MV.regroup = 2; fxShow(`<div class="endt">연장전</div><div class="ends">${h} : ${a} · 30분</div>`, 'end', 2400, true); PX.ui.render(); }
     return false; }
   if (MV.etOn && (Core.koTied ? Core.koTied(M, h, a) : h === a) && !MV.so) {                                                    // 연장 120분에도 무승부 → 승부차기
     if (!skip) { startShootout(M); return false; }
     const plan = soPlan(MV.mst, MV.ost, M.xt.mineWins); M.xt.so = plan; MV.so = { plan, i: plan.seq.length, sm: plan.sm, so: plan.so };
     MV.log.unshift({ min: 120, ic: '🏆', cls: '', t: `<b>승부차기 ${plan.sm} : ${plan.so}</b> — ${esc(plan.sm > plan.so ? M.mine.name : M.opp.name)} 승리` }); }
-  clearInterval(MV.timer); MV.over = true; sfx('whistle'); finishLog(M); return true;
+  clearInterval(MV.timer); MV.over = true; PX.ui.sfx('whistle'); finishLog(M); return true;
 }
 function offsideFx(M, x) {                                                                // 오프사이드: 깃발·오프사이드 라인 표시 + 상대 공격권
   if (!MV || !MV.pos || MV.sp || MV.pg || MV.pen || MV.so || MV.momentOpen || MV.lead || MV.goalRes || MV.talk || MV.cele || MV.over || MV.skipping || MV.fast) { lbl('오프사이드'); return; }
@@ -1489,7 +1505,7 @@ function vizIdx(st, sd, p) {                                                    
 function emitAt(M, min, anim) {
   const out = []; const dM = dM_(M);
   for (const e of M.evMine.concat(M.evOpp)) if (e.min <= min && !e.shown) {             // 재계산(감독 교체 등)으로 이미 지난 분에 생긴 골도 놓치지 않고 표시
-    if (anim && MV.pg && MV.pos && MV.pos.m.length) continue;                            // 같은 분에 골이 둘이면 앞 골 연출이 끝난 뒤 다음 분에 이어서(덮어써서 사라지던 문제)
+    if (anim && (MV.pg || MV.goalRes) && MV.pos && MV.pos.m.length) continue;                 // 앞 골 연출 중이거나 킥오프 대기 중이면 다음 분에(킥오프 전 골 연출이 멈추던 문제)                            // 같은 분에 골이 둘이면 앞 골 연출이 끝난 뒤 다음 분에 이어서(덮어써서 사라지던 문제)
     e.shown = true; const ms = M.evMine.includes(e), team = ms ? M.mine : M.opp;
     if (!e.mine && !e.pen && min <= 90 && !MV.etOn && !MV.so && rnd2() < 0.06) e.varOff = pick3(['off', 'off', 'off', 'foul', 'foul', 'hand']);
     const lg = [{ min: e.min, ic: IC.ball, cls: 'g ' + (ms ? 'mine' : 'opp'), t: `<b>골! ${esc(e.sc.name)}</b>${e.pen ? ' <span class="tag">PK</span>' : ''} <span class="dim">${esc(team.name)}</span>` }];
@@ -1555,18 +1571,18 @@ function startMatch() {
   if (isM() && !S.mgrGo) { if (G0().pendingMine) { mgrPre(); render(); } return; } S.mgrGo = false;
   const M = Core.prepareMine(); if (!M) return;
   const PT = pickPitch(M);
-  MV = { rng: mb32(matchSeed(M)), clk: 0, tq: [], min: 0, timer: null, paused: false, log: [], over: false, momentOpen: null, speed: spdMs(), ball: { x: 50, y: 32 }, poss: 'm', holder: null, pos: { m: [], o: [] }, ballFree: false, red: {}, pitch: PT, kit: pickKits(M, PT), t: 0, rt: 0, kick: 0, act: null, dec: 1, els: null, raf: 0, last: 0, run: {}, tgt: { m: [], o: [] }, mst: sortSt(M.stMine), ost: sortSt(M.stOpp), fxT: null, st: { m: { pt: 0, sh: 0, sot: 0, xg: 0, pa: 0, pm: 0 }, o: { pt: 0, sh: 0, sot: 0, xg: 0, pa: 0, pm: 0 } }, heat: new Array(60).fill(0), my: { pa: 0, pm: 0 } };
+  MV = { ...(() => { const sd = newMatchSeed(M); return { seed: sd, rng: mb32(sd) }; })(), clk: 0, tq: [], min: 0, timer: null, paused: false, log: [], over: false, momentOpen: null, speed: spdMs(), ball: { x: 50, y: 32 }, poss: 'm', holder: null, pos: { m: [], o: [] }, ballFree: false, red: {}, pitch: PT, kit: pickKits(M, PT), t: 0, rt: 0, kick: 0, act: null, dec: 1, els: null, raf: 0, last: 0, run: {}, tgt: { m: [], o: [] }, mst: sortSt(M.stMine), ost: sortSt(M.stOpp), fxT: null, st: { m: { pt: 0, sh: 0, sot: 0, xg: 0, pa: 0, pm: 0 }, o: { pt: 0, sh: 0, sot: 0, xg: 0, pa: 0, pm: 0 } }, heat: new Array(60).fill(0), my: { pa: 0, pm: 0 } };
   placeMe(M); S.vm = S.vm || vmGet(); MV.hl = S.vm === 'hl' || S.vm === 'mine'; MV.keys = keysFor(M); if (MV.hl && !hlNear() && M.role !== 'bench' && M.role !== 'inj' && M.role !== 'sus' && M.role !== 'away') { MV.speed = 40; MV.hlFast = true; }
   try { const m0 = Core.me(); MV.snap = { mor: m0.mor, trust: m0.trust, tac: JSON.stringify(M.mine.tactic) }; } catch (e) {}   // 도중에 나가면 이 값으로 되돌림
-  MV.kc = { m: kitClub(M.mine, MV.kit.m), o: kitClub(M.opp, MV.kit.o) }; S.matchOpen = true; sfx('whistle'); if ((M.role==='bench' || M.role==='inj' || M.role==='sus' || M.role==='away') && (S.vm || 'full') !== 'full') { MV.speed = 60; MV.fast = true; }
+  MV.kc = { m: kitClub(M.mine, MV.kit.m), o: kitClub(M.opp, MV.kit.o) }; S.matchOpen = true; PX.ui.sfx('whistle'); if ((M.role==='bench' || M.role==='inj' || M.role==='sus' || M.role==='away') && (S.vm || 'full') !== 'full') { MV.speed = 60; MV.fast = true; }
   $('#match').innerHTML = `<div class="mh" id="mh"></div><div id="pitchbox">${pitchHTML(M)}</div><div class="mb" id="mb"></div><div class="mf" id="mf"></div>`;
   { const pb = $('#pitchbox'); if (pb) pb.addEventListener('click', () => { if (MV && MV.rp) MV.rp.skip = true; }); }
-  lockOrient('landscape'); $('#match').classList.add('on'); S.emer2d = false; viewApply(); initPos(M); bringMeTop(); renderMatch(); movePitch(); introStart(M);
+  lockOrient('landscape'); $('#match').classList.add('on'); S.emer2d = false; viewApply(); initPos(M); bringMeTop(); PX.ui.render(); PX.ui.move(); introStart(M);
   try { const rv = Core.rivalOf, der = rv && M.mine.kind === 'pro' && M.opp.kind === 'pro' && (rv(M.mine) === M.opp.id || rv(M.opp) === M.mine.id), fin = /결승/.test(M.title || '') && !/준결승/.test(M.title || '');
     MV.big = der ? { k: 'derby', t: '🔥 라이벌 더비' } : fin ? { k: 'final', t: '🏆 결승전' } : Core.wcKO && Core.wcKO(M) ? { k: 'ko', t: '⚔️ 토너먼트' } : null;
     if (M.rivalM) { const rv = G0().players[M.rivalM]; if (rv) MV.log.unshift({ min: 0, ic: '🆚', cls: '', t: `<b>동기 라이벌 ${esc(rv.name)}과(와) 맞대결!</b> <span class="dim">${esc(M.opp.name)} · 종합 ${rv.ovr}</span>` }); }
     if (M.order && Core.ORDERS[M.order]) MV.log.unshift({ min: 0, ic: '📋', cls: '', t: `<b>감독 지시: ${Core.ORDERS[M.order].n}</b> <span class="dim">“${Core.ORDERS[M.order].d}” · 지시에 맞는 선택(📋)은 성공률 +4%, 따르면 신뢰가 오릅니다</span>` });
-    if (MV.big) { MV.log.unshift({ min: 0, ic: der ? '🔥' : '🏆', cls: '', t: der ? `<b>라이벌 더비</b> — 경기장이 꽉 찼습니다. 양 팀 서포터즈의 응원 열기가 대단합니다!` : `<b>${MV.big.t.slice(2)}</b> — 모든 것이 걸린 한 판입니다. 관중석이 들썩입니다!` }); if (!MV.fast) setTimeout(() => sfx('crowd'), 300); } } catch (e) { MV.big = null; }
+    if (MV.big) { MV.log.unshift({ min: 0, ic: der ? '🔥' : '🏆', cls: '', t: der ? `<b>라이벌 더비</b> — 경기장이 꽉 찼습니다. 양 팀 서포터즈의 응원 열기가 대단합니다!` : `<b>${MV.big.t.slice(2)}</b> — 모든 것이 걸린 한 판입니다. 관중석이 들썩입니다!` }); if (!MV.fast) setTimeout(() => PX.ui.sfx('crowd'), 300); } } catch (e) { MV.big = null; }
   if (!MV.fast) fxShow(`<div class="ends" style="font-size:12px;opacity:.85">${esc(M.title)}</div><div class="endt" style="font-size:18px;display:flex;align-items:center;justify-content:center;gap:8px">${crest(M.h, 22)}<span>${esc(M.h.name)}</span><span style="opacity:.6">vs</span><span>${esc(M.a.name)}</span>${crest(M.a, 22)}</div><div class="ends" style="font-size:13px">${MV.big ? MV.big.t + ' · ' : ''}킥오프!</div>`, 'end', MV.big ? 2600 : 2000, true);
 }
 function scoreAt(min) {
@@ -1595,7 +1611,7 @@ function tick() {
   if (M.role==='sub' && MV.min===M.from) MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 투입 — ${esc(m.name)}` })
   if (M.role==='sub' && MV.min===M.from && !MV.mst.some(p => p.me)) { let ix = MV.mst.findIndex(p => p.sub === m.sub && p.sub !== 'GK'); if (ix < 0) ix = MV.mst.findIndex(p => p.sub !== 'GK'); if (ix >= 0) { const outp = MV.mst[ix]; MV.mst[ix] = m; lbl('교체 투입'); const pb = $('#pitchbox'); if (pb) { pb.innerHTML = pitchHTML(M); MV.els = null; MV.refEl = null; bringMeTop(); } fxShow(`<div class="gchar">${sprH(m, MV.kc.m, 40)}</div><div class="gs">교체 투입 · ${esc(m.name)}</div><div class="dim">${esc(outp.name)} ↔ ${MV.min}분</div>`, 'save', 1800, false); } }
   const mo = M.moments[M.mi];
-  if (mo && !mo.done && mo.min <= MV.min && !MV.pg && !MV.lead && !MV.momentOpen && !MV.sp && !MV.pen && !MV.so) { MV.paused = true; beginLead(M, mo); }     // 골 연출 중이면 끝난 뒤에 장면을 연다
+  if (mo && !mo.done && mo.min <= MV.min && !MV.pg && !MV.lead && !MV.momentOpen && !MV.sp && !MV.pen && !MV.so) { if (mo.min < MV.min) mo.min = MV.min; MV.paused = true; beginLead(M, mo); }   // 늦게 열린 선택 장면은 기준 분을 지금으로(이미 화면에 나온 골이 바꿔치기되지 않게)     // 골 연출 중이면 끝난 뒤에 장면을 연다
   if (!MV.htDone && MV.min >= 45 && MV.min < 90 && !MV.pg && !MV.momentOpen && !MV.fast && !MV.skipping) {         // 전반 종료 → 잠깐 멈춤 → 후반 킥오프
     MV.htDone = true; MV.htWait = true; MV.flipH = true; swapEnds(M, true); const [hh, ha] = scoreAt(45); MV.log.unshift({ min: 45, ic: '⏸️', cls: '', t: `<b>전반 종료</b> ${hh} : ${ha}` });
     MV.regroup = 2.2; fxShow(`<div class="endt">전반 종료</div><div class="ends">${hh} : ${ha}</div>`, 'end', 2200, true);
@@ -1605,7 +1621,7 @@ function tick() {
   if (!MV.flipH && MV.min >= 46 && !MV.pg && !MV.momentOpen && !MV.lead && !MV.pen) { MV.flipH = true; swapEnds(M); MV.goalRes = 'o'; }      // 빠른 진행 중에도 후반엔 진영 교체
   if (MV.etOn && MV.min === 105 && !MV.pg) { swapEnds(M, true); MV.goalRes = 'm'; MV.regroup = 1.2; MV.log.unshift({ min: 105, ic: '⏸️', cls: '', t: '<b>연장 전반 종료</b> — 연장 후반 시작' }); lbl('연장 후반'); }
   if (MV.min >= (MV.etOn ? 120 : 90) && !MV.pg) fullTime(M, !!(MV.skipping || MV.fast));
-  movePitch(); renderMatch(); hlSync();
+  PX.ui.move(); PX.ui.render(); hlSync();
 }
 function skipMatch() {
   if (MV.lead) { const M0 = G0().mm; clearInterval(MV.timer); if (MV.talk) { if (G0().mm && G0().mm.role === 'mgr') Core.mgrTalkPick('calm', 0); else Core.talkPick('follow'); MV.talk = null; MV.paused = false; MV.goalRes = 'o'; }
@@ -1613,13 +1629,13 @@ function skipMatch() {
   clearInterval(MV.timer); const M = G0().mm; if (!M) return; MV.skipping = true; flushPg(); MV.paused = false;
   for (;;) { while (MV.min < (MV.etOn ? 120 : 90)) { MV.min++; emitAt(M, MV.min, false); const mo = M.moments[M.mi];
     if (M.role==='sub' && MV.min===M.from) MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 투입 — ${esc(Core.me().name)}` });
-    if (mo && !mo.done && mo.min===MV.min) { MV.paused = true; MV.momentOpen = mo; MV.timer = setInterval(tick, 40); stepBall(M); stageMoment(M, mo); movePitch(); renderMatch(); return; } }
+    if (mo && !mo.done && mo.min===MV.min) { MV.paused = true; MV.momentOpen = mo; MV.timer = setInterval(tick, 40); stepBall(M); stageMoment(M, mo); PX.ui.move(); PX.ui.render(); return; } }
     if (fullTime(M, true)) break; }
-  movePitch(); renderMatch();
+  PX.ui.move(); PX.ui.render();
 }
 
 const lvl3 = (p) => p >= 0.62 ? ['높음', 'hi'] : p >= 0.4 ? ['보통', 'mid'] : ['낮음', 'lo'];
-function startSecond() { if (!MV || MV.over || !G0().mm) return; if (MV.regWalk) { later(startSecond, 300); return; } MV.htWait = false; MV.talk = null; if (!MV.momentOpen && !MV.pg && !MV.pen && !MV.so && !MV.lead && !MV.sp) MV.paused = false; MV.regroup = 0; MV.goalRes = 'o'; MV.log.unshift({ min: 46, ic: '▶️', cls: '', t: '<b>후반 시작</b>' }); fxShow('<div class="endt" style="font-size:26px">후반 시작</div>', 'end', 1100, false); renderMatch(); }
+function startSecond() { if (!MV || MV.over || !G0().mm) return; if (MV.regWalk) { later(startSecond, 300); return; } MV.htWait = false; MV.talk = null; if (!MV.momentOpen && !MV.pg && !MV.pen && !MV.so && !MV.lead && !MV.sp) MV.paused = false; MV.regroup = 0; MV.goalRes = 'o'; MV.log.unshift({ min: 46, ic: '▶️', cls: '', t: '<b>후반 시작</b>' }); fxShow('<div class="endt" style="font-size:26px">후반 시작</div>', 'end', 1100, false); PX.ui.render(); }
 function mtabs() { const T = (MV && MV.over ? [['ana', '분석']] : []).concat([['flow', '경기 흐름'], ['stat', '통계'], ['tac', '전술']]).concat(isM() ? [] : [['me', '내 평점']]); return `<div class="mtabs">${T.map(([k, n]) => `<button class="mtb ${(S.mtab || 'flow') === k ? 'on' : ''}" data-act="mtab" data-id="${k}">${n}</button>`).join('')}</div>`; }
 function anaRec(M) {                                                                        // 이번 경기 기록(추세 계산용)
   const A = MV.st.m, B = MV.st.o, tot = (A.pt + B.pt) || 1, [fh, fa] = scoreAt(MV.etOn ? 120 : 90), gm = M.mineHome ? fh : fa, go = M.mineHome ? fa : fh;
@@ -1826,7 +1842,7 @@ function msetSync() { const el = document.getElementById('mset'); if (el && MV &
 function msetClose() { const el = document.getElementById('mset'); if (el) el.remove(); if (MV) { MV.setOpen = false; MV.last = 0; } }
 // ---- 경기 전 입장 연출(화면만): 터널에서 입장 → 중앙선 앞 한 줄 정렬 → 양 팀 이름 → 휘슬 → 킥오프. '건너뛰기'로 바로 정렬 ----
 function introStart(M) {
-  const go = () => { if (!MV || MV.timer || MV.over) return; introClear(); MV.force = null; MV.introWalk = false; resetPos(M); MV.ball.x = 50; MV.ball.y = 32; MV.paused = false; sfx('whistle'); lbl('킥오프!'); MV.timer = setInterval(tick, MV.speed); renderMatch(); movePitch(); };
+  const go = () => { if (!MV || MV.timer || MV.over) return; introClear(); MV.force = null; MV.introWalk = false; resetPos(M); MV.ball.x = 50; MV.ball.y = 32; MV.paused = false; PX.ui.sfx('whistle'); lbl('킥오프!'); MV.timer = setInterval(tick, MV.speed); PX.ui.render(); PX.ui.move(); };
   if (MV.fast || MV.hlFast || MV.skipping || !canStageLoose()) { go(); return; }
   MV.intro = { ph: 'walk', tm: [], go }; MV.paused = true; MV.introWalk = true; MV.force = {};
   const homeP = M.mineHome ? 'm' : 'o', awayP = homeP === 'm' ? 'o' : 'm';
@@ -1849,7 +1865,7 @@ function exitAskClose() { const el = document.getElementById('exitq'); if (el) e
 function exitMatch() { try { vfullToggle(true); } catch (e) {}                                                                              // 경기 폐기: 결과·기록 없이 경기 전 상태로 복귀(경기일은 그대로 남아 다시 진행)
   const el = document.getElementById('exitq'); if (el) el.remove();
   if (!MV) return; const G = G0();
-  try { clearInterval(MV.timer); if (MV.raf) cancelAnimationFrame(MV.raf); if (MV.fxT) clearTimeout(MV.fxT); } catch (e) {}
+  try { clearInterval(MV.timer); if (MV.raf) cancelAnimationFrame(MV.raf); clearTimeout(PX.fxT); } catch (e) {}
   try { const sn = MV.snap, M = G.mm; if (sn) { const m0 = Core.me(); m0.mor = sn.mor; m0.trust = sn.trust; if (M && M.mine && sn.tac) M.mine.tactic = JSON.parse(sn.tac); } } catch (e) {}
   const was = MV; MV.over = true; MV = null; G.mm = null; G.wcLast = null; S.matchOpen = false; S.mgrGo = false; S.mtab = 'flow'; S.mpout = null;
   $('#match').classList.remove('on'); $('#match').innerHTML = ''; lockOrient('portrait');
@@ -2085,7 +2101,7 @@ function mgrPanelOpen() {
   if (!MV || MV.over || !G0().mm || MV.mgrPanel) return;
   if (MV.pg || MV.lead || MV.sp || MV.momentOpen || MV.pen || MV.so || MV.cele) { MV.wantPanel = true; toast('장면이 끝나면 바로 열립니다'); return; }      // 연출 중이면 예약해 두었다가 끝나는 즉시 연다
   MV.wantPanel = false;
-  MV.mgrPanel = true; MV.mgrPrev = MV.paused; MV.paused = true; MV.mgrDirty = false; S.mpout = null; renderMatch();
+  MV.mgrPanel = true; MV.mgrPrev = MV.paused; MV.paused = true; MV.mgrDirty = false; S.mpout = null; PX.ui.render();
 }
 function mgrPanelClose() {
   if (!MV || !MV.mgrPanel) return; const M = G0().mm;
@@ -2093,13 +2109,13 @@ function mgrPanelClose() {
   MV.mgrPanel = false; MV.mgrDirty = false;
   // 창을 열기 전에 멈춰 있던 이유가 '하프타임 휴식'이거나 장면 선택·연출(득점·세트피스 등)이면 그 흐름을 이어 가고, 배너 연출용 일시정지였다면 풀어 준다(예전엔 그대로 멈춰 버렸음)
   { const hold = !!MV.regWalk || !!MV.talk || !!MV.momentOpen || !!MV.pen || !!MV.so || !!MV.lead || !!MV.pg || !!MV.sp; MV.paused = hold; if (!hold) { laterClear(MV.fxP); } MV.pzUntil = nowR() + 12000; }
-  renderMatch();
+  PX.ui.render();
 }
 function mgrSubUI(outId, inId) {
   const M = G0().mm, r = Core.mgrSub(outId, inId, MV.min); if (r) M.segDirty = true; if (!r) { toast('교체할 수 없습니다 (5회 한도)'); return; }
   const i = MV.mst.findIndex(p => p.id === outId); if (i >= 0) MV.mst[i] = r.inn;
   MV.mgrDirty = true; MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 — ${esc(r.inn.name)} IN / ${esc(r.out.name)} OUT` });
-  const pb = $('#pitchbox'); if (pb) { pb.innerHTML = pitchHTML(M); MV.els = null; MV.refEl = null; } S.mpout = null; renderMatch();
+  const pb = $('#pitchbox'); if (pb) { pb.innerHTML = pitchHTML(M); MV.els = null; MV.refEl = null; } S.mpout = null; PX.ui.render();
 }
 
 const NAV = [['home','홈'],['me','내 선수'],['ctr','이적'],['league','순위·대회'],['news','뉴스']];
@@ -2145,9 +2161,9 @@ function render() {
   const app = $('#app');
   try { const g = G0(); if (g && S.step === 'game') Core.normStats(Core.me()); } catch (e) {}
   try { if (S.welcome && S.step === 'game' && !S.busy && !S.matchOpen) { const w = S.welcome; S.welcome = null; setTimeout(() => popup('게임 시작!', w==='start' ? '선수 육성 모드가 시작되었습니다.\n아래 ‘진행’ 버튼으로 하루씩 보내며 훈련하고, 경기 일정에 맞춰 컨디션을 관리하세요.' : w==='mstart' ? '감독 모드가 시작되었습니다.\n구단 탭에서 스폰서·스태프를, 전술 탭에서 포메이션을 먼저 살펴보세요.' : '월드컵 모드가 시작되었습니다.\n조별리그를 통과해 결승 트로피를 노려보세요!', '🎉'), 250); } } catch (e) {}
-  try { const g0 = G0(); if (g0 && g0.cer && !S.modal && !S.matchOpen && !S.busy && S.step === 'game') { S.modalKind = 'cer'; S.modal = cerModal(); sfx('trophy'); } } catch (e) {}
+  try { const g0 = G0(); if (g0 && g0.cer && !S.modal && !S.matchOpen && !S.busy && S.step === 'game') { S.modalKind = 'cer'; S.modal = cerModal(); PX.ui.sfx('trophy'); } } catch (e) {}
   try { const g0 = G0(); if (g0 && !g0.cer && !g0.awardPop && g0.seasonCard && !S.modal && !S.matchOpen && !S.busy && S.step === 'game') { S.modalKind = 'sc'; S.modal = seasonCardModal(); } } catch (e) { try { G0().seasonCard = null; } catch (e2) {} }
-  try { const g0 = G0(); if (g0 && !g0.cer && g0.awardPop && !S.modal && !S.matchOpen && !S.busy && S.step === 'game') { S.modalKind = 'aw'; S.modal = awardModal(); sfx('trophy'); } } catch (e) { try { G0().awardPop = null; } catch (e2) {} }
+  try { const g0 = G0(); if (g0 && !g0.cer && g0.awardPop && !S.modal && !S.matchOpen && !S.busy && S.step === 'game') { S.modalKind = 'aw'; S.modal = awardModal(); PX.ui.sfx('trophy'); } } catch (e) { try { G0().awardPop = null; } catch (e2) {} }
   if (S.step==='setup' || S.step==='create' || S.step==='mode' || S.step==='mcreate' || S.step==='wcsel' || S.step==='wcsquad') {
     const o0 = document.querySelector('.scr'); const k0 = S.step + '|' + (S.step==='setup' ? (S.sel ? 'x' : '') : '') ; const t0 = (o0 && S._sk === k0) ? o0.scrollTop : 0;
     app.innerHTML = `<div class="scr">${S.step==='wcsquad' ? wcSquadView() : S.step==='mode' ? modeView() : S.step==='mcreate' ? mcreateView() : S.step==='wcsel' ? wcselView() : S.step==='setup' ? setupView() : creatorView()}</div>`;
@@ -2233,7 +2249,7 @@ function makeWorld() {
   setTimeout(stepW, 60);
 }
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('[data-act]'); if (!t || S.busy) return; const a = t.dataset.act, id = t.dataset.id; if (SND.bgm && !SND.tm) bgmApply(); if (a !== 'snd') sfx('click');
+  const t = e.target.closest('[data-act]'); if (!t || S.busy) return; const a = t.dataset.act, id = t.dataset.id; if (SND.bgm && !SND.tm) bgmApply(); if (a !== 'snd') PX.ui.sfx('click');
   if ((a==='start' || a==='mstart' || a==='wcstart')) {
     if (a==='mstart' && S.cr.mclub == null) { popup('구단 선택', '먼저 맡을 구단을 골라 주세요.', '⚽'); return; }
     if (!S.okGo && a==='wcstart') { const nm0 = $('#nm'); const nm1 = (nm0 && nm0.value.trim()) || '양메시', go = (d) => () => { S.cr.wcdraw = d; S.okGo = true; t.click(); };
@@ -2275,9 +2291,9 @@ document.addEventListener('click', (e) => {
   if (a==='mfull') { vfullToggle(); return; }
   if (a==='vmenu') { vfullMenu(); return; }
   if (a==='mball') { try { V3D.setBall(id); } catch (e) {} msetSync(); return; }
-  if (a==='mment') { const M = G0().mm; if (!M || !MV || MV.over) return; Core.mgrSetInstr('ment', +id); MV.tk.m = tkOf(M.mine); M.segDirty = true; const nx = segNext(MV.min); MV.log.unshift({ min: MV.min, ic: '📋', cls: '', t: `<b>감독 지시</b> ${['수비적', '균형', '공격적'][+id]}으로 전환${nx ? ` <span class="dim">· ${nx}분 구간부터 결과에 반영</span>` : ''}` }); toast(nx ? `${['수비적', '균형', '공격적'][+id]} 전환 — ${nx}분부터 결과에 반영` : '남은 구간이 없어 결과에는 반영되지 않습니다'); renderMatch(); return; }
-  if (a==='mpinstr') { Core.mgrSetInstr(t.dataset.k, +id); if (MV) MV.mgrDirty = true; renderMatch(); return; }
-  if (a==='mpout') { S.mpout = (S.mpout === +id) ? null : +id; renderMatch(); return; }
+  if (a==='mment') { const M = G0().mm; if (!M || !MV || MV.over) return; Core.mgrSetInstr('ment', +id); MV.tk.m = tkOf(M.mine); M.segDirty = true; const nx = segNext(MV.min); MV.log.unshift({ min: MV.min, ic: '📋', cls: '', t: `<b>감독 지시</b> ${['수비적', '균형', '공격적'][+id]}으로 전환${nx ? ` <span class="dim">· ${nx}분 구간부터 결과에 반영</span>` : ''}` }); toast(nx ? `${['수비적', '균형', '공격적'][+id]} 전환 — ${nx}분부터 결과에 반영` : '남은 구간이 없어 결과에는 반영되지 않습니다'); PX.ui.render(); return; }
+  if (a==='mpinstr') { Core.mgrSetInstr(t.dataset.k, +id); if (MV) MV.mgrDirty = true; PX.ui.render(); return; }
+  if (a==='mpout') { S.mpout = (S.mpout === +id) ? null : +id; PX.ui.render(); return; }
   if (a==='mpin') { if (S.mpout == null) { toast('먼저 나갈 선수를 탭하세요'); return; } mgrSubUI(S.mpout, +id); return; }
   if (a==='sel') { const i = S.sel.indexOf(id); if (i>=0) S.sel.splice(i,1); else if (S.sel.length<10) S.sel.push(id); else toast('최대 10개국입니다'); render(); return; }
   if (a==='world') { if (S.sel.length) makeWorld(); return; }
@@ -2291,9 +2307,9 @@ document.addEventListener('click', (e) => {
   else if (a==='spa') { Core.sponsorAccept(+id); toast('스폰서 계약 완료'); }
   else if (a==='spd') Core.sponsorDecline(+id);
   else if (a==='inv') { Core.setInv(+id); }
-  else if (a==='ada') { const r = Core.adAccept(+id); toast(r.msg); if (r.ok) sfx('coin'); }
+  else if (a==='ada') { const r = Core.adAccept(+id); toast(r.msg); if (r.ok) PX.ui.sfx('coin'); }
   else if (a==='add') Core.adDecline(+id);
-  else if (a==='shop') { const [k, i] = id.split(':'); const r = Core.shopBuy(k, i); toast(r.ok ? '구매·계약 완료' : r.msg); if (r.ok) sfx('coin'); }
+  else if (a==='shop') { const [k, i] = id.split(':'); const r = Core.shopBuy(k, i); toast(r.ok ? '구매·계약 완료' : r.msg); if (r.ok) PX.ui.sfx('coin'); }
   else if (a==='ofd') S.modal = offerModal(+id);
   else if (a==='nf') S.nf = id; else if (a==='lc') { S.lc = id; S.ld = null; S.sea = null; } else if (a==='ld') { S.ld = id; S.sea = null; } else if (a==='lsea') { S.seaUser = true; S.sea = +id < 0 ? null : +id; if (S.lt==='hist') S.lt = 'table'; } else if (a==='lt') S.lt = id; else if (a==='cv') S.cv = id;
   else if (a==='pl') S.modal = profileHTML(G0().players[id]);
@@ -2308,11 +2324,11 @@ document.addEventListener('click', (e) => {
   else if (a==='close') { S.modal = null; S.modalKind = null; if (G0() && G0().cer) G0().cer = null; else if (G0() && G0().awardPop) G0().awardPop = null; else if (G0() && G0().seasonCard) G0().seasonCard = null; save(); }
   else if (a==='cerpress') { const g0 = G0(); Core.mgrCerPress(); g0.cer = null; S.modalKind = 'press'; S.modal = pressModal(); }
   else if (a==='mprepress') { const g0 = G0(); Core.mgrPreGen(); Core.mgrX().preDay = g0.day; S.modalKind = 'press'; S.modal = pressModal(); }
-  else if (a==='msponsor') { const [sl, ix] = id.split(':'); const r = Core.mgrSponsorSign(sl, +ix); toast(r.msg); if (r.ok) sfx('coin'); save(); }
+  else if (a==='msponsor') { const [sl, ix] = id.split(':'); const r = Core.mgrSponsorSign(sl, +ix); toast(r.msg); if (r.ok) PX.ui.sfx('coin'); save(); }
   else if (a==='rnopen') { const [k, i] = id.split(':'); S.rn = { k, i: +i, back: S.modal, bk: S.modalKind }; const cur = k === 'p' ? G0().players[+i].name : Core.clubOf(+i).name; S.modalKind = 'rename'; S.modal = `<div class="ttl">이름 변경</div><div class="dim">${k === 'p' ? '선수' : '구단'} 이름을 직접 바꿀 수 있습니다 (최대 ${k === 'p' ? 14 : 16}자).</div><input id="rnv" class="inp" maxlength="16" value="${esc(cur)}" style="width:100%;margin:10px 0"><div class="row g8"><button class="btn grow" data-act="rnsave">저장</button><button class="btn sec grow" data-act="rncancel">취소</button></div>`; }
   else if (a==='rnsave') { const v = $('#rnv') && $('#rnv').value, r = S.rn; if (r) { const ok = r.k === 'p' ? Core.renamePlayer(r.i, v) : Core.renameClub(r.i, v); if (ok) popup('이름 변경', '이름을 바꿨습니다.', '✏️', 1800); else popup('이름 변경', '이름을 입력해 주세요.', '✏️'); if (ok) { S.modal = r.k === 'p' ? profileHTML(G0().players[r.i]) : clubModal(r.i); S.modalKind = r.k === 'p' ? null : 'club'; S.rn = null; save(); } } }
   else if (a==='rncancel') { const r = S.rn; S.modal = r ? r.back : null; S.modalKind = r ? r.bk : null; S.rn = null; }
-  else if (a==='mstaff') { const r = Core.mgrStaffUp(id); toast(r.msg); if (r.ok) sfx('coin'); save(); }
+  else if (a==='mstaff') { const r = Core.mgrStaffUp(id); toast(r.msg); if (r.ok) PX.ui.sfx('coin'); save(); }
   else if (a==='snd') { sndSet(id, !SND[id]); render(); popup('소리 설정', (id==='sfx' ? '효과음 ' : '배경음악 ') + (SND[id] ? 'ON' : 'OFF') + ' 으로 바꿨습니다.', SND[id] ? '🔊' : '🔇', 1800); return; }
   else if (a==='mpress') { Core.mgrPressPick(id); S.modalKind = 'press'; S.modal = pressModal(); save(); }
   else if (a==='news') { const n = G0().news[+id]; if (n) S.modal = articleOf(n); }
@@ -2342,13 +2358,13 @@ document.addEventListener('click', (e) => {
   else if (a==='day') { if (isM() && G0().pendingMine) return; advance(1); return; }
   else if (a==='week') { advance(7); return; }
   else if (a==='match') { advance(120); return; }
-  else if (a==='mv') { if (!MV || !G0().mm || !MV.momentOpen) return; const M = G0().mm, mo = MV.momentOpen; const r = Core.resolveMoment(id); if (r.goal || r.assist) { MV.ballFree = false; } MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: esc(r.text) }); MV.momentOpen = null; MV.paused = false; try { playOutcome(M, mo, r); } catch (e) { MV.holder = MV.holder || null; } stepBall(M); emitAt(M, mo ? mo.min : MV.min, true); movePitch(); renderMatch(); return; }
+  else if (a==='mv') { mvPick(id); return; }
   else if (a==='fs') { try { localStorage.setItem('bfm_fs', String(+id)); } catch (e) {} fsApply(); render(); { const f = FS_OPT.find(x => String(x[0]) === String(id)); popup('글자·버튼 크기', `‘${f ? f[1] : id}’ 크기로 바꿨습니다.`, '🔠', 1800); } return; }
-  else if (a==='talk') { if (!MV || !MV.talk) return; const r = (G0().mm && G0().mm.role === 'mgr') ? Core.mgrTalkPick(id, MV.talkDiff || 0) : Core.talkPick(id); MV.log.unshift({ min: 45, ic: '💬', cls: '', t: `<b>하프타임</b> ${esc(r.text)}` }); MV.talk = null; later(startSecond, 600); renderMatch(); return; }
-  else if (a==='mtab') { S.mtab = id; renderMatch(); return; }
-  else if (a==='mview') { S.mfOpen = false; viewSet(id); if (MV) { renderMatch(); msetSync(); } else render(); if (!MV) popup('경기 화면', `‘${VIEW_N[viewNow()]}’ 화면으로 바꿨습니다. 경기 결과에는 영향이 없습니다.`, '🏟', 1800); return; }
-  else if (a==='mvm') { S.mfOpen = false; S.vm = id; try { localStorage.setItem('bfm_vm', id); } catch (e) {} if (MV) { MV.hl = id === 'hl' || id === 'mine'; if (!MV.hl) MV.hlFast = false; MV.speed = -1; hlSync(); renderMatch(); msetSync(); } return; }
-  else if (a==='mspd') { S.mfOpen = false; S.spd = +id; try { localStorage.setItem('bfm_spd', String(S.spd)); } catch (e) {} if (MV) { MV.speed = spdMs(); if (MV.timer && !MV.skipping && !MV.over) { clearInterval(MV.timer); MV.timer = setInterval(tick, MV.speed); } hlSync(); renderMatch(); msetSync(); } return; }
+  else if (a==='talk') { if (!MV || !MV.talk) return; const r = (G0().mm && G0().mm.role === 'mgr') ? Core.mgrTalkPick(id, MV.talkDiff || 0) : Core.talkPick(id); MV.log.unshift({ min: 45, ic: '💬', cls: '', t: `<b>하프타임</b> ${esc(r.text)}` }); MV.talk = null; later(startSecond, 600); PX.ui.render(); return; }
+  else if (a==='mtab') { S.mtab = id; PX.ui.render(); return; }
+  else if (a==='mview') { S.mfOpen = false; viewSet(id); if (MV) { PX.ui.render(); msetSync(); } else render(); if (!MV) popup('경기 화면', `‘${VIEW_N[viewNow()]}’ 화면으로 바꿨습니다. 경기 결과에는 영향이 없습니다.`, '🏟', 1800); return; }
+  else if (a==='mvm') { S.mfOpen = false; S.vm = id; try { localStorage.setItem('bfm_vm', id); } catch (e) {} if (MV) { MV.hl = id === 'hl' || id === 'mine'; if (!MV.hl) MV.hlFast = false; MV.speed = -1; hlSync(); PX.ui.render(); msetSync(); } return; }
+  else if (a==='mspd') { S.mfOpen = false; S.spd = +id; try { localStorage.setItem('bfm_spd', String(S.spd)); } catch (e) {} if (MV) { MV.speed = spdMs(); if (MV.timer && !MV.skipping && !MV.over) { clearInterval(MV.timer); MV.timer = setInterval(tick, MV.speed); } hlSync(); PX.ui.render(); msetSync(); } return; }
   else if (a==='pwatch' || a==='psum') { S.modal = null; S.modalKind = null; render(); startMatch(); if (a==='psum' && MV && !MV.over) { S.mtab = 'flow'; skipMatch(); } return; }
   else if (a==='mexit') { exitAskOpen(); return; }
   else if (a==='mexitno') { exitAskClose(); return; }
