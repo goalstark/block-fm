@@ -16,6 +16,12 @@ try {   // gradle 이 홈 폴더 키를 무시하는 경우를 막기 위해 프
   }
   console.log('gradle debug signing -> fixed keystore');
 } catch (e) { console.log('gradle signing patch skipped', e.message); }
+try {   // 최소 안드로이드 7.0(API 24): 3D(WebGL)가 제대로 돌지 않는 2015~2016년 이전 저가폰은 설치 단계에서 막음 (이전 22 = 5.1)
+  const vp = path.join('android', 'variables.gradle'); let v = fs.readFileSync(vp, 'utf8');
+  if (!/minSdkVersion\s*=\s*\d+/.test(v)) throw new Error('minSdkVersion 줄을 찾지 못함');
+  v = v.replace(/minSdkVersion\s*=\s*\d+/, 'minSdkVersion = 24'); fs.writeFileSync(vp, v);
+  console.log('minSdkVersion -> 24 (Android 7.0)');
+} catch (e) { console.log('minSdk patch FAILED', e.message); process.exitCode = 1; }
 try {
   const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
   const root = path.join('android', 'app', 'src', 'main', 'java');
