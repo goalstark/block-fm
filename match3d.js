@@ -560,7 +560,7 @@ const V3D = (() => {
   function hudUpdate(dt) {
     R.hudT = (R.hudT || 0) - dt; if (R.hudT > 0) return; R.hudT = 0.25;
     const h = R.wrap && hudMake(R.wrap), M = G0() && G0().mm; if (!h || !M) return;
-    let sh = 0, sa = 0; try { [sh, sa] = scoreAt(MV.pg ? MV.min - 1 : MV.min); } catch (e) {}
+    let sh = 0, sa = 0; try { [sh, sa] = typeof scoreShown === 'function' ? scoreShown() : scoreAt(MV.pg ? MV.min - 1 : MV.min); } catch (e) {}
     const short = (n) => { const s = String(n || '').replace(/\s*(FC|SC|CF|AFC|유나이티드)$/i, '').trim(); return s.length > 5 ? s.slice(0, 5) : s; };
     const lg0 = MV.log && MV.log[0]; if (lg0 !== R.capL) { R.capL = lg0; R.capT = R.t; }
     const lg = lg0 && R.t - (R.capT || 0) < 6 ? lg0 : null, key = [sh, sa, MV.min, R.cm, lg ? lg.min + lg.t : ''].join('|'); if (key === R.hudK) return; R.hudK = key;   // 중계 자막은 새 문구가 나온 뒤 6초만(옛 문구가 계속 떠 있지 않게)
