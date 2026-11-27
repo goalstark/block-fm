@@ -386,6 +386,7 @@ const V3D = (() => {
       r.head.rotation.y = st.hy; r.upper.rotation.y += st.uy;
       if (key && MV.ask && MV.ask[key] > MV.t) { r.armR.rotation.x = -2.7; r.armR.rotation.z = -.25; }               // B5 공 요구(팔 들기)
       if (key && MV.point && MV.point[key] > MV.t && sp > 1) { r.armL.rotation.x = -1.5; r.armL.rotation.z = .1; }    // B5 침투 방향 가리키기
+      if (extra && extra.shake) { r.armR.rotation.x = -1.25; r.armR.rotation.z = -.12; }
       if (extra && extra.jockey) { r.body.position.y -= .07; r.upper.rotation.x += .25; r.legL.rotation.z = .16; r.legR.rotation.z = -.16; }   // B6 낮은 자세
     }
   }
@@ -458,7 +459,9 @@ const V3D = (() => {
         const defending = MV.poss && MV.poss !== pre; let dd = moveYaw - toBall; while (dd > Math.PI) dd -= Math.PI * 2; while (dd < -Math.PI) dd += Math.PI * 2;
         want = (defending && sp < 6 && Math.abs(dd) > 1.2) || (sp < 3.5 && Math.abs(dd) > .9) ? toBall : moveYaw;
       } else want = toBall;
-      if (MV.intro && MV.intro.ph === 'line' && sp < 1) want = 0;
+      if (MV.intro && (MV.intro.ph === 'line' || MV.intro.ph === 'shake') && sp < 1) want = 0;                // 줄 서서 입장한 쪽을 봄
+      if (MV.intro && MV.intro.ph === 'shake') { const op = pre === 'm' ? 'o' : 'm'; let bj = null, bd = 1.7; (MV.pos[op] || []).forEach((q, j) => { if (!q) return; const dd = Math.hypot(q.x - c.x, q.y - c.y); if (dd < bd) { bd = dd; bj = q; } });   // 악수: 지나가는 상대를 보고 손을 내밂
+        if (bj) { want = angTo(x, z, wx(bj.x), wz(bj.y)); extra.shake = 1; } }
       extra.key = pre + i; try { extra.agi = typeof nA === 'function' ? nA(playerOf(pre, i), 'AGI') : 0; } catch (e) { extra.agi = 0; }
       { const A = MV.aim; if (isHold && A && A.s === pre && A.i === i) { want = angTo(x, z, wx(A.x), wz(A.y)); extra.quick = 1; } }                // B3 차기 전: 차는 방향으로 몸 정렬
       if (!isHold && MV.jk && MV.jk[pre + i] > MV.t) { const sg = (wz(by) - z) * (atkDir(pre) > 0 ? 1 : -1) > 0 ? 1 : -1; want = toBall + sg * Math.PI / 4; extra.jockey = 1; }   // B6 옆으로 선 지연 자세(터치라인 쪽을 열어 줌)
@@ -484,7 +487,8 @@ const V3D = (() => {
     R.ring.visible = false; R.arrow.visible = !!(meR && meR.root.visible);
     if (meR) { const p = meR.root.position, s = 1 + Math.sin(R.t * 5) * .08; R.ring.position.set(p.x, .03, p.z); R.ring.scale.set(s, s, s); R.arrow.position.set(p.x, 2.75 + Math.sin(R.t * 4) * .12, p.z); R.arrow.rotation.y += dt * 2; }
     const rf = MV.ref || { x: 44, y: 40, a1: 50, a2: 50 };
-    place(R.ref[0], rf.x, rf.y, 0, 0, dt, bx, by); place(R.ref[1], rf.a1, 64.2, 0, 0, dt, bx, by); place(R.ref[2], rf.a2, -.2, 0, 0, dt, bx, by);
+    { const ph = MV.intro && MV.intro.ph, fc = ph === 'line' || ph === 'shake' ? 0 : null, P = R.refPv || (R.refPv = {}), sp3 = [[0, rf.x, rf.y], [1, rf.a1, rf.a1y != null ? rf.a1y : 64.2], [2, rf.a2, rf.a2y != null ? rf.a2y : -.2]];   // 심판 3명(입장 땐 줄에 섬)
+      sp3.forEach(([k, gx, gy]) => { const pv = P[k] || { x: gx, y: gy }, vx = dt > 0 ? (gx - pv.x) / dt : 0, vy = dt > 0 ? (gy - pv.y) / dt : 0; P[k] = { x: gx, y: gy }; place(R.ref[k], gx, gy, Math.abs(vx) < 30 ? vx : 0, Math.abs(vy) < 30 ? vy : 0, dt, bx, by, null, fc != null && Math.hypot(vx, vy) < 1 ? fc : null); }); }
     { const of = MV.offFlag; if (of && MV.t - of.t < 1.8) { const ar = of.y > 32 ? R.ref[1] : R.ref[2]; if (ar) { ar.armR.rotation.x = -2.9; ar.armR.rotation.z = -.15; } } }
     const rc = MV.refCard, on = !!(rc && rc.until > MV.t); R.card.visible = on;
     if (on) { const p = R.ref[0].root.position; R.card.position.set(p.x + .45, 2.45, p.z); R.card.material.color.copy(col(rc.c === 'r' ? '#E0262F' : '#F2D21B')); R.ref[0].armR.rotation.x = -2.9; }
@@ -504,10 +508,10 @@ const V3D = (() => {
   function camUpdate(gbx, gby, dt) {
     const m = R.cm || (R.cm = camMode()), asp = R.cam.aspect, b = { x: wx(gbx), z: wz(gby) }, pos = new THREE.Vector3(), look = new THREE.Vector3(); let fov = 34, rate = 3;
     const cele = MV.cele, cr = cele && R.pl[cele.s] && R.pl[cele.s][cele.si], narrow = asp < 1.4;
-    const IN = MV.intro && (MV.intro.ph === 'walk' || MV.intro.ph === 'line');
+    const IN = MV.intro && (MV.intro.ph === 'walk' || MV.intro.ph === 'line' || MV.intro.ph === 'shake');
     if (IN) {                                                                                  // 입장: 선수들을 따라가며 비추고, 일렬로 서면 정면에서 전체를 담음
       let cx = 0, cz = 0, nn = 0; for (const pre of ['m', 'o']) (R.pl[pre] || []).forEach(r => { if (r && r.root.visible) { cx += r.root.position.x; cz += r.root.position.z; nn++; } }); if (nn) { cx /= nn; cz /= nn; }
-      const ln = MV.intro.ph === 'line', dz = ln ? (narrow ? 44 : 36) : (narrow ? 24 : 18); pos.set(cx * .4, ln ? 7.5 : 6, cz + dz); look.set(cx * .4, ln ? 3.2 : 1.1, cz); fov = ln ? 40 : 40; rate = 1.6; }
+      const ln = MV.intro.ph === 'line' || MV.intro.ph === 'shake', dz = ln ? (narrow ? 44 : 34) : (narrow ? 24 : 18); pos.set(cx * .4, ln ? 7 : 6, cz + dz); look.set(cx * .4, ln ? 2.6 : 1.1, cz); fov = ln ? 58 : 40; rate = 1.6; }
     else if (cele && cr && m !== 'far') { const s = cr.root.position, d = s.x > 0 ? 1 : -1; pos.set(s.x - d * 8, 2.8, s.z * .85 + (s.z > 0 ? -4.5 : 4.5)); look.set(s.x, 1.3, s.z); fov = 34; rate = 2.2; }
     else if (m === 'far') { const zf = narrow ? 1.35 : 1; pos.set(b.x * .12, 88 * zf, 72 * zf + b.z * .05); look.set(b.x * .12, 0, 2); fov = 38; rate = 2; }
     else if (m === 'near') { const zf = narrow ? 1.2 : 1; pos.set(clamp(b.x * .96, -L, L), 11 * zf, b.z + 19 * zf); look.set(clamp(b.x, -L, L), .5, b.z - 1); fov = 40; rate = 3.2; }
