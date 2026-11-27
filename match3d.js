@@ -383,7 +383,7 @@ const V3D = (() => {
     const toBall = Math.atan2(wx(bx) - x, wz(by) - z), moveYaw = Math.atan2(vx * WS, vy * WZ);
     const yaw = wantYaw != null ? wantYaw : (sp < .6 ? toBall : moveYaw);
     { let dl = yaw - st.yaw; while (dl > Math.PI) dl -= Math.PI * 2; while (dl < -Math.PI) dl += Math.PI * 2;                                       // B7 회전 속도: 빠를수록 천천히, 민첩할수록 빨리
-      const om = 7 * (.75 + .25 * ((extra && extra.agi) || 0)) * (1 - .5 * Math.min(1, sp / 14)) * (extra && extra.quick ? 1.6 : 1), stp = Math.min(Math.abs(dl) * Math.min(1, dt * 10), om * dt);
+      const om = 7 * (.75 + .25 * ((extra && extra.agi) || 0)) * (1 - .5 * Math.min(1, sp / 14)) * (extra && extra.quick ? (extra.quick === 2 ? 3 : 1.6) : 1), stp = Math.min(Math.abs(dl) * Math.min(1, dt * 10), om * dt);
       st.yaw += Math.sign(dl) * stp; } r.root.rotation.y = st.yaw;
     let dot = 1, side = 0; if (sp > .6) { let d = moveYaw - st.yaw; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; dot = Math.cos(d); side = Math.abs(Math.sin(d)); }
     const back = dot < -.3, sideStep = !back && side > .65;
@@ -432,6 +432,9 @@ const V3D = (() => {
         const high = (R.ballZ || 0) > 1.1 || act.h0 > 1;                   // 공이 떠 있을 때 처리 → 헤딩
         if (high && kh.i !== 0) { r.st.head = .55; }
         else { r.st.kick = act.k === 'shot' ? .45 : .35; r.st.kind = act.k === 'shot' ? 'shot' : (u < 30 && act.to && act.to.s !== kh.s) || (u < 34 && ['CB', 'FB', 'DM', 'GK'].includes(p.sub) && (act.d0 || 0) > 30) ? 'clear' : (act.cross || act.hi || (act.d0 || 0) > 32) ? 'long' : 'pass';
+          if (c) { let tx = null, ty = null; if (act.k === 'shot') { const g = act.to && MV.pos[act.to.s] && MV.pos[act.to.s][act.to.i]; if (g) { tx = g.x; ty = g.y; } else { tx = act.tx; ty = act.ty; } }   // 차는 순간 몸을 공이 가는 쪽으로 고정
+            else { const q = act.to && MV.pos[act.to.s] && MV.pos[act.to.s][act.to.i]; if (act.px != null) { tx = act.px; ty = act.py; } else if (q) { tx = q.x; ty = q.y; } }
+            if (tx != null) { r.st.kYaw = angTo(wx(c.x), wz(c.y), wx(tx), wz(ty)); r.st.kYT = act.k === 'shot' ? .6 : .4; } }
           if (act.k === 'shot' && act.sty) { const k2 = { volley: 'volley', chip: 'chip', curve: 'curve', knuckle: 'shot', drive: 'shot', low: 'shot', tap: 'pass', first: 'shot', overhead: 'volley' }[act.sty]; if (k2) r.st.kind = k2; if (act.sty === 'header') { r.st.kick = 0; r.st.head = .55; } } }
       }
       if (act.k === 'shot' && (act.out === 'post' || (act.out === 'wide' && Math.abs((act.ty || 32) - 32) < 9 && (act.eh || 0) < 2.6)) && Math.random() < .6) { const ds = act.s === 'm' ? 'o' : 'm', gk = R.pl[ds] && R.pl[ds][0]; if (gk) { gk.st.dive = .7; gk.st.diveH = act.eh || 1; gk.st.diveSide = ((act.ty || 32) > 32 ? 1 : -1) * (atkDir(act.s) > 0 ? 1 : -1); } }
@@ -467,7 +470,7 @@ const V3D = (() => {
         if (r.st.keepT > 0 && k === 'back') want = goalYaw + Math.PI;
         else if (r.st.keepT > 0 && k === 'win') want = angMix(inYaw, goalYaw, .35);
         else if (r.st.keepT > 0 && k === 'wout') want = goalYaw;
-        else want = sp > 1.2 ? moveYaw : goalYaw;
+        else { const u = d > 0 ? c.x : 100 - c.x, gYaw = angTo(x, z, d > 0 ? L : -L, 0); want = u > 72 ? (sp > 1.2 ? angMix(moveYaw, gYaw, .6) : gYaw) : sp > 1.2 ? moveYaw : goalYaw; }   // 슈팅 거리에선 골문 쪽을 봄
       } else if (gk) { want = toBall; const own = d > 0 ? bx < 34 : bx > 66; extra.ready = own && !r.st.dive && !r.st.catch; }
       else if (sp > .6) {                                                  // 공 없는 선수: 수비 중 천천히 물러설 땐 공을 보며 뒷걸음, 옆으로 맞출 땐 옆걸음
         const defending = MV.poss && MV.poss !== pre; let dd = moveYaw - toBall; while (dd > Math.PI) dd -= Math.PI * 2; while (dd < -Math.PI) dd += Math.PI * 2;
@@ -479,6 +482,7 @@ const V3D = (() => {
       extra.key = pre + i; try { extra.agi = typeof nA === 'function' ? nA(playerOf(pre, i), 'AGI') : 0; } catch (e) { extra.agi = 0; }
       { const A = MV.aim; if (isHold && A && A.s === pre && A.i === i) { want = angTo(x, z, wx(A.x), wz(A.y)); extra.quick = 1; } }                // B3 차기 전: 차는 방향으로 몸 정렬
       if (!isHold && MV.jk && MV.jk[pre + i] > MV.t) { const sg = (wz(by) - z) * (atkDir(pre) > 0 ? 1 : -1) > 0 ? 1 : -1; want = toBall + sg * Math.PI / 4; extra.jockey = 1; }   // B6 옆으로 선 지연 자세(터치라인 쪽을 열어 줌)
+      if (r.st.kYT > 0) { r.st.kYT -= dt; if (!isHold || r.st.kick > 0) { want = r.st.kYaw; extra.quick = 2; } }   // 킥 직후: 찬 방향 유지
       if (thr && thr.s === pre && thr.tk === i) { extra.throw = true; extra.throwT = clamp((thr.t || 0) / (thr.dur || 1.5), 0, 1); want = toBall; }
       place(r, c.x, c.y, c.vx || 0, c.vy || 0, dt, bx, by, extra, want); if (r.me) meR = r;
     });
@@ -494,6 +498,8 @@ const V3D = (() => {
       const rr = recv && R.pl[recv.s] && R.pl[recv.s][recv.i];
       if (rr && act && act.d0) { const p = rr.root.position, fx = p.x + Math.sin(rr.st.yaw) * .5, fz = p.z + Math.cos(rr.st.yaw) * .5, dist = Math.hypot(bp.x - fx, bp.z - fz); if (dist < 3) { const k = 1 - dist / 3; bp.x += (fx - bp.x) * k; bp.z += (fz - bp.z) * k; } }
     }
+    if (R.bPrev && !rpA) { const dx = bp.x - R.bPrev.x, dz = bp.z - R.bPrev.z, d = Math.hypot(dx, dz), cap = (act ? 95 : 38) * Math.min(dt, .1) + .05;   // 안전장치: 공이 한 프레임에 크게 건너뛰면(주인 바뀜 등) 순간이동 대신 빠르게 굴러가게
+      if (d > cap) { const k = cap / d; bp.x = R.bPrev.x + dx * k; bp.z = R.bPrev.z + dz * k; bp.y = Math.max(BR, R.bPrev.y + (bp.y - R.bPrev.y) * k); (R.bJump = (R.bJump || 0) + 1); } }
     R.ballZ = bp.y - BR;
     if (R.bPrev) { const dx = bp.x - R.bPrev.x, dz = bp.z - R.bPrev.z, d = Math.hypot(dx, dz); if (d > 1e-4 && d < 5) R.ball.rotateOnWorldAxis(new THREE.Vector3(dz, 0, -dx).normalize(), d / BR); }
     R.bPrev = bp.clone(); R.ball.position.copy(bp);

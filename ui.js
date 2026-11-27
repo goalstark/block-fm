@@ -789,7 +789,7 @@ function retarget(M) {
     });
   };
   place('m'); place('o');
-  if (MV.cele || MV.regroup > 0) applyCele(M); else if (MV.sp) applySp(M);
+  if (MV.cele || MV.regroup > 0 || (MV.goalRes && !MV.intro && !MV.pg)) applyCele(M); else if (MV.sp) applySp(M);   // 킥오프 대기 중엔 모두 자기 진영 킥오프 자리로
   if (MV.pg) pgTargets(M);
   if (MV.force) for (const k in MV.force) { const F = MV.force[k], tg = MV.tgt[k[0]]; if (tg && tg[+k.slice(1)]) tg[+k.slice(1)] = { x: F.x, y: F.y, sprint: !MV.introWalk }; }   // 장면 진입: 목표 위치로 전력 질주
   if (MV.offRun) { const R = MV.offRun, q = MV.pos[R.s][R.i], tg = MV.tgt[R.s]; if (MV.t - R.t > 5 || !q || MV.poss !== R.s || MV.sp || MV.pg) MV.offRun = null; else if (tg && tg[R.i]) { const d = R.s === 'm' ? dM_(M) : -dM_(M); tg[R.i] = { x: d > 0 ? R.u : 100 - R.u, y: q.y, sprint: true }; } }   // 엔진 오프사이드용 이른 침투
@@ -800,7 +800,7 @@ function applyCele(M) {                                   // 골 세레머니·�
   for (const pre of ['m', 'o']) sideOf(pre).forEach((p, i) => {
     if (!MV.tgt[pre][i]) return;
     const f = fxy(pre, i), fx = D[pre] > 0 ? f[0] : 100 - f[0], fy = f[1] * 0.64;
-    if (!C) { MV.tgt[pre][i] = { x: fx, y: fy, sprint: true }; return; }
+    if (!C) { const k = koXY(M, pre, i); MV.tgt[pre][i] = { x: k.x, y: k.y, sprint: true }; return; }
     if (pre === C.s && i === C.si) MV.tgt[pre][i] = { x: C.cx, y: C.cy, sprint: true };
     else if (pre === C.s && i > 0) { const sc = MV.pos[pre][C.si] || { x: C.cx, y: C.cy }, a = i * 0.85, r = 2.6 + (i % 3) * 0.9; MV.tgt[pre][i] = { x: c01(sc.x + Math.cos(a) * r, 2.5, 97.5), y: c01(sc.y + Math.sin(a) * r, 3, 61), sprint: true }; }
     else MV.tgt[pre][i] = { x: fx, y: fy, sprint: false };
@@ -808,9 +808,13 @@ function applyCele(M) {                                   // 골 세레머니·�
 }
 function movePitch() { const M = G0().mm; if (!M || !MV || !MV.pos) return; retarget(M); if (!MV.raf) MV.raf = requestAnimationFrame(frame); }
 function lbl(t) { if (MV) MV.lbl = { t, l: 1 }; }
-function resetPos(M) { const dM = dM_(M); const f = (st, pre, d) => st.forEach((p, i) => { const b = fxy(pre, i), c = MV.pos[pre][i], ko = koSpot(M, pre, i); if (c) { c.x = ko ? ko.x : d > 0 ? b[0] : 100 - b[0]; c.y = ko ? ko.y : b[1] * 0.64; c.vx = c.vy = 0; } }); f(MV.mst, 'm', dM); f(MV.ost, 'o', -dM); MV.run = {}; }
+function koXY(M, pre, i) {                                                                // 킥오프 대형: 모두 자기 진영, 킥오프 안 하는 팀은 센터서클 밖
+  const d = pre === 'm' ? dM_(M) : -dM_(M), b = fxy(pre, i), y = b[1] * 0.64, kick = MV && MV.goalRes ? MV.goalRes === pre : true; let u = Math.min(b[0], 47.5);
+  if (!kick && Math.abs(y - 32) < 9.6) u = Math.min(u, 50 - Math.sqrt(9.6 * 9.6 - (y - 32) * (y - 32)));
+  return { x: d > 0 ? u : 100 - u, y }; }
+function resetPos(M) { const f = (st, pre) => st.forEach((p, i) => { const c = MV.pos[pre][i], ko = koSpot(M, pre, i) || koXY(M, pre, i); if (c) { c.x = ko.x; c.y = ko.y; c.vx = c.vy = 0; } }); f(MV.mst, 'm'); f(MV.ost, 'o'); MV.run = {}; }
 function koSpot(M, pre, i) { if (!MV || MV.goalRes !== pre || MV.pg || i !== Math.min(6, sideOf(pre).length - 1)) return null; const d = pre === 'm' ? dM_(M) : -dM_(M); return { x: 50 - d * 0.9, y: 32 }; }   // 킥오프 차는 선수는 공 바로 뒤
-function kickoffTargets(M) { const dM = dM_(M), F = {}; for (const pre of ['m', 'o']) { const d = pre === 'm' ? dM : -dM; sideOf(pre).forEach((p, i) => { const b = fxy(pre, i); F[pre + i] = koSpot(M, pre, i) || { x: d > 0 ? b[0] : 100 - b[0], y: b[1] * 0.64 }; }); } return F; }
+function kickoffTargets(M) { const F = {}; for (const pre of ['m', 'o']) sideOf(pre).forEach((p, i) => { F[pre + i] = koSpot(M, pre, i) || koXY(M, pre, i); }); return F; }
 function walkToKickoff(M, done, maxMs) {                                                  // 선수들이 실제로 걸어서 킥오프 위치로 이동 → 다 도착하면 시작
   MV.force = kickoffTargets(M); MV.introWalk = false; MV.paused = true; MV.regWalk = true; const t0 = nowR(), F0 = MV.force;
   const chk = () => { if (!MV || MV.over || MV.force !== F0) { if (MV) MV.regWalk = false; return; } let ok = true;
@@ -877,14 +881,14 @@ function shoot(M, out, sty) {
   const h = MV.holder, s = h.s, d = s === 'm' ? dM_(M) : -dM_(M), os = s === 'm' ? 'o' : 'm', cur = MV.pos[s][h.i], gx = d > 0 ? 99 : 1;
   let t = { x: gx, y: 32 }, to = null;
   if (out === 'goal') t = { x: gx, y: 32 + (rnd2() < 0.5 ? -1 : 1) * (2 + rnd2() * 3) };
-  else if (out === 'wide') t = { x: gx, y: 32 + (rnd2() < 0.5 ? -1 : 1) * (9 + rnd2() * 5) };
+  else if (out === 'wide') { const g0 = Math.hypot(100 - uOf(cur.x, d), cur.y - 32); t = { x: gx, y: 32 + (rnd2() < 0.5 ? -1 : 1) * (4 + rnd2() * clampN(g0 * 0.22, 1.5, 7)) }; }   // 빗나감: 가까울수록 골대 바로 옆(가까이서 코너 쪽으로 차는 일 없게)
   else if (out === 'post') t = { x: gx, y: 32 + (rnd2() < 0.5 ? -1 : 1) * 4.2 };
   else if (out === 'save') t = { x: MV.pos[os][0].x, y: MV.pos[os][0].y };
-  else { let bi = -1, bd = 1e9; MV.pos[os].forEach((q, i) => { if (i === 0 || !q || MV.red[os + i]) return; const dd = Math.hypot(q.x - cur.x, q.y - cur.y); if (dd < bd) { bd = dd; bi = i; } }); if (bi < 0) { out = 'wide'; t = { x: gx, y: 32 + 10 }; } else to = { s: os, i: bi }; }
+  else { let bi = -1, bd = 1e9; MV.pos[os].forEach((q, i) => { if (i === 0 || !q || MV.red[os + i]) return; const dd = Math.hypot(q.x - cur.x, q.y - cur.y); if (dd < bd) { bd = dd; bi = i; } }); if (bi < 0) { out = 'wide'; t = { x: gx, y: 32 + 5 }; } else to = { s: os, i: bi }; }
   let eh = 0.4 + rnd2() * 1.4;                                                   // 슛이 골문에 도착하는 높이(화면용)
   if (!sty && !MV.pg) { const u1 = uOf(cur.x, d), g1 = Math.hypot(100 - u1, cur.y - 32), hiB = MV.rcvHi > 0 && MV.t - MV.rcvHi < 0.5; const r = rnd2();
     sty = hiB ? (r < 0.6 ? 'header' : 'volley') : g1 > 22 ? (r < 0.4 ? 'knuckle' : r < 0.75 ? 'curve' : 'drive') : g1 < 9 ? (r < 0.5 ? 'tap' : 'first') : (r < 0.25 ? 'chip' : r < 0.5 ? 'curve' : r < 0.75 ? 'low' : null); }
-  if (out === 'wide' && rnd2() < 0.45) { eh = 3.1 + rnd2() * 1.6; t.y = 32 + (rnd2() * 2 - 1) * 5; }               // 골대 위로 날아감
+  if (out === 'wide' && rnd2() < 0.45) { eh = 3.1 + rnd2() * 1.6; t.y = 32 + (rnd2() * 2 - 1) * 3; }               // 골대 위로 날아감
   else if (out === 'wide') eh = 0.3 + rnd2() * 1.4;
   if (out === 'post') { if (rnd2() < 0.45) { eh = 2.44; t.y = 32 + (rnd2() * 2 - 1) * 3; } else eh = 0.4 + rnd2() * 1.8; }   // 크로스바 / 좌우 기둥
   if (out === 'save') eh = 0.25 + rnd2() * 2.0; if (out === 'block') eh = 0.6;
@@ -1274,7 +1278,9 @@ function frame(ts) {
     if ((!MV.paused || MV.pg) && !MV.over && !MV.momentOpen && !MV.aim && !MV.intro) { MV.dec -= dt * (1 + 0.14 * (TK((MV.holder && MV.holder.s) || MV.poss).tempo - 1)); if (MV.dec <= 0) decide(M); }
   }
   if ((MV.goalRes || MV.regWalk || MV.htWait) && !MV.act && !MV.sp && !MV.pen && !MV.so && !MV.pg) { if (MV.goalRes && !MV.momentOpen) { MV.holder = null; MV.rs = null; } const gx = 50 - b.x, gy = 32 - b.y, gd = Math.hypot(gx, gy); if (gd > 0.05) { const st = Math.min(gd, Math.max(20, gd * 1.6) * realDt); b.x += gx / gd * st; b.y += gy / gd * st; } }   // 킥오프 대기: 공이 가운데로 돌아감
-  if (MV.goalRes && !MV.paused && !MV.act && !MV.momentOpen && (() => { const ki = Math.min(6, sideOf(MV.goalRes).length - 1), kq = MV.pos[MV.goalRes][ki]; MV.koW = (MV.koW || 0) + realDt; return (Math.hypot(b.x - 50, b.y - 32) < 1 && kq && Math.hypot(kq.x - 50, kq.y - 32) < 2.2) || MV.koW > 3; })()) {
+  if (MV.goalRes && !MV.paused && !MV.act && !MV.momentOpen && (() => { const ki = Math.min(6, sideOf(MV.goalRes).length - 1), kq = MV.pos[MV.goalRes][ki], qk = MV.fast || MV.skipping || MV.hlFast; if (!qk && (MV.cele || MV.regroup > 0)) return false; MV.koW = (MV.koW || 0) + realDt;   // 세레머니 끝난 뒤부터 잼
+      const home = qk || ['m', 'o'].every(pre => { const d = pre === 'm' ? dM_(M) : -dM_(M); return MV.pos[pre].every((c, i) => !c || MV.red[pre + i] || (d > 0 ? c.x : 100 - c.x) <= 50.6); });   // 모두 자기 진영으로 돌아온 뒤 킥오프
+      const ok = Math.hypot(b.x - 50, b.y - 32) < 1 && kq && Math.hypot(kq.x - 50, kq.y - 32) < 2.2 && home; if (!ok && MV.koW > (qk ? 3 : 8)) { cntAdd('koFb'); return true; } return ok; })()) {
     const s = MV.goalRes, st = sideOf(s); MV.goalRes = null; MV.koW = 0; MV.cele = null; MV.regroup = 0; b.x = 50; b.y = 32; MV.holder = { s, i: Math.min(6, st.length - 1) }; MV.poss = s; MV.dec = 0.45; MV.kick = 0.7; MV.fin = 0; retarget(M); }
   const els = MV.els || (MV.els = { m: MV.mst.map((_, i) => document.getElementById('m' + i)), o: MV.ost.map((_, i) => document.getElementById('o' + i)) });
   for (const pre of ['m', 'o']) els[pre].forEach((el, i) => { const c = MV.pos[pre][i]; if (!el || !c) return; const sp = Math.hypot(c.vx, c.vy), bob = Math.abs(Math.sin(MV.t * 11 + i * 1.3)) * Math.min(0.6, sp / 25);
