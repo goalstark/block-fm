@@ -445,37 +445,138 @@ function fsApply() { document.documentElement.style.setProperty('--fs', String(f
 fsApply();
 
 // ================= 소리 (WebAudio 합성 · 외부 파일 없음) =================
-const SND = { ctx: null, master: null, sfx: true, bgm: true, tm: null, nx: 0, st: 0 };
+const SND = { ctx: null, master: null, fx: null, rev: null, sfx: true, bgm: true, tm: null, nx: 0, st: 0, nb: {}, amb: null };
 (function () { try { SND.sfx = localStorage.getItem('bfm_sfx') !== '0'; SND.bgm = localStorage.getItem('bfm_bgm') !== '0'; } catch (e) {} })();
+// ===== 소리: 파일 없이 기기에서 직접 합성(오프라인). 경기장 잔향 + 리미터 + 관중(웅성임·함성·탄식·박수·야유) + 실제 같은 휘슬·킥·골대·골망 =====
 function sndCtx() {
   if (SND.ctx) return SND.ctx;
-  try { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; SND.ctx = new AC(); SND.master = SND.ctx.createGain(); SND.master.gain.value = 0.6; SND.master.connect(SND.ctx.destination); } catch (e) { SND.ctx = null; }
+  try { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; const c = SND.ctx = new AC();
+    const lim = c.createDynamicsCompressor(); lim.threshold.value = -12; lim.knee.value = 8; lim.ratio.value = 10; lim.attack.value = 0.003; lim.release.value = 0.25; lim.connect(c.destination);
+    SND.master = c.createGain(); SND.master.gain.value = 0.6; SND.master.connect(lim);
+    SND.fx = c.createGain(); SND.fx.gain.value = 1; SND.fx.connect(SND.master);
+    try { const rv = c.createConvolver(), rg = c.createGain(); rv.buffer = sndIR(c, 1.9); rg.gain.value = 0.5; rv.connect(rg); rg.connect(SND.master); SND.rev = rv; } catch (e) { SND.rev = null; }
+  } catch (e) { SND.ctx = null; }
   return SND.ctx;
 }
-function tone(f, t0, d, type, vol, fEnd, dest) {
+function sndIR(c, dur) {                                                                    // 경기장 잔향(지붕·관중석에 부딪혀 퍼지는 울림)
+  const n = Math.floor(c.sampleRate * dur), b = c.createBuffer(2, n, c.sampleRate);
+  for (let ch = 0; ch < 2; ch++) { const d = b.getChannelData(ch); for (let i = 0; i < n; i++) { const x = i / n; d[i] = (Math.random() * 2 - 1) * Math.pow(1 - x, 2.4) * (i < c.sampleRate * 0.012 ? i / (c.sampleRate * 0.012) : 1); }
+    for (const [ms, g] of [[23, 0.5], [41, 0.35], [67, 0.28], [97, 0.2]]) { const k = Math.floor(c.sampleRate * ms / 1000) + ch * 37; if (k < n) d[k] += g * (ch ? -1 : 1); } }
+  return b;
+}
+function sndNoise(kind) {                                                                   // 잡음 버퍼(한 번 만들어 재사용): white / pink / babble(웅성임) / clap(박수)
+  if (SND.nb[kind]) return SND.nb[kind];
+  const c = SND.ctx, sr = c.sampleRate, len = kind === 'babble' ? 7 : kind === 'clap' ? 3 : 2.5, n = Math.floor(sr * len), b = c.createBuffer(kind === 'babble' || kind === 'clap' ? 2 : 1, n, sr);
+  for (let ch = 0; ch < b.numberOfChannels; ch++) { const d = b.getChannelData(ch);
+    if (kind === 'white') for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    else if (kind === 'pink' || kind === 'babble') { let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0;
+      for (let i = 0; i < n; i++) { const w = Math.random() * 2 - 1; b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852; b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898; d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + w * 0.5362) * 0.11; }
+      if (kind === 'babble') { const V = 26, env = new Float32Array(n); for (let v = 0; v < V; v++) { let t = Math.floor(Math.random() * sr * 0.3); const gv = 0.4 + Math.random() * 0.6;   // 여러 사람이 말하는 음절 리듬(초당 3~6음절)
+          while (t < n) { const sl = Math.floor(sr * (0.09 + Math.random() * 0.16)), gap = Math.floor(sr * (Math.random() < 0.2 ? 0.4 + Math.random() * 0.8 : 0.03 + Math.random() * 0.08)); for (let k = 0; k < sl && t + k < n; k++) env[t + k] += gv * Math.sin(Math.PI * k / sl); t += sl + gap; } }
+        let mx = 0; for (let i = 0; i < n; i++) mx = Math.max(mx, env[i]); for (let i = 0; i < n; i++) d[i] *= 0.35 + 0.65 * env[i] / (mx || 1);
+        const fd = Math.floor(sr * 0.2); for (let i = 0; i < fd; i++) { const g = i / fd; d[i] = d[i] * g + d[n - fd + i] * (1 - g); } } }   // 이음매 없이 반복되게
+    else if (kind === 'clap') { for (let i = 0; i < n; i++) d[i] = 0; const N = Math.floor(len * 90);   // 수십 명이 치는 박수
+      for (let k = 0; k < N; k++) { const t0 = Math.floor(Math.random() * (n - sr * 0.03)), L = Math.floor(sr * (0.006 + Math.random() * 0.012)), g = 0.25 + Math.random() * 0.75; for (let j = 0; j < L; j++) d[t0 + j] += g * (Math.random() * 2 - 1) * Math.exp(-j / (L * 0.3)); }
+      let mx = 0; for (let i = 0; i < n; i++) mx = Math.max(mx, Math.abs(d[i])); for (let i = 0; i < n; i++) d[i] /= (mx || 1) * 1.3; } }
+  return (SND.nb[kind] = b);
+}
+function sndOut(node, dry, wet) { const c = SND.ctx; if (dry !== 0) { const g = c.createGain(); g.gain.value = dry == null ? 1 : dry; node.connect(g); g.connect(SND.fx); } if (wet && SND.rev) { const g = c.createGain(); g.gain.value = wet; node.connect(g); g.connect(SND.rev); } }
+function sndNz(kind, t0, d, o) {                                                               // 걸러 낸 잡음 한 덩어리: o = { f, f2, q, type, vol, a(어택), r(잔향 보냄), pan, off(버퍼 시작) }
+  const c = SND.ctx, src = c.createBufferSource(); src.buffer = sndNoise(kind); src.loop = true;
+  const f = c.createBiquadFilter(); f.type = o.type || 'bandpass'; f.frequency.setValueAtTime(o.f || 1000, t0); if (o.f2) f.frequency.exponentialRampToValueAtTime(o.f2, t0 + d); f.Q.value = o.q == null ? 0.8 : o.q;
+  const g = c.createGain(), a = o.a == null ? 0.005 : o.a, v = o.vol || 0.2; g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(v, t0 + a); if (o.hold) g.gain.setValueAtTime(v, t0 + a + o.hold); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+  src.connect(f); f.connect(g); let out = g; if (o.pan != null && c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = o.pan; g.connect(p); out = p; }
+  sndOut(out, o.dry, o.r); src.start(t0, o.off != null ? o.off : Math.random() * 2); src.stop(t0 + d + 0.05); return g;
+}
+function sndOsc(f, t0, d, o) {                                                                  // 짧은 음: o = { type, vol, f2, a, r }
+  const c = SND.ctx, x = c.createOscillator(), g = c.createGain(); x.type = o.type || 'sine'; x.frequency.setValueAtTime(f, t0); if (o.f2) x.frequency.exponentialRampToValueAtTime(o.f2, t0 + d);
+  const a = o.a == null ? 0.003 : o.a; g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(o.vol || 0.1, t0 + a); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+  x.connect(g); sndOut(g, o.dry, o.r); x.start(t0); x.stop(t0 + d + 0.05); return x;
+}
+function tone(f, t0, d, type, vol, fEnd, dest) {                                            // 메뉴 배경음악용(그대로)
   const c = SND.ctx, o = c.createOscillator(), g = c.createGain(); o.type = type || 'square'; o.frequency.setValueAtTime(f, t0);
   if (fEnd) o.frequency.exponentialRampToValueAtTime(fEnd, t0 + d);
   g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d); o.connect(g); g.connect(dest || SND.master); o.start(t0); o.stop(t0 + d + 0.03);
 }
-function noiseBurst(t0, d, vol, fc, fEnd) {
-  const c = SND.ctx, n = Math.max(1, Math.floor(c.sampleRate * d)), buf = c.createBuffer(1, n, c.sampleRate), ch = buf.getChannelData(0);
-  for (let i = 0; i < n; i++) ch[i] = Math.random() * 2 - 1;
-  const src = c.createBufferSource(); src.buffer = buf; const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.setValueAtTime(fc, t0); if (fEnd) f.frequency.linearRampToValueAtTime(fEnd, t0 + d); f.Q.value = 0.8;
-  const g = c.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(vol, t0 + Math.min(0.25, d * 0.3)); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
-  src.connect(f); f.connect(g); g.connect(SND.master); src.start(t0);
+function sndWhistle(t0, segs) {                                                             // 주심 호루라기: 굴러가는 구슬 떨림(FM) + 숨소리
+  const c = SND.ctx; let t = t0;
+  for (const [d, gap] of segs) { const x = c.createOscillator(), m = c.createOscillator(), mg = c.createGain(), g = c.createGain(); x.type = 'sine'; x.frequency.value = 3050 + Math.random() * 120;
+    m.type = 'sine'; m.frequency.value = 38 + Math.random() * 14; mg.gain.value = 210; m.connect(mg); mg.connect(x.frequency);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.11, t + 0.018); g.gain.setValueAtTime(0.1, t + d - 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    x.connect(g); sndOut(g, 1, 0.35); x.start(t); m.start(t); x.stop(t + d + 0.05); m.stop(t + d + 0.05);
+    sndNz('white', t, d, { type: 'highpass', f: 2600, q: 0.5, vol: 0.025, a: 0.01, hold: Math.max(0, d - 0.06) }); t += d + gap; }
 }
-function sfx(n) {
-  if (!SND.sfx) return; const c = sndCtx(); if (!c) return; try { if (c.state === 'suspended') c.resume(); const t = c.currentTime;
-    if (n === 'click') tone(740, t, 0.05, 'square', 0.04, 620);
-    else if (n === 'goal') { noiseBurst(t, 1.9, 0.35, 700, 1500); [523, 659, 784, 1047].forEach((f, i) => tone(f, t + i * 0.09, 0.22, 'triangle', 0.16)); }
-    else if (n === 'goalopp') { noiseBurst(t, 1.2, 0.18, 500, 300); tone(330, t, 0.5, 'sawtooth', 0.07, 150); }
-    else if (n === 'whistle') { tone(2900, t, 0.16, 'sine', 0.13); tone(2900, t + 0.22, 0.4, 'sine', 0.13, 2700); }
-    else if (n === 'save') { noiseBurst(t, 0.18, 0.25, 1800); tone(220, t, 0.14, 'triangle', 0.1, 120); }
-    else if (n === 'shot') { noiseBurst(t, 0.12, 0.2, 900); tone(160, t, 0.1, 'triangle', 0.09, 90); }
-    else if (n === 'coin') { tone(988, t, 0.09, 'square', 0.06); tone(1319, t + 0.09, 0.22, 'square', 0.06); }
-    else if (n === 'crowd') { noiseBurst(t, 2.6, 0.2, 500, 1100); noiseBurst(t + 0.6, 2.0, 0.14, 900, 1400); }
-    else if (n === 'trophy') { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, t + i * 0.12, 0.3, 'triangle', 0.14)); noiseBurst(t + 0.4, 1.6, 0.25, 900, 1600); }
+function sndCrowdVowel(t0, d, v, o) {                                                       // 관중 목소리 덩어리: 모음 포먼트(오/아/에)로 걸러 낸 잡음 — 함성·탄식·야유의 재료
+  const F = { oo: [320, 800], ah: [760, 1220], eh: [520, 1750], boo: [260, 620] }[v] || [600, 1100], k = o.shift || 1, V = (o.vol || 0.2) * 3.5;   // 좁은 대역이라 에너지가 작아 크게 키움
+  sndNz('pink', t0, d, Object.assign({ f: F[0], f2: F[0] * k, q: 2.2, a: o.a || 0.25 }, o, { vol: V }));
+  sndNz('pink', t0, d, Object.assign({ f: F[1], f2: F[1] * k, q: 2.6, a: o.a || 0.25 }, o, { vol: V * 0.6 }));
+  sndNz('babble', t0, d, { f: (F[0] + F[1]) / 2, q: 0.6, vol: V * 0.45, a: o.a || 0.25, hold: o.hold, r: o.r, pan: o.pan });
+}
+function sndRoar(t0, d, vol, pan) {                                                         // 골 함성: 확 터졌다가 길게 이어지는 환호 + 박수
+  sndCrowdVowel(t0, d, 'ah', { vol, a: 0.18, hold: d * 0.45, r: 0.5, pan, shift: 1.25 });
+  sndCrowdVowel(t0 + 0.05, d * 0.9, 'eh', { vol: vol * 0.7, a: 0.25, hold: d * 0.35, r: 0.5, pan: pan == null ? null : -pan * 0.5 });
+  sndNz('pink', t0, d, { f: 2400, q: 0.7, vol: vol * 1.2, a: 0.2, hold: d * 0.4, r: 0.4 });
+  sndNz('clap', t0 + d * 0.35, d * 0.9, { type: 'highpass', f: 900, q: 0.4, vol: vol * 1.1, a: 0.4, hold: d * 0.3, r: 0.4 });
+}
+function sndKick(t0, p) {                                                                   // 킥: 공을 찬 둔탁한 소리(세기에 따라 패스·슛·롱볼)
+  sndOsc(150 - p * 40, t0, 0.07 + p * 0.08, { f2: 48, vol: 0.18 + p * 0.32, r: 0.08 + p * 0.15 });
+  sndNz('white', t0, 0.03 + p * 0.03, { f: 1800 - p * 500, q: 0.9, vol: 0.06 + p * 0.14, a: 0.001, r: 0.05 + p * 0.1 });
+}
+function sfx(n, x) {
+  if (!SND.sfx) return; if (MV && (MV.skipping || MV.fast) && n !== 'whistleEnd' && n !== 'click') return; const c = sndCtx(); if (!c) return; try { if (c.state === 'suspended') c.resume(); const t = c.currentTime + 0.01;
+    if (n === 'click') { sndOsc(880, t, 0.05, { f2: 640, vol: 0.05, dry: 1 }); sndNz('white', t, 0.015, { f: 3000, vol: 0.015, a: 0.001 }); }
+    else if (n === 'kick') sndKick(t, x == null ? 0.3 : x);
+    else if (n === 'shot') sndKick(t, 1);
+    else if (n === 'head') { sndOsc(210, t, 0.07, { f2: 95, vol: 0.2, r: 0.08 }); sndNz('white', t, 0.03, { f: 700, vol: 0.08, a: 0.001 }); }
+    else if (n === 'whistle') sndWhistle(t, [[0.32, 0]]);
+    else if (n === 'whistleFoul') sndWhistle(t, [[0.42, 0]]);
+    else if (n === 'whistleHalf') sndWhistle(t, [[0.32, 0.12], [0.75, 0]]);
+    else if (n === 'whistleEnd') { sndWhistle(t, [[0.33, 0.12], [0.33, 0.12], [1.05, 0]]); sndRoar(t + 1.9, 3.2, 0.12); }
+    else if (n === 'post') { for (const [f, d, v] of [[412, 1.1, 0.07], [1068, 0.9, 0.06], [1842, 0.7, 0.045], [2961, 0.5, 0.03], [4120, 0.35, 0.02]]) sndOsc(f, t, d, { vol: v, r: 0.3 }); sndKick(t, 0.4); sndCrowdVowel(t + 0.15, 1.7, 'oo', { vol: 0.16, a: 0.3, shift: 0.8, r: 0.4 }); }
+    else if (n === 'miss') sndCrowdVowel(t, 1.6, 'oo', { vol: 0.15, a: 0.25, shift: 0.78, r: 0.4 });
+    else if (n === 'save') { sndNz('white', t, 0.07, { f: 1300, q: 0.7, vol: 0.22, a: 0.001, r: 0.15 }); sndOsc(120, t, 0.09, { f2: 60, vol: 0.2 }); sndCrowdVowel(t + 0.1, 1.5, 'ah', { vol: 0.12, a: 0.2, shift: 0.85, r: 0.4 }); sndNz('clap', t + 0.5, 1.6, { type: 'highpass', f: 900, vol: 0.08, a: 0.3, r: 0.3 }); }
+    else if (n === 'block') { sndOsc(130, t, 0.08, { f2: 70, vol: 0.2 }); sndNz('white', t, 0.04, { f: 900, vol: 0.1, a: 0.001 }); sndCrowdVowel(t + 0.1, 1.0, 'oo', { vol: 0.08, a: 0.2, shift: 0.85, r: 0.3 }); }
+    else if (n === 'goalH') { sndNz('white', t, 0.45, { f: 3200, f2: 1400, q: 0.6, vol: 0.12, a: 0.01, r: 0.2 }); sndRoar(t + 0.05, 5.5, (x && x.big) ? 0.34 : 0.28, -0.1); }   // 홈 팀 골: 골망 + 경기장 전체 함성
+    else if (n === 'goalA') { sndNz('white', t, 0.45, { f: 3200, f2: 1400, q: 0.6, vol: 0.12, a: 0.01, r: 0.2 }); sndRoar(t + 0.05, 3.6, 0.12, 0.7); sndCrowdVowel(t + 0.1, 2.0, 'oo', { vol: 0.12, a: 0.2, shift: 0.7, r: 0.4, pan: -0.3 }); }   // 원정 팀 골: 원정석만 환호 + 홈 관중 탄식
+    else if (n === 'goal') sfx('goalH', x); else if (n === 'goalopp') sfx('goalA', x);
+    else if (n === 'boo') { sndCrowdVowel(t, 2.2, 'boo', { vol: 0.13, a: 0.3, hold: 0.8, shift: 0.95, r: 0.4 }); }
+    else if (n === 'card') { sndWhistle(t, [[0.42, 0]]); sndCrowdVowel(t + 0.4, 2.0, 'boo', { vol: x === 'r' ? 0.18 : 0.1, a: 0.3, hold: 0.6, r: 0.4 }); }
+    else if (n === 'varNo') { sndCrowdVowel(t, 2.4, 'boo', { vol: 0.16, a: 0.2, hold: 0.8, r: 0.4 }); }
+    else if (n === 'coin') { sndOsc(1319, t, 0.25, { vol: 0.05, r: 0.1 }); sndOsc(2637, t, 0.18, { vol: 0.02 }); sndOsc(1760, t + 0.08, 0.35, { vol: 0.05, r: 0.15 }); sndOsc(3520, t + 0.08, 0.25, { vol: 0.018 }); }
+    else if (n === 'crowd') sndRoar(t, 3.2, 0.16);
+    else if (n === 'trophy') { [[262, 0], [330, 0.14], [392, 0.28], [523, 0.42], [392, 0.7], [523, 0.84]].forEach(([f, dt]) => { for (const m of [1, 1.004, 2]) sndOsc(f * m, t + dt, 0.55, { type: 'sawtooth', vol: m === 2 ? 0.012 : 0.03, a: 0.03, r: 0.3 }); }); sndRoar(t + 0.4, 4, 0.2); }
   } catch (e) {}
+}
+// ---- 경기 내내 깔리는 관중 소리: 웅성임(반복 버퍼) + 공이 위험 지역에 가까울수록 커짐 + 가끔 박수 응원 ----
+function sndAmb(M, dt) {
+  if (!SND.sfx || !MV) return; const c = sndCtx(); if (!c || c.state !== 'running') { if (c && c.state === 'suspended') { try { c.resume(); } catch (e) {} } return; }
+  let A = SND.amb;
+  if (!A) { A = SND.amb = { lv: 0, t: 0, nxChant: c.currentTime + 25 + Math.random() * 20, last: 0 };
+    A.g = c.createGain(); A.g.gain.value = 0.0001; sndOut(A.g, 1, 0.35);
+    const s1 = c.createBufferSource(); s1.buffer = sndNoise('babble'); s1.loop = true; const f1 = c.createBiquadFilter(); f1.type = 'bandpass'; f1.frequency.value = 650; f1.Q.value = 0.5; s1.connect(f1); f1.connect(A.g);
+    const s2 = c.createBufferSource(); s2.buffer = sndNoise('pink'); s2.loop = true; const f2 = c.createBiquadFilter(); f2.type = 'lowpass'; f2.frequency.value = 900; const g2 = c.createGain(); g2.gain.value = 0.5; s2.connect(f2); f2.connect(g2); g2.connect(A.g);
+    A.f1 = f1; A.src = [s1, s2]; s1.start(); s2.start(c.currentTime, 1.1);
+    A.wd = setInterval(() => { const B = SND.amb; if (!B) return; if (!SND.sfx || !MV || !S.matchOpen || document.visibilityState !== 'visible' || performance.now() - B.last > 700) sndAmbStop(); }, 300); }
+  A.last = performance.now();
+  let lv = (MV.big ? 0.15 : 0.11);                                                           // 기본 웅성임(빅매치는 더 큼)
+  if (MV.min > 0 && !MV.over && !MV.htWait) { const p = MV.poss, b = MV.ball; if (p && b) { const d = p === 'm' ? dM_(M) : -dM_(M), u = d > 0 ? b.x : 100 - b.x; lv += clampN((u - 62) / 30, 0, 1) * 0.1; } if (MV.pg) lv += 0.06; if (MV.pen) lv *= 0.55; }   // 공격이 상대 박스로 갈수록 커지고, PK 순간엔 숨죽임
+  if (MV.over || MV.htWait) lv *= 0.7; if (MV.setOpen || MV.exitAsk) lv *= 0.4;
+  if (Math.abs(lv - A.lv) > 0.004) { A.lv = lv; A.g.gain.setTargetAtTime(lv, c.currentTime, 0.6); A.f1.frequency.setTargetAtTime(560 + lv * 1600, c.currentTime, 0.8); }
+  if (!MV.over && !MV.pen && !MV.pg && !MV.htWait && MV.min > 0 && c.currentTime > A.nxChant) { A.nxChant = c.currentTime + 35 + Math.random() * 40; sndChant(c.currentTime + 0.05, MV.big ? 0.12 : 0.09); }
+}
+function sndChant(t0, v) {                                                                  // 홈 관중 박수 응원: 짝 짝 — 짝짝짝 — 헤이!
+  const pat = [0, 0.5, 1.25, 1.5, 1.75], bar = 2.3;
+  for (let r = 0; r < 3; r++) { for (const b of pat) sndNz('clap', t0 + r * bar + b, 0.16, { type: 'highpass', f: 1100, q: 0.5, vol: v, a: 0.004, r: 0.35, off: Math.random() * 2.5 });
+    sndCrowdVowel(t0 + r * bar + 2.05, 0.32, 'eh', { vol: v * 0.9, a: 0.03, r: 0.4 }); }
+}
+function sndAmbStop() { const A = SND.amb; if (!A) return; SND.amb = null; clearInterval(A.wd); try { const c = SND.ctx; A.g.gain.setTargetAtTime(0.0001, c.currentTime, 0.4); A.src.forEach(s => s.stop(c.currentTime + 2)); } catch (e) {} }
+function sndMatch(M, dt) {                                                                  // 매 프레임: 관중 소리 + 킥·슛 결과에 맞춘 소리(장면과 같은 순간에)
+  sndAmb(M, dt); if (!SND.sfx || !SND.ctx) return;
+  const a = MV.act, la = SND.la;
+  if (a !== la) { SND.la = a;
+    if (la && la.k === 'shot') { const o = la.out; if (o === 'post') sfx('post'); else if (o === 'wide') sfx('miss'); else if (o === 'save') sfx('save'); else if (o === 'block') sfx('block'); }   // 슛이 도착한 순간의 결과음
+    if (a && (a.k === 'pass' || a.k === 'shot') && a.from !== null) { if ((MV.bz || 0) > 1.1 || (a.h0 || 0) > 1) sfx('head'); else sfx(a.k === 'shot' ? 'shot' : 'kick', a.k === 'shot' ? 1 : clampN((a.sp || 40) / 70, 0.15, 0.75)); } }
+  const rc = MV.refCard; if (rc && rc !== SND.lc) { SND.lc = rc; sfx('card', rc.c); }
 }
 const BGM_CH = [[220, 261.6, 329.6], [174.6, 220, 261.6], [261.6, 329.6, 392], [196, 246.9, 293.7]];
 function bgmTick() {
@@ -897,7 +998,7 @@ function shoot(M, out, sty) {
   MV.act = { k: 'shot', tx: t.x, ty: t.y, sp: 56, out, s, to, eh, sty: sty || 'drive' }; MV.holder = null; lbl('슛!');
   const SY = SHOT_STY[sty]; if (SY) { MV.act.h0 = SY.h; MV.act.sp = SY.sp; if (SY.dev) MV.act.dev = SY.dev * (footOf(sideOf(s)[h.i]) === 'L' ? 1 : -1) * d; if (SY.cy != null && out === 'goal') MV.act.ty = 32 + (t.y > 32 ? 1 : -1) * SY.cy; lbl(SY.t); }
   if (MV.pg && MV.pg.ng) { chanceEnd(M, s, h.i, os); return; }
-  if (out !== 'goal') { PX.ui.sfx(out === 'save' ? 'save' : 'shot'); const nm = esc(sideOf(s)[h.i].name); MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${({ save: '골키퍼 선방', wide: '골대를 벗어남', block: '수비가 막아냄', post: '골대를 때림' })[out]}` }); }
+  if (out !== 'goal') { const nm = esc(sideOf(s)[h.i].name); MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${({ save: '골키퍼 선방', wide: '골대를 벗어남', block: '수비가 막아냄', post: '골대를 때림' })[out]}` }); }
 }
 const SHOT_STY = { header: { h: 1.0, sp: 60, t: '헤딩슛!' }, volley: { h: 2.0, sp: 68, t: '발리슛!' }, chip: { h: 3.4, sp: 36, t: '칩슛!', cy: 1.6 }, curve: { h: 1.6, sp: 54, t: '감아차기!', dev: 2.8 }, drive: { h: 1.3, sp: 82, t: '중거리 슛!' }, low: { h: 0.5, sp: 58, t: '땅볼 슛!' }, tap: { h: 0.4, sp: 34, t: '밀어 넣기!' }, overhead: { h: 2.6, sp: 56, t: '바이시클 킥!' }, first: { h: 0.7, sp: 66, t: '논스톱 슛!' }, knuckle: { h: 1.0, sp: 92, t: '무회전 슛!', dev: 0.9 } };
 // ===== 공격 전진·개인 행동 설정값(fm-detail-spec.md 출발값). 조정은 이 표의 숫자만 =====
@@ -1135,7 +1236,7 @@ function stepBall() { if (MV) MV.dec = Math.min(MV.dec == null ? 0.2 : MV.dec, 0
 function varSeq(steps) { let t = 0; steps.forEach(([html, cls, ms]) => { later(() => { if (MV && !MV.over && !MV.skipping) fxShow(html, cls, ms, true); }, t); t += ms; }); return t; }
 const pick3 = a => a[Math.floor(rnd2() * a.length)];
 const VAR_WHY = { off: '오프사이드', foul: '공격자 반칙', hand: '핸드볼' };
-function varOverturn(M, e, ms, out, min) {                                                  // 이미 기록된 골을 VAR로 실제 번복: 점수·득점/도움 기록에서 제거
+function varOverturn(M, e, ms, out, min) { if (MV && !MV.skipping && !MV.fast) PX.ui.sfx('varNo');                                                  // 이미 기록된 골을 VAR로 실제 번복: 점수·득점/도움 기록에서 제거
   const arr = ms ? M.evMine : M.evOpp, ix = arr.indexOf(e); if (ix >= 0) arr.splice(ix, 1);
   const team = ms ? M.mine : M.opp;
   out.push({ min, ic: '📺', cls: '', t: '<b>VAR 판독</b> — 골 취소' });
@@ -1156,7 +1257,8 @@ function goalFx(M) {
   pg.logs.forEach(o => { if (MV.min > o.min) o.min = MV.min; }); pg.logs.slice().reverse().forEach(o => MV.log.unshift(o)); MV.goalRes = pg.ms ? 'o' : 'm';
   { const stt = sideOf(pg.s), outf = stt.map((_, i) => i).filter(i => i > 0 && MV.pos[pg.s][i]); const si = pg.si > 0 && MV.pos[pg.s][pg.si] ? pg.si : outf[outf.length - 1], c = MV.pos[pg.s][si], dd = pg.s === 'm' ? dM_(M) : -dM_(M);
     MV.cele = { s: pg.s, si, t: 0, cx: dd > 0 ? 91 : 9, cy: c && c.y < 32 ? 6 : 58 }; MV.regroup = 0; }
-  PX.ui.sfx(pg.ms ? 'goal' : 'goalopp'); if (MV.big) setTimeout(() => PX.ui.sfx('crowd'), 250); fxShow(pg.html, pg.ms ? 'goal' : 'goal opp', 3100, true);
+  PX.ui.sfx(pg.ms === !!M.mineHome ? 'goalH' : 'goalA', { big: !!MV.big });   // 홈 팀 골이면 경기장 전체 함성, 원정 팀 골이면 원정석 환호 + 홈 탄식
+  fxShow(pg.html, pg.ms ? 'goal' : 'goal opp', 3100, true);
   if (MV.big && MV.big.k === 'derby') MV.log.unshift({ min: MV.min, ic: '🔥', cls: '', t: pg.ms ? pick3(['라이벌을 상대로 한 골! 홈 관중석이 폭발합니다!', '더비의 주인공이 나왔습니다! 서포터즈가 열광합니다!', '라이벌의 골문을 열었습니다! 관중석이 들썩입니다!']) : pick3(['라이벌에게 실점… 원정석만 환호합니다.', '더비에서 뼈아픈 실점입니다. 경기장이 조용해집니다.', '라이벌 서포터즈의 함성이 경기장을 뒤덮습니다.']) });
   if (!MV.skipping && !MV.fast && !MV.hlFast && MV.rb && MV.rb.length > 20) MV.rpWant = { f: MV.rb.slice(-42), ms: pg.ms, nm: pg.ev && pg.ev.sc ? pg.ev.sc.name : '' };
   PX.ui.render();
@@ -1197,6 +1299,7 @@ function frame(ts) {
       const [eh, ea] = scoreAt(MV.etOn ? 120 : 90), pks = MV.so ? `<div class="endt" style="font-size:14px">승부차기 ${M.mineHome ? MV.so.sm : MV.so.so} : ${M.mineHome ? MV.so.so : MV.so.sm}</div>` : ''; fxShow(`<div class="endt">경기 종료</div><div class="ends">${eh} : ${ea}</div>${pks}`, 'end', 3600000, false); PX.ui.move(); }
     return; }
   let dt = MV.last ? Math.min(0.05, MV.rawE || 0) : 0.016; MV.last = ts; const realDt = dt; dt *= tsOf();   // 연출 시간(같은 시계, 상한 0.05초) → 경기 시간은 배속 적용
+  try { if (!MV.skipping && !MV.fast && !MV.hlFast) sndMatch(M, realDt); } catch (e) {}
   if (MV.rp) { if (rpStep(M, realDt)) return; }
   if (MV.momentOpen && MV.settle > 0) MV.settle -= realDt; const hold = !!MV.momentOpen && !(MV.settle > 0), pdt = hold ? 0 : dt;
   if (MV.momentOpen && !MV.over) {                                                                  // 내 선택 장면: 선택하기 전에는 상대도 절대 진행하지 않는다 + 10초 제한(초과 시 무작위 선택)
@@ -1209,7 +1312,7 @@ function frame(ts) {
   if (!MV.over && MV.min > 0 && !hold) { if (MV.poss && MV.st[MV.poss]) MV.st[MV.poss].pt += dt; const mi0 = MV.myI == null ? (MV.myI = MV.mst.findIndex(p => p.me)) : MV.myI, mc = mi0 >= 0 && MV.pos.m[mi0]; if (mc) { const uu = uOf(mc.x, dM_(M)); MV.heat[Math.min(5, Math.floor(mc.y / 64 * 6)) * 10 + Math.min(9, Math.max(0, Math.floor(uu / 10)))] += dt; } }
   if (MV.pen && !MV.pen.shot && !MV.act && MV.pen.sx != null) { const bb = MV.ball, gx = MV.pen.sx - bb.x, gy = 32 - bb.y, gd = Math.hypot(gx, gy); if (gd > 0.05) { const st = Math.min(gd, Math.max(14, gd * 1.5) * realDt); bb.x += gx / gd * st; bb.y += gy / gd * st; } }   // PK 지점까지 공이 굴러감
   if (MV.sp && !MV.act) { const P0 = MV.sp, bb = MV.ball, gx = P0.sx - bb.x, gy = P0.sy - bb.y, gd = Math.hypot(gx, gy); if (gd > 0.05) { const v = Math.min(42, Math.max(16, gd / Math.max(0.25, (P0.dur || 1.9) * 0.6 - P0.t))), st = Math.min(gd, v * realDt); bb.x += gx / gd * st; bb.y += gy / gd * st; } }   // 세트피스 지점까지 공이 굴러감
-  if (MV.sp) { MV.sp.t += realDt; if (!MV.sp.wh && MV.sp.kind !== 'th' && MV.sp.t > (MV.sp.dur || 1.9) - 0.6) { MV.sp.wh = 1; PX.ui.sfx('whistle'); lbl('휘슬'); retarget(M); } if (MV.sp && MV.sp.t > (MV.sp.dur || 1.9) && (Math.hypot(MV.ball.x - MV.sp.sx, MV.ball.y - MV.sp.sy) < 0.6 || MV.sp.t > (MV.sp.dur || 1.9) + 6)) endSp(M); }   // 공이 지점에 도착하면 시작(다른 공 움직임 때문에 늦어도 순간이동 없이)
+  if (MV.sp) { MV.sp.t += realDt; if (!MV.sp.wh && MV.sp.kind !== 'th' && MV.sp.t > (MV.sp.dur || 1.9) - 0.6) { MV.sp.wh = 1; if (MV.sp.kind !== 'cn') PX.ui.sfx('whistle'); lbl('휘슬'); retarget(M); } if (MV.sp && MV.sp.t > (MV.sp.dur || 1.9) && (Math.hypot(MV.ball.x - MV.sp.sx, MV.ball.y - MV.sp.sy) < 0.6 || MV.sp.t > (MV.sp.dur || 1.9) + 6)) endSp(M); }   // 공이 지점에 도착하면 시작(다른 공 움직임 때문에 늦어도 순간이동 없이)
   MV.t += dt; MV.rt -= dt; if (MV.kick > 0) MV.kick -= dt; if (MV.pg) MV.pg.t += dt; if (MV.rt <= 0) { retarget(M); MV.rt = 0.22; }
   const all = [];
   for (const pre of ['m', 'o']) sideOf(pre).forEach((p, i) => {
@@ -1437,7 +1540,7 @@ function deadBall(M, o) {
   const wall = (type === 'fk' && gd < 30) ? (gd < 22 ? 5 : 4) : 0;
   MV.act = null; MV.rs = null; MV.holder = null; MV.dec = 99; MV.paused = true; MV.poss = s;   // 공은 frame에서 지점까지 굴러감(순간이동 없음)
   MV.sp = { s, tk, sx, sy, type: type === 'ifk' ? 'fk' : type, kind: type, gx, d, t: 0, wall, pgd: !!o.pgd, dur: type === 'th' ? 1.5 : wall ? 3.0 : 2.5, foot: footOf(sideOf(s)[tk]) };
-  MV.nsp = (MV.nsp || 0) + 1; (MV.cnt || (MV.cnt = {}))[type] = ((MV.cnt || {})[type] || 0) + 1; PX.ui.sfx('whistle'); lbl(DB_NM[type]); retarget(M);
+  MV.nsp = (MV.nsp || 0) + 1; (MV.cnt || (MV.cnt = {}))[type] = ((MV.cnt || {})[type] || 0) + 1; if (type === 'fk' || type === 'ifk') PX.ui.sfx('whistleFoul'); lbl(DB_NM[type]); retarget(M);
 }
 function applySp(M) {
   const P = MV.sp, os = P.s === 'm' ? 'o' : 'm', u0 = uOf(P.sx, P.d), box = P.kind === 'cn' || (P.kind !== 'th' && u0 > 58); let k = 0;
@@ -1595,7 +1698,7 @@ function penScene(M, o) {
   at(lead - 450, () => { P.run = true; retarget(M); });
   at(lead, () => {                                                                       // 슛: 골키퍼 다이빙 방향 결정
     P.dive = o.res === 'save' ? (shotY - 32) * 1.1 : (rnd2() < 0.6 ? -(shotY - 32) : (rnd2() < 0.5 ? -4 : 4)); retarget(M);
-    P.shot = 1; MV.act = { k: 'shot', tx: sp.gx, ty: shotY, sp: 62, out: o.res === 'goal' ? 'goal' : o.res, s: o.s, to: null }; PX.ui.sfx(o.res === 'save' ? 'save' : 'shot'); lbl('페널티킥!'); });
+    P.shot = 1; MV.act = { k: 'shot', tx: sp.gx, ty: shotY, sp: 62, out: o.res === 'goal' ? 'goal' : o.res, s: o.s, to: null }; lbl('페널티킥!'); });
   if (o.res !== 'goal' || o.so) at(lead + 1700, () => { MV.pen = null; if (o.done) o.done(); else if (!MV.pg && !MV.momentOpen && !MV.lead && !MV.talk) MV.paused = false; });
 }
 // 승부차기 계획: 승자(myWin)는 core가 결정, 킥 순서·성패는 규칙대로 생성
@@ -1633,7 +1736,7 @@ function soNext(M) {
     S0.i++; PX.ui.render(); later(() => soNext(M), 1300); } });
 }
 function soEnd(M) {
-  const S0 = MV.so; MV.pen = null; MV.pg = null; MV.paused = false; clearInterval(MV.timer); MV.over = true; PX.ui.sfx('whistle');
+  const S0 = MV.so; MV.pen = null; MV.pg = null; MV.paused = false; clearInterval(MV.timer); MV.over = true; PX.ui.sfx('whistleEnd');
   MV.log.unshift({ min: 120, ic: '🏆', cls: '', t: `<b>승부차기 ${S0.sm} : ${S0.so}</b> — ${esc(S0.sm > S0.so ? M.mine.name : M.opp.name)} 승리` }); finishLog(M); PX.ui.move(); PX.ui.render();
 }
 // 90분(또는 120분) 종료 처리. true = 경기 완전 종료
@@ -1648,7 +1751,7 @@ function fullTime(M, skip) {
     if (!skip) { startShootout(M); return false; }
     const plan = soPlan(MV.mst, MV.ost, M.xt.mineWins); M.xt.so = plan; MV.so = { plan, i: plan.seq.length, sm: plan.sm, so: plan.so };
     MV.log.unshift({ min: 120, ic: '🏆', cls: '', t: `<b>승부차기 ${plan.sm} : ${plan.so}</b> — ${esc(plan.sm > plan.so ? M.mine.name : M.opp.name)} 승리` }); }
-  clearInterval(MV.timer); MV.over = true; PX.ui.sfx('whistle'); finishLog(M); return true;
+  clearInterval(MV.timer); MV.over = true; PX.ui.sfx('whistleEnd'); finishLog(M); return true;
 }
 function offScreen(M, s, i) {                                                               // 화면에서 생긴 오프사이드(이른 침투에 패스): 깃발·기록·상대 프리킥. 엔진 골·결과와는 무관
   const p = sideOf(s)[i], team = s === 'm' ? M.mine : M.opp; if (!p) return; MV.aim = null;
@@ -1696,7 +1799,6 @@ function chanceEnd(M, s, i, os) { const pg = MV.pg; MV.pg = null; const team = s
   if (k === 'pt') { MV.log.unshift({ min: MV.min, ic: IC.post, cls: 'p', t: `${nm}의 슛, 골대를 강타!` }); fxShow(`<div class="gb">🥅</div><div class="gs">골대 강타!</div>`, 'save', 1000, false); }
   else if (k === 'sv') { MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${sl}` }); MV.log.unshift({ min: MV.min, ic: IC.glove, cls: 's', t: `<b>슈퍼세이브!</b> ${esc(gk ? gk.name : '골키퍼')} <span class="dim">${esc(oteam.name)}</span>` }); fxShow(`<div class="gb">🧤</div><div class="gs">슈퍼세이브</div>`, 'save', 1000, false); }
   else { MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${sl}` }); fxShow(sl === '골키퍼 선방' ? `<div class="gb">🧤</div><div class="gs">선방!</div>` : `<div class="gb">❌</div><div class="gs">${sl}</div>`, 'save', 900, false); }
-  PX.ui.sfx(pg.ng === 'save' ? 'save' : 'shot');
   if (!MV.talk && !MV.momentOpen && !MV.lead && !MV.sp && !MV.pen && !MV.so && !MV.regWalk && !MV.htWait && !MV.intro) MV.paused = false; PX.ui.render(); }
 function emitAt(M, min, anim) {
   const out = []; const dM = dM_(M);
@@ -1817,7 +1919,7 @@ function tick() {
   if (mo && !mo.done && mo.min <= MV.min && !MV.pg && !MV.lead && !MV.momentOpen && !MV.sp && !MV.pen && !MV.so && !MV.htWait && !MV.regWalk && !MV.goalRes && !(MV.act && MV.act.k === 'out')) { if (mo.min < MV.min) mo.min = MV.min; MV.paused = true; beginLead(M, mo); }   // 늦게 열린 선택 장면은 기준 분을 지금으로(이미 화면에 나온 골이 바꿔치기되지 않게)     // 골 연출 중이면 끝난 뒤에 장면을 연다
   if (!MV.htDone && MV.min >= 45 && MV.min < 90 && !MV.pg && !MV.momentOpen && !MV.lead && !MV.pen && !MV.sp && !(MV.act && MV.act.k === 'out') && !MV.fast && !MV.skipping) {         // 전반 종료 → 잠깐 멈춤 → 후반 킥오프
     MV.htDone = true; MV.htWait = true; MV.flipH = true; swapEnds(M, true); const [hh, ha] = scoreShown(); MV.log.unshift({ min: 45, ic: '⏸️', cls: '', t: `<b>전반 종료</b> ${hh} : ${ha}` });
-    MV.regroup = 2.2; fxShow(`<div class="endt">전반 종료</div><div class="ends">${hh} : ${ha}</div>`, 'end', 2200, true);
+    PX.ui.sfx('whistleHalf'); MV.regroup = 2.2; fxShow(`<div class="endt">전반 종료</div><div class="ends">${hh} : ${ha}</div>`, 'end', 2200, true);
     if (M.role === 'mgr') { MV.talkDiff = M.mineHome ? hh - ha : ha - hh; MV.talk = Core.mgrTalkInfo(MV.talkDiff); }
     else if (M.role === 'start' || M.role === 'sub') MV.talk = Object.assign(Core.talkInfo(M.mineHome ? hh - ha : ha - hh), { }); 
     else later(startSecond, 2300); }
@@ -2477,7 +2579,7 @@ function makeWorld() {
   setTimeout(stepW, 60);
 }
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('[data-act]'); if (!t || S.busy) return; const a = t.dataset.act, id = t.dataset.id; if (SND.bgm && !SND.tm) bgmApply(); if (a !== 'snd') PX.ui.sfx('click');
+  const t = e.target.closest('[data-act]'); if (!t || S.busy) return; const a = t.dataset.act, id = t.dataset.id; if (SND.bgm && !SND.tm) bgmApply(); if (SND.sfx || SND.bgm) { try { const c0 = sndCtx(); if (c0 && c0.state === 'suspended') c0.resume(); } catch (e) {} }   // 화면을 누를 때 소리 잠금 해제(폰은 터치 후에만 소리가 남) if (a !== 'snd') PX.ui.sfx('click');
   if ((a==='start' || a==='mstart' || a==='wcstart')) {
     if (a==='mstart' && S.cr.mclub == null) { popup('구단 선택', '먼저 맡을 구단을 골라 주세요.', '⚽'); return; }
     if (!S.okGo && a==='wcstart') { const nm0 = $('#nm'); const nm1 = (nm0 && nm0.value.trim()) || '양메시', go = (d) => () => { S.cr.wcdraw = d; S.okGo = true; t.click(); };
