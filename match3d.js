@@ -486,19 +486,19 @@ const V3D = (() => {
       if (thr && thr.s === pre && thr.tk === i) { extra.throw = true; extra.throwT = clamp((thr.t || 0) / (thr.dur || 1.5), 0, 1); want = toBall; }
       place(r, c.x, c.y, c.vx || 0, c.vy || 0, dt, bx, by, extra, want); if (r.me) meR = r;
     });
-    // 공: 가진 선수 몸 정면 발 앞 / 패스가 거의 도착하면 받는 선수 발 앞으로 / 스로인은 머리 위
+    // 공: 가진 선수 몸 정면 발 앞(공이 아직 오는 중이면 실제 위치) / 패스가 거의 도착하면 받는 선수 발 앞으로 / 스로인은 머리 위
     let bp;
     const hr = hold && R.pl[hold.s] && R.pl[hold.s][hold.i];
     const tr = thr && R.pl[thr.s] && R.pl[thr.s][thr.tk];
     if (tr && tr.root.visible && (thr.t || 0) < (thr.dur || 1.5) * .8) { const p = tr.root.position; bp = new THREE.Vector3(p.x, 2.55, p.z); }
-    else if (hr && hr.root.visible) { const y = hr.st.yaw, p = hr.root.position; bp = new THREE.Vector3(p.x + Math.sin(y) * .5, BR, p.z + Math.cos(y) * .5);
+    else if (hr && hr.root.visible && (() => { const hc = MV.pos[hold.s] && MV.pos[hold.s][hold.i]; return !hc || rpA || Math.hypot(hc.x - bx, hc.y - by) < 2.2; })()) { const y = hr.st.yaw, p = hr.root.position; bp = new THREE.Vector3(p.x + Math.sin(y) * .5, BR, p.z + Math.cos(y) * .5);
       const ft = MV.ft; if (ft && ft.s === hold.s && ft.i === hold.i && ft.until > MV.t) { const k = (ft.until - MV.t) / PX_CFG.touch.dur, vx2 = ft.dx * WS, vz2 = ft.dy * WZ, L2 = Math.hypot(vx2, vz2) || 1; bp.x += vx2 / L2 * ft.len * WS * k; bp.z += vz2 / L2 * ft.len * WZ * k; } }
     else {
       bp = new THREE.Vector3(wx(bx), BR + bz * .85, wz(by));
       const rr = recv && R.pl[recv.s] && R.pl[recv.s][recv.i];
       if (rr && act && act.d0) { const p = rr.root.position, fx = p.x + Math.sin(rr.st.yaw) * .5, fz = p.z + Math.cos(rr.st.yaw) * .5, dist = Math.hypot(bp.x - fx, bp.z - fz); if (dist < 3) { const k = 1 - dist / 3; bp.x += (fx - bp.x) * k; bp.z += (fz - bp.z) * k; } }
     }
-    if (R.bPrev && !rpA) { const dx = bp.x - R.bPrev.x, dz = bp.z - R.bPrev.z, d = Math.hypot(dx, dz), cap = (act ? 95 : 38) * Math.min(dt, .1) + .05;   // 안전장치: 공이 한 프레임에 크게 건너뛰면(주인 바뀜 등) 순간이동 대신 빠르게 굴러가게
+    if (R.bPrev && !rpA && !MV.so) { const dx = bp.x - R.bPrev.x, dz = bp.z - R.bPrev.z, d = Math.hypot(dx, dz), cap = (act ? 95 : 38) * Math.min(dt, .1) + .05;   // 안전장치: 공이 한 프레임에 크게 건너뛰면(주인 바뀜 등) 순간이동 대신 빠르게 굴러가게
       if (d > cap) { const k = cap / d; bp.x = R.bPrev.x + dx * k; bp.z = R.bPrev.z + dz * k; bp.y = Math.max(BR, R.bPrev.y + (bp.y - R.bPrev.y) * k); (R.bJump = (R.bJump || 0) + 1); } }
     R.ballZ = bp.y - BR;
     if (R.bPrev) { const dx = bp.x - R.bPrev.x, dz = bp.z - R.bPrev.z, d = Math.hypot(dx, dz); if (d > 1e-4 && d < 5) R.ball.rotateOnWorldAxis(new THREE.Vector3(dz, 0, -dx).normalize(), d / BR); }
@@ -562,7 +562,8 @@ const V3D = (() => {
     const h = R.wrap && hudMake(R.wrap), M = G0() && G0().mm; if (!h || !M) return;
     let sh = 0, sa = 0; try { [sh, sa] = scoreAt(MV.pg ? MV.min - 1 : MV.min); } catch (e) {}
     const short = (n) => { const s = String(n || '').replace(/\s*(FC|SC|CF|AFC|유나이티드)$/i, '').trim(); return s.length > 5 ? s.slice(0, 5) : s; };
-    const lg = MV.log && MV.log[0], key = [sh, sa, MV.min, R.cm, lg ? lg.min + lg.t : ''].join('|'); if (key === R.hudK) return; R.hudK = key;
+    const lg0 = MV.log && MV.log[0]; if (lg0 !== R.capL) { R.capL = lg0; R.capT = R.t; }
+    const lg = lg0 && R.t - (R.capT || 0) < 6 ? lg0 : null, key = [sh, sa, MV.min, R.cm, lg ? lg.min + lg.t : ''].join('|'); if (key === R.hudK) return; R.hudK = key;   // 중계 자막은 새 문구가 나온 뒤 6초만(옛 문구가 계속 떠 있지 않게)
     h.querySelector('.hc').style.background = M.h.col || '#C8202F'; h.querySelector('.ac').style.background = M.a.col || '#2B5BD7';
     h.querySelector('.hn').textContent = short(M.h.name); h.querySelector('.an').textContent = short(M.a.name);
     h.querySelector('.sc0').textContent = `${sh} : ${sa}`; h.querySelector('.mn').textContent = (MV.etOn ? '연장 ' : '') + MV.min + "'";

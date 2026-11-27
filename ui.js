@@ -812,14 +812,14 @@ function koXY(M, pre, i) {                                                      
   const d = pre === 'm' ? dM_(M) : -dM_(M), b = fxy(pre, i), y = b[1] * 0.64, kick = MV && MV.goalRes ? MV.goalRes === pre : true; let u = Math.min(b[0], 47.5);
   if (!kick && Math.abs(y - 32) < 9.6) u = Math.min(u, 50 - Math.sqrt(9.6 * 9.6 - (y - 32) * (y - 32)));
   return { x: d > 0 ? u : 100 - u, y }; }
-function resetPos(M) { const f = (st, pre) => st.forEach((p, i) => { const c = MV.pos[pre][i], ko = koSpot(M, pre, i) || koXY(M, pre, i); if (c) { c.x = ko.x; c.y = ko.y; c.vx = c.vy = 0; } }); f(MV.mst, 'm'); f(MV.ost, 'o'); MV.run = {}; }
+function resetPos(M, soft) { const f = (st, pre) => st.forEach((p, i) => { const c = MV.pos[pre][i], ko = koSpot(M, pre, i) || koXY(M, pre, i); if (c && !(soft && Math.hypot(c.x - ko.x, c.y - ko.y) > 2.4)) { c.x = ko.x; c.y = ko.y; c.vx = c.vy = 0; } }); f(MV.mst, 'm'); f(MV.ost, 'o'); MV.run = {}; }
 function koSpot(M, pre, i) { if (!MV || MV.goalRes !== pre || MV.pg || i !== Math.min(6, sideOf(pre).length - 1)) return null; const d = pre === 'm' ? dM_(M) : -dM_(M); return { x: 50 - d * 0.9, y: 32 }; }   // 킥오프 차는 선수는 공 바로 뒤
 function kickoffTargets(M) { const F = {}; for (const pre of ['m', 'o']) sideOf(pre).forEach((p, i) => { F[pre + i] = koSpot(M, pre, i) || koXY(M, pre, i); }); return F; }
 function walkToKickoff(M, done, maxMs) {                                                  // 선수들이 실제로 걸어서 킥오프 위치로 이동 → 다 도착하면 시작
   MV.force = kickoffTargets(M); MV.introWalk = false; MV.paused = true; MV.regWalk = true; const t0 = nowR(), F0 = MV.force;
   const chk = () => { if (!MV || MV.over || MV.force !== F0) { if (MV) MV.regWalk = false; return; } let ok = true;
     for (const k in F0) { const c = MV.pos[k[0]][+k.slice(1)], F = F0[k]; if (c && !MV.red[k] && Math.hypot(c.x - F.x, c.y - F.y) > 1.6) { ok = false; break; } }
-    if (ok || nowR() - t0 > (maxMs || 8000)) { MV.force = null; MV.regWalk = false; resetPos(G0().mm || M); if (done) done(); else if (!MV.htWait && !MV.talk && !MV.momentOpen && !MV.pg && !MV.lead && !MV.sp && !MV.pen && !MV.so && !MV.mgrPanel && !MV.intro) MV.paused = false; } else later(chk, 200); };
+    if (ok || nowR() - t0 > (maxMs || 8000)) { MV.force = null; MV.regWalk = false; resetPos(G0().mm || M, true); if (done) done(); else if (!MV.htWait && !MV.talk && !MV.momentOpen && !MV.pg && !MV.lead && !MV.sp && !MV.pen && !MV.so && !MV.mgrPanel && !MV.intro) MV.paused = false; } else later(chk, 200); };
   later(chk, 400); }
 function swapEnds(M, walk) {                                                              // 진영 교체: 공격 방향을 뒤집고 킥오프 대형으로(walk면 걸어서 이동)
   if (!MV || !MV.pos) return; if (MV.act && MV.act.cnEv) cnUndo(MV.act.cnEv); MV.flip = !MV.flip; MV.act = null; MV.rs = null; MV.sp = null; MV.ln = null; MV.holder = null; MV.lbl = null;
@@ -1208,7 +1208,7 @@ function frame(ts) {
   if (!MV.over && MV.min > 0 && !hold) { if (MV.poss && MV.st[MV.poss]) MV.st[MV.poss].pt += dt; const mi0 = MV.myI == null ? (MV.myI = MV.mst.findIndex(p => p.me)) : MV.myI, mc = mi0 >= 0 && MV.pos.m[mi0]; if (mc) { const uu = uOf(mc.x, dM_(M)); MV.heat[Math.min(5, Math.floor(mc.y / 64 * 6)) * 10 + Math.min(9, Math.max(0, Math.floor(uu / 10)))] += dt; } }
   if (MV.pen && !MV.pen.shot && !MV.act && MV.pen.sx != null) { const bb = MV.ball, gx = MV.pen.sx - bb.x, gy = 32 - bb.y, gd = Math.hypot(gx, gy); if (gd > 0.05) { const st = Math.min(gd, Math.max(14, gd * 1.5) * realDt); bb.x += gx / gd * st; bb.y += gy / gd * st; } }   // PK 지점까지 공이 굴러감
   if (MV.sp && !MV.act) { const P0 = MV.sp, bb = MV.ball, gx = P0.sx - bb.x, gy = P0.sy - bb.y, gd = Math.hypot(gx, gy); if (gd > 0.05) { const v = Math.min(42, Math.max(16, gd / Math.max(0.25, (P0.dur || 1.9) * 0.6 - P0.t))), st = Math.min(gd, v * realDt); bb.x += gx / gd * st; bb.y += gy / gd * st; } }   // 세트피스 지점까지 공이 굴러감
-  if (MV.sp) { MV.sp.t += realDt; if (!MV.sp.wh && MV.sp.kind !== 'th' && MV.sp.t > (MV.sp.dur || 1.9) - 0.6) { MV.sp.wh = 1; PX.ui.sfx('whistle'); lbl('휘슬'); retarget(M); } if (MV.sp && MV.sp.t > (MV.sp.dur || 1.9) && (Math.hypot(MV.ball.x - MV.sp.sx, MV.ball.y - MV.sp.sy) < 0.6 || MV.sp.t > (MV.sp.dur || 1.9) + 2)) endSp(M); }
+  if (MV.sp) { MV.sp.t += realDt; if (!MV.sp.wh && MV.sp.kind !== 'th' && MV.sp.t > (MV.sp.dur || 1.9) - 0.6) { MV.sp.wh = 1; PX.ui.sfx('whistle'); lbl('휘슬'); retarget(M); } if (MV.sp && MV.sp.t > (MV.sp.dur || 1.9) && (Math.hypot(MV.ball.x - MV.sp.sx, MV.ball.y - MV.sp.sy) < 0.6 || MV.sp.t > (MV.sp.dur || 1.9) + 6)) endSp(M); }   // 공이 지점에 도착하면 시작(다른 공 움직임 때문에 늦어도 순간이동 없이)
   MV.t += dt; MV.rt -= dt; if (MV.kick > 0) MV.kick -= dt; if (MV.pg) MV.pg.t += dt; if (MV.rt <= 0) { retarget(M); MV.rt = 0.22; }
   const all = [];
   for (const pre of ['m', 'o']) sideOf(pre).forEach((p, i) => {
@@ -1386,7 +1386,7 @@ function endLead(M) {
   for (const k in L.force) { const c = MV.pos[k[0]][+k.slice(1)], f = L.fin[k[0]][+k.slice(1)]; if (c && f) { c.x = f.x; c.y = f.y; c.vx = c.vy = 0; } }   // 도착 못 한 선수만 남은 거리를 맞춘다
   Object.assign(MV, { holder: L.fin.holder, act: L.fin.act, poss: L.fin.poss, stage: L.fin.stage, stageOpp: L.fin.stageOpp, settle: L.fin.settle, rs: L.fin.rs, run: L.fin.run });
   { const fb = L.fin.ball, bd = Math.hypot(MV.ball.x - fb.x, MV.ball.y - fb.y);
-    if (bd > 1.5 && MV.holder) { MV.act = { k: 'pass', to: { s: MV.holder.s, i: MV.holder.i }, sp: 60, pas: 99, from: MV.holder.s, h0: 0.2 }; MV.holder = null; } else { MV.ball.x = fb.x; MV.ball.y = fb.y; } }
+    if (bd > 1.5 && MV.holder) { MV.act = { k: 'pass', to: { s: MV.holder.s, i: MV.holder.i }, sp: 60, pas: 99, from: MV.holder.s, h0: 0.2 }; MV.holder = null; } else if (!(MV.act && bd > 1.5)) { MV.ball.x = fb.x; MV.ball.y = fb.y; } }   // 패스가 날아가는 중이면 공을 옮기지 않고 지금 자리에서 이어 감
   MV.paused = true; MV.momentOpen = L.mo; MV.dec = 99;
   retarget(M); fxShow(`<div class="gs">⚡ 내 차례!</div>`, 'save', 900, false); bringMeTop(); PX.ui.render();
 }
@@ -1688,12 +1688,13 @@ function chanceStart(M, x) {
   const out = k === 'pt' ? 'post' : k === 'sv' ? 'save' : (rnd2() < 0.6 ? 'save' : 'wide');
   let pid = 'solo'; try { pid = pgPlan(st[si], null, false); } catch (e) {} if (!PAT[pid] || PAT[pid].special || PAT[pid].dead || pid === 'pk') pid = 'solo';
   MV.pg = { s: sd, ms: atkMs, si, html: '', logs: [], t: 0, pen: false, ev: null, ng: out, ngK: k, ngX: x, as: -1, pat: pid, pp: PAT[pid], sj: (rnd2() * 2 - 1) * 4 };
+  if (k === 'ch') { const nm0 = esc(st[si].name), tm0 = sd === 'm' ? M.mine : M.opp; MV.log.unshift({ min: MV.min, ic: IC.target, cls: 's', t: `<b>결정적 기회!</b> ${nm0} <span class="dim">${esc(tm0.name)}</span>` }); fxShow(`<div class="gb">🎯</div><div class="gs">결정적 기회 · ${nm0}</div>`, 'save', 900, false); }   // 결정적 기회 문구는 공격이 시작될 때, 결과 문구는 슛하는 순간
   MV.paused = true; MV.dec = Math.min(MV.dec, 0.3); { const c = MV.cnt || (MV.cnt = {}); c.chance = (c.chance || 0) + 1; } return true; }
 function chanceEnd(M, s, i, os) { const pg = MV.pg; MV.pg = null; const team = s === 'm' ? M.mine : M.opp, oteam = s === 'm' ? M.opp : M.mine, nm = esc(sideOf(s)[i].name), gk = sideOf(os)[0], k = pg.ngK, act = MV.act;
   const sl = { save: '골키퍼 선방', wide: '골대를 벗어남', post: '골대를 때림' }[pg.ng] || '골대를 벗어남';
   if (k === 'pt') { MV.log.unshift({ min: MV.min, ic: IC.post, cls: 'p', t: `${nm}의 슛, 골대를 강타!` }); fxShow(`<div class="gb">🥅</div><div class="gs">골대 강타!</div>`, 'save', 1000, false); }
   else if (k === 'sv') { MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${sl}` }); MV.log.unshift({ min: MV.min, ic: IC.glove, cls: 's', t: `<b>슈퍼세이브!</b> ${esc(gk ? gk.name : '골키퍼')} <span class="dim">${esc(oteam.name)}</span>` }); fxShow(`<div class="gb">🧤</div><div class="gs">슈퍼세이브</div>`, 'save', 1000, false); }
-  else { MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${sl}` }); MV.log.unshift({ min: MV.min, ic: IC.target, cls: 's', t: `<b>결정적 기회!</b> ${nm} <span class="dim">${esc(team.name)}</span>` }); fxShow(`<div class="gb">🎯</div><div class="gs">결정적 기회 · ${nm}</div>`, 'save', 900, false); }
+  else { MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${sl}` }); fxShow(sl === '골키퍼 선방' ? `<div class="gb">🧤</div><div class="gs">선방!</div>` : `<div class="gb">❌</div><div class="gs">${sl}</div>`, 'save', 900, false); }
   PX.ui.sfx(pg.ng === 'save' ? 'save' : 'shot');
   if (!MV.talk && !MV.momentOpen && !MV.lead && !MV.sp && !MV.pen && !MV.so && !MV.regWalk && !MV.htWait && !MV.intro) MV.paused = false; PX.ui.render(); }
 function emitAt(M, min, anim) {
@@ -2045,7 +2046,7 @@ function introSlots(M) { const homeP = M.mineHome ? 'm' : 'o', awayP = homeP ===
   L.ref = { a1: X0 + 11 * SP, m: X0 + 12 * SP, a2: X0 + 13 * SP };
   sideOf(awayP).forEach((p, i) => { L.pos[awayP + i] = { x: X0 + (14 + i) * SP, y: Y }; }); return L; }
 function introStart(M) {
-  const go = () => { if (!MV || MV.timer || MV.over) return; introClear(); MV.introRef = null; if (MV.ref) { delete MV.ref.a1y; delete MV.ref.a2y; } MV.force = null; MV.introWalk = false; resetPos(M); MV.ball.x = 50; MV.ball.y = 32; if (!MV.holder) MV.goalRes = M.mineHome ? 'm' : 'o'; MV.paused = false; PX.ui.sfx('whistle'); lbl('킥오프!'); MV.timer = setInterval(tick, MV.speed); PX.ui.render(); PX.ui.move(); };
+  const go = () => { if (!MV || MV.timer || MV.over) return; introClear(); MV.introRef = null; if (MV.ref) { delete MV.ref.a1y; delete MV.ref.a2y; } MV.force = null; MV.introWalk = false; resetPos(M, true); MV.ball.x = 50; MV.ball.y = 32; if (!MV.holder) MV.goalRes = M.mineHome ? 'm' : 'o'; MV.paused = false; PX.ui.sfx('whistle'); lbl('킥오프!'); MV.timer = setInterval(tick, MV.speed); PX.ui.render(); PX.ui.move(); };
   if (MV.fast || MV.hlFast || MV.skipping || !canStageLoose()) { go(); return; }
   const L = introSlots(M); MV.intro = { ph: 'walk', tm: [], go, L, wp: {} }; MV.paused = true; MV.introWalk = true; MV.force = {}; MV.holder = null; MV.act = null;   // 입장 중엔 공 없음·경기 정지
   [[L.homeP, 48.6], [L.awayP, 51.4]].forEach(([pre, fx]) => sideOf(pre).forEach((p, i) => { const c = MV.pos[pre][i]; if (c) { c.x = fx; c.y = 67 + (pre === L.awayP ? sideOf(pre).length - 1 - i : i) * 1.6; c.vx = c.vy = 0; } MV.force[pre + i] = Object.assign({}, L.pos[pre + i]); }));   // 터널에서 두 줄로
