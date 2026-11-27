@@ -215,8 +215,8 @@ const V3D = (() => {
       for (const z of [-GW, GW]) { const sd = new THREE.Mesh(new THREE.PlaneGeometry(D, GH), nm); sd.position.set(s * D / 2, GH / 2, z); g.add(sd); }
     }
     // LED 광고판
-    const bt = boardTex(); R.boards = [];
-    for (const [x, z, len, ry] of [[0, W + 3.2, 2 * L + 4, Math.PI], [0, -(W + 3.2), 2 * L + 4, 0], [L + 3.2, 0, 2 * W + 2, -Math.PI / 2], [-(L + 3.2), 0, 2 * W + 2, Math.PI / 2]]) {
+    const bt = boardTex(); R.boards = []; const TG = 3.4, TY = 3;                     // TG: 선수 입장 터널 반폭(본부석 가운데), TY: 터널 천장 높이
+    for (const [x, z, len, ry] of [[-(L + 2 + TG) / 2, W + 3.2, L + 2 - TG, Math.PI], [(L + 2 + TG) / 2, W + 3.2, L + 2 - TG, Math.PI], [0, -(W + 3.2), 2 * L + 4, 0], [L + 3.2, 0, 2 * W + 2, -Math.PI / 2], [-(L + 3.2), 0, 2 * W + 2, Math.PI / 2]]) {
       const t = bt.clone(); t.needsUpdate = true; t.repeat.set(len / 30, 1); R.tex.set('board' + x + z, t); R.boards.push(t);
       const m = R.lp ? new THREE.MeshBasicMaterial({ map: t, toneMapped: false }) : new THREE.MeshStandardMaterial({ map: t, emissive: col('#ffffff'), emissiveMap: t, emissiveIntensity: 1.15, roughness: .4 });
       const pl = new THREE.Mesh(new THREE.PlaneGeometry(len, 1.6), m); pl.position.set(x, .85, z); pl.rotation.y = ry; sc.add(pl);
@@ -228,19 +228,33 @@ const V3D = (() => {
     for (const sd of [{ ax: 'z', s: 1, len: 2 * L + 16 }, { ax: 'z', s: -1, len: 2 * L + 16 }, { ax: 'x', s: 1, len: 2 * W + 14 }, { ax: 'x', s: -1, len: 2 * W + 14 }]) {
       const base = (sd.ax === 'z' ? W : L) + 6;
       for (let i = 0; i < TIERS; i++) {
-        const h = (i + 1) * TH, off = base + i * TD + TD / 2;
-        const m = new THREE.Mesh(sd.ax === 'z' ? box(sd.len, h, TD) : box(TD, h, sd.len), mat('flat', i % 2 ? '#222a35' : '#2a3340', { r: .6 }));
-        if (sd.ax === 'z') m.position.set(0, h / 2, sd.s * off); else m.position.set(sd.s * off, h / 2, 0); m.receiveShadow = !R.lp; sc.add(m);
+        const h = (i + 1) * TH, off = base + i * TD + TD / 2, tun = sd.ax === 'z' && sd.s === 1, tm = mat('flat', i % 2 ? '#222a35' : '#2a3340', { r: .6 });
+        if (tun) {                                                                         // 본부석: 가운데 터널 입구를 비우고, 터널 천장 위로만 계단을 이어 붙임
+          const sl = sd.len / 2 - TG; for (const sx of [-1, 1]) { const m = new THREE.Mesh(box(sl, h, TD), tm); m.position.set(sx * (TG + sl / 2), h / 2, off); m.receiveShadow = !R.lp; sc.add(m); }
+          if (h > TY) { const m = new THREE.Mesh(box(TG * 2, h - TY, TD), tm); m.position.set(0, TY + (h - TY) / 2, off); sc.add(m); }
+        } else {
+        const m = new THREE.Mesh(sd.ax === 'z' ? box(sd.len, h, TD) : box(TD, h, sd.len), tm);
+        if (sd.ax === 'z') m.position.set(0, h / 2, sd.s * off); else m.position.set(sd.s * off, h / 2, 0); m.receiveShadow = !R.lp; sc.add(m); }
         const n = Math.floor(sd.len / step);
         for (let k = 0; k < n; k++) { if (Math.random() < .13) continue; const t = -sd.len / 2 + (k + .5) * step + (Math.random() - .5) * .2, r = Math.random(), team = r < .5 ? 0 : r < .82 ? 1 : 2;
+          if (tun && h <= TY && Math.abs(t) < TG + .3) continue;
           crowd.push({ x: sd.ax === 'z' ? t : sd.s * off, z: sd.ax === 'z' ? sd.s * off : t, y: h, team, ph: Math.random() * 6.28, sc: .9 + Math.random() * .2 }); }
       }
       const topH = TIERS * TH + 2.4, wo = base + TIERS * TD + .3;
+      if (sd.ax === 'z' && sd.s === 1) {                                                // 본부석 뒷벽도 터널 자리는 비우고, 터널 안(벽·천장)은 어둡게
+        const wm = mat('flat', '#151a21'), sl = sd.len / 2 - TG; for (const sx of [-1, 1]) { const w2 = new THREE.Mesh(box(sl, topH, .6), wm); w2.position.set(sx * (TG + sl / 2), topH / 2, wo); sc.add(w2); }
+        { const w2 = new THREE.Mesh(box(TG * 2, topH - TY, .6), wm); w2.position.set(0, TY + (topH - TY) / 2, wo); sc.add(w2); }
+        const dk = mat('flat', '#07090c'), tl = wo - base + 1.2, tz = base + tl / 2 - .6;
+        const ceil = new THREE.Mesh(box(TG * 2 + .4, .3, tl), dk); ceil.position.set(0, TY + .15, tz); sc.add(ceil);
+        for (const sx of [-1, 1]) { const sw = new THREE.Mesh(box(.3, TY, tl), dk); sw.position.set(sx * (TG + .15), TY / 2, tz); sc.add(sw); }
+        const fl = new THREE.Mesh(box(TG * 2, .04, tl), dk); fl.position.set(0, .02, tz); sc.add(fl);
+        const lip = new THREE.Mesh(box(TG * 2 + 1.2, .5, .5), mat('flat', '#C9CFD8')); lip.position.set(0, TY + .25, base - .1); sc.add(lip);   // 터널 입구 테두리
+      } else {
       const wall = new THREE.Mesh(sd.ax === 'z' ? box(sd.len, topH, .6) : box(.6, topH, sd.len), mat('flat', '#151a21'));
-      if (sd.ax === 'z') wall.position.set(0, topH / 2, sd.s * wo); else wall.position.set(sd.s * wo, topH / 2, 0); sc.add(wall);
+      if (sd.ax === 'z') wall.position.set(0, topH / 2, sd.s * wo); else wall.position.set(sd.s * wo, topH / 2, 0); sc.add(wall); }
       if (sd.ax === 'z') {
         const roof = new THREE.Mesh(box(sd.len + 4, .5, 17), mat('metal', '#2a3038', { r: .45 })); roof.position.set(0, topH + 3.4, sd.s * (wo - 7.5)); roof.rotation.x = sd.s * -.08; sc.add(roof);
-        for (let k = -4; k <= 4; k++) { const p = new THREE.Mesh(box(.5, topH + 3.4, .5), mat('metal', '#3a414b')); p.position.set(k * 14, (topH + 3.4) / 2, sd.s * wo); sc.add(p); }
+        for (let k = -4; k <= 4; k++) { if (k === 0 && sd.s === 1) continue; const p =new THREE.Mesh(box(.5, topH + 3.4, .5), mat('metal', '#3a414b')); p.position.set(k * 14, (topH + 3.4) / 2, sd.s * wo); sc.add(p); }
         if (!R.lp) { const strip = new THREE.Mesh(box(sd.len, .12, .3), new THREE.MeshStandardMaterial({ color: col('#000000'), emissive: col('#cfe6ff'), emissiveIntensity: 2 })); strip.position.set(0, topH + 3.05, sd.s * (wo - 15.8)); sc.add(strip); }
       }
     }
@@ -511,7 +525,14 @@ const V3D = (() => {
     const IN = MV.intro && (MV.intro.ph === 'walk' || MV.intro.ph === 'line' || MV.intro.ph === 'shake');
     if (IN) {                                                                                  // 입장: 선수들을 따라가며 비추고, 일렬로 서면 정면에서 전체를 담음
       let cx = 0, cz = 0, nn = 0; for (const pre of ['m', 'o']) (R.pl[pre] || []).forEach(r => { if (r && r.root.visible) { cx += r.root.position.x; cz += r.root.position.z; nn++; } }); if (nn) { cx /= nn; cz /= nn; }
-      const ln = MV.intro.ph === 'line' || MV.intro.ph === 'shake', dz = ln ? (narrow ? 44 : 34) : (narrow ? 24 : 18); pos.set(cx * .4, ln ? 7 : 6, cz + dz); look.set(cx * .4, ln ? 2.6 : 1.1, cz); fov = ln ? 58 : 40; rate = 1.6; }
+      const ln = MV.intro.ph === 'line' || MV.intro.ph === 'shake';   // 카메라는 관중석(W+6) 안·밖으로 나가지 않음
+      let fz = 99; for (const pre of ['m', 'o']) (R.pl[pre] || []).forEach(r => { if (r && r.root.visible) fz = Math.min(fz, r.root.position.z); });
+      if (R.inI !== MV.intro) { R.inI = MV.intro; R.inShot = 0; R.camInit = false; }        // 입장 시작은 컷으로
+      const sh = ln ? 2 : (R.inShot || fz < W - 9) ? 1 : 0; if (sh !== R.inShot) { R.inShot = sh; if (sh === 1) R.camInit = false; }
+      if (sh === 0) { pos.set(.6, 3.2, W - 13); look.set(0, 1.9, W + 4); fov = narrow ? 62 : 50; }                     // ① 경기장에서 터널을 정면으로: 선수들이 걸어 나옴
+      else if (sh === 1) { pos.set(0, 4.6, W + 2.4); look.set(cx * .35, .6, Math.min(cz, W - 8) - 6); fov = narrow ? 70 : 58; }   // ② 터널 입구 뒤에서: 선수들 뒷모습 너머 라인 서는 모습
+      else { pos.set(cx * .4, 11, W + 4.2); look.set(cx * .4, 2.2, Math.min(cz, W - 6)); fov = narrow ? 78 : 66; }      // ③ 줄 서기·악수: 광고판 바로 뒤에서 줄 전체
+      rate = 1.6; }
     else if (cele && cr && m !== 'far') { const s = cr.root.position, d = s.x > 0 ? 1 : -1; pos.set(s.x - d * 8, 2.8, s.z * .85 + (s.z > 0 ? -4.5 : 4.5)); look.set(s.x, 1.3, s.z); fov = 34; rate = 2.2; }
     else if (m === 'far') { const zf = narrow ? 1.35 : 1; pos.set(b.x * .12, 88 * zf, 72 * zf + b.z * .05); look.set(b.x * .12, 0, 2); fov = 38; rate = 2; }
     else if (m === 'near') { const zf = narrow ? 1.2 : 1; pos.set(clamp(b.x * .96, -L, L), 11 * zf, b.z + 19 * zf); look.set(clamp(b.x, -L, L), .5, b.z - 1); fov = 40; rate = 3.2; }
