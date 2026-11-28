@@ -774,10 +774,12 @@ function refHTML() { const c = refCol(), ol = c === '#1A1A1A' ? '#fff' : '#000';
   return fig('refA1', .62, 1) + fig('refA2', .62, 1) + fig('refM', .7, 0); }
 function refStep(M, dt) {                                                                  // 심판 위치 갱신(매 프레임)
   const b = MV.ball; if (!MV.ref) MV.ref = { x: 44, y: 40, a1: 50, a2: 50 }; const R = MV.ref; if (MV.intro && MV.introRef) return;
-  const d = MV.poss === 'o' ? -dM_(M) : dM_(M); let tx = b.x - d * 9, ty = b.y + (b.y < 32 ? 11 : -11);
-  if (MV.sp) { tx = MV.sp.sx - MV.sp.d * 7; ty = MV.sp.sy + (MV.sp.sy < 32 ? 8 : -8); }
+  const d = MV.poss === 'o' ? -dM_(M) : dM_(M);
+  if (R.sd == null) R.sd = 1; if (b.y < 20) R.sd = 1; else if (b.y > 44) R.sd = -1;   // 공이 가운데 가로선을 오갈 때마다 심판이 위↔아래로 건너뛰지 않게: 공이 한쪽 측면 깊이 갈 때만 서는 쪽을 바꿈
+  let tx = b.x - d * 9, ty = clampN(b.y + R.sd * 10, 8, 56);
+  if (MV.sp) { if (MV.sp.sy < 20) R.sd = 1; else if (MV.sp.sy > 44) R.sd = -1; tx = MV.sp.sx - MV.sp.d * 7; ty = clampN(MV.sp.sy + R.sd * 8, 6, 58); }
   const rc = MV.refCard; if (rc && rc.until > MV.t) { const st = rc.ms ? MV.mst : MV.ost, i = st.indexOf(rc.p), q = i >= 0 && MV.pos[rc.ms ? 'm' : 'o'][i]; if (q) { tx = q.x + 3; ty = q.y + 1; } }
-  if (MV.over || MV.goalRes || MV.cele) { tx = 50 - dM_(M) * 4; ty = 40; }
+  if (MV.over || MV.goalRes || MV.cele) { tx = 50 - dM_(M) * 4; ty = 32 + R.sd * 8; }
   tx = clampN(tx, 4, 96); ty = clampN(ty, 4, 60); const dx = tx - R.x, dy = ty - R.y, dd = Math.hypot(dx, dy), v = Math.min(dd, (dd > 10 ? 13 : 8) * dt); if (dd > 0.05) { R.x += dx / dd * v; R.y += dy / dd * v; }
   const tA1 = clampN(b.x, 50, 98), tA2 = clampN(b.x, 2, 50); R.a1 += clampN(tA1 - R.a1, -10 * dt, 10 * dt); R.a2 += clampN(tA2 - R.a2, -10 * dt, 10 * dt);
   const E = MV.refEl || (MV.refEl = { m: document.getElementById('refM'), a1: document.getElementById('refA1'), a2: document.getElementById('refA2'), c: document.getElementById('refC') });
@@ -925,7 +927,7 @@ function walkToKickoff(M, done, maxMs) {                                        
   later(chk, 400); }
 function swapEnds(M, walk) {                                                              // 진영 교체: 공격 방향을 뒤집고 킥오프 대형으로(walk면 걸어서 이동)
   if (!MV || !MV.pos) return; if (MV.act && MV.act.cnEv) cnUndo(MV.act.cnEv); MV.flip = !MV.flip; MV.act = null; MV.rs = null; MV.sp = null; MV.ln = null; MV.holder = null; MV.lbl = null;
-  if (walk && !MV.fast && !MV.hlFast && !MV.skipping) walkToKickoff(M); else { resetPos(M); MV.ball.x = 50; MV.ball.y = 32; } if (MV.ref) { MV.ref.x = 50 - dM_(M) * 6; MV.ref.y = 40; } }
+  if (walk && !MV.fast && !MV.hlFast && !MV.skipping) walkToKickoff(M); else { resetPos(M); MV.ball.x = 50; MV.ball.y = 32; if (MV.ref) { MV.ref.x = 50 - dM_(M) * 6; MV.ref.y = 40; } } }   // 걸어서 돌아갈 땐 심판도 걸어감(순간이동 없이)
 function sideOf(s) { return s === 'm' ? MV.mst : MV.ost; }
 // ===== 경기 화면 측정 카운터(MV.cnt, 판단에는 쓰지 않음) =====
 function pstatOn() { return MV && !MV.pg && !MV.sp && !MV.pen && !MV.so && !MV.lead && !MV.over; }
@@ -1610,7 +1612,11 @@ function benchSub(M) { if (!MV || !MV.pos || !MV.pos.m.length) return;
     let c = st.map((_, j) => j).filter(j => ok(j, true)); if (!c.length) c = st.map((_, j) => j).filter(j => ok(j, false) && st[j].sub !== 'GK'); if (!c.length) continue;
     const j = c[Math.floor(rnd2() * c.length)], outP = st[j]; st[j] = o.p; cntAdd('vSub');
     MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 — ${esc(o.p.name)} IN / ${esc(outP.name)} OUT <span class="dim">${esc((ms ? M.mine : M.opp).name)}</span>` });
-    const pb = typeof $ === 'function' && $('#pitchbox'); if (pb) { pb.innerHTML = pitchHTML(M); MV.els = null; MV.refEl = null; } if (!MV.hlFast) lbl('선수 교체'); } }
+    pitchRedraw(M); if (!MV.hlFast) lbl('선수 교체'); } }
+// 교체로 경기 화면을 다시 그릴 때: 전체화면(서랍 안의 경기 흐름·버튼)이 같이 날아가지 않게 상태를 살려 둠
+function pitchRedraw(M) { const pb = typeof $ === 'function' && $('#pitchbox'); if (!pb) return; const ow = pb.querySelector('.pwrap'), fs = !!(ow && ow.classList.contains('vfull')), rot = !!(ow && ow.classList.contains('rot')), dr = document.getElementById('vdrawer'), op = !!(dr && dr.classList.contains('open')), au = dr ? dr.dataset.auto || '' : '';
+  if (fs) vfullDrawer(false); pb.innerHTML = pitchHTML(M); MV.els = null; MV.refEl = null;
+  if (fs) { const w = pb.querySelector('.pwrap'); if (w) { w.classList.add('vfull'); if (rot) w.classList.add('rot'); } vfullDrawer(true); const d2 = document.getElementById('vdrawer'), tb = document.getElementById('vmtab'); if (op && d2) { d2.classList.add('open'); d2.dataset.auto = au; if (tb) { tb.textContent = '▶ 닫기'; tb.classList.add('open'); } } } }
 function dgStage(M, x) { if (!MV.pos || !MV.pos.m.length || !canStage() || MV.regWalk || MV.htWait || MV.intro || MV.rp || MV.aim || (MV.act && MV.act.k === 'out')) return false;
   const ms = !!x.ms, sd = ms ? 'm' : 'o', st = sideOf(sd); let si = vizIdx(st, sd, x.p); if (!(si > 0) || MV.red[sd + si] || !MV.pos[sd][si]) return false;
   const ev = { min: MV.min, side: (ms ? M.mine : M.opp).id, sc: st[si], as: null, pen: false, varOff: x.why || 'off', fake: true };   // 기록에 없는 골(점수 불변): 번복 처리에서 지울 것이 없음
@@ -1959,7 +1965,7 @@ function tick() {
   if (MV.min === 1) MV.log.unshift({ min: 1, ic: '🧠', cls: '', t: `<b>상대 감독</b> <span class="dim">전술 이해도 ${MV.tacR.o}${M.aiNote ? ' · ' + esc(M.aiNote) : ''}</span>` });
   if ((MV.min === 60 || MV.min === 75) && !MV.etOn && !MV.hlFast) aiInGame(M);
   if (M.role==='sub' && MV.min===M.from) MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 투입 — ${esc(m.name)}` })
-  if (M.role==='sub' && MV.min===M.from && !MV.mst.some(p => p.me)) { let ix = MV.mst.findIndex(p => p.sub === m.sub && p.sub !== 'GK'); if (ix < 0) ix = MV.mst.findIndex(p => p.sub !== 'GK'); if (ix >= 0) { const outp = MV.mst[ix]; MV.mst[ix] = m; lbl('교체 투입'); const pb = $('#pitchbox'); if (pb) { pb.innerHTML = pitchHTML(M); MV.els = null; MV.refEl = null; bringMeTop(); } fxShow(`<div class="gchar">${sprH(m, MV.kc.m, 40)}</div><div class="gs">교체 투입 · ${esc(m.name)}</div><div class="dim">${esc(outp.name)} ↔ ${MV.min}분</div>`, 'save', 1800, false); } }
+  if (M.role==='sub' && MV.min===M.from && !MV.mst.some(p => p.me)) { let ix = MV.mst.findIndex(p => p.sub === m.sub && p.sub !== 'GK'); if (ix < 0) ix = MV.mst.findIndex(p => p.sub !== 'GK'); if (ix >= 0) { const outp = MV.mst[ix]; MV.mst[ix] = m; lbl('교체 투입'); pitchRedraw(M); bringMeTop(); fxShow(`<div class="gchar">${sprH(m, MV.kc.m, 40)}</div><div class="gs">교체 투입 · ${esc(m.name)}</div><div class="dim">${esc(outp.name)} ↔ ${MV.min}분</div>`, 'save', 1800, false); } }
   const mo = M.moments[M.mi];
   if (mo && !mo.done && mo.min <= MV.min && !MV.pg && !MV.lead && !MV.momentOpen && !MV.sp && !MV.pen && !MV.so && !MV.htWait && !MV.regWalk && !MV.goalRes && !(MV.act && MV.act.k === 'out')) { if (mo.min < MV.min) mo.min = MV.min; MV.paused = true; beginLead(M, mo); }   // 늦게 열린 선택 장면은 기준 분을 지금으로(이미 화면에 나온 골이 바꿔치기되지 않게)     // 골 연출 중이면 끝난 뒤에 장면을 연다
   if (!MV.htDone && MV.min >= 45 && MV.min < 90 && !MV.pg && !MV.momentOpen && !MV.lead && !MV.pen && !MV.sp && !(MV.act && MV.act.k === 'out') && !MV.fast && !MV.skipping) {         // 전반 종료 → 잠깐 멈춤 → 후반 킥오프
@@ -2084,7 +2090,10 @@ function mvOverlay() {                                                          
   ov.innerHTML = `<div class="mvq">${Core.momentText(mo.kind)} <b id="mvt2">${Math.max(0, Math.ceil(MV.moT == null ? 10 : MV.moT))}</b></div><div class="mvb">${opts.map(o => `<button class="opt ${o.fav ? 'fav' : ''}" data-act="mv" data-id="${o.id}"><b>${o.fav ? '★ ' : ''}${o.n}</b><span>성공 ${Math.round(o.shown * 100)}%</span></button>`).join('')}</div>`;
 }
 function renderMatch0() {
-  const G = G0(), M = G.mm; if (!M || !MV || !$('#mh')) return; const [sh, sa] = scoreShown();
+  const G = G0(), M = G.mm; if (!M || !MV || !$('#mh')) return;
+  if (!$('#mb') || !$('#mf')) { const mt = $('#match'); if (!mt) return; ['mb', 'mf'].forEach(id => { if (!$('#' + id)) { const d = document.createElement('div'); d.className = id; d.id = id; mt.appendChild(d); } });   // 안전장치: 경기 흐름·버튼 칸이 사라졌으면 다시 만들고 전체화면이면 서랍에 다시 넣음
+    const w = document.querySelector('#pitchbox .pwrap'); if (w && document.body.classList.contains('vfull-on')) { w.classList.add('vfull'); vfullDrawer(true); vfullFit(); } }
+  const [sh, sa] = scoreShown();
   let dec = '';
   if (MV.talk) dec = `<div class="card gl"><div class="row g8"><b style="font-size:13.5px;line-height:1.25">감독: “${esc(MV.talk.text)}”</b></div><div class="opts3">${MV.talk.opts.map(o => `<button class="opt" data-act="talk" data-id="${o.id}"><b>${o.t}</b></button>`).join('')}</div></div>`;
   else if (MV.momentOpen) { const mo = MV.momentOpen; const opts = Core.momentOptions(mo); dec = `<div class="card gl"><div class="row g8" style="align-items:flex-end"><span class="mebub">${sprH(Core.me(), MV.kc.m, 28, 'idle')}</span><b>${Core.momentText(mo.kind)}</b></div><div class="dim">${MV.min}분 · 어떻게 할까? <b id="mvt" style="color:#FFB27A">${Math.max(0, Math.ceil(MV.moT == null ? 10 : MV.moT))}</b>초 안에 고르세요</div><div class="${opts.length===3?'opts3':'optsn'}">${opts.map(o => { const lv = lvl3(o.shown); return `<button class="opt ${o.fav?'fav':''}" data-act="mv" data-id="${o.id}"><b>${o.fav?'★ ':''}${o.ord?'📋 ':''}${o.n}</b><span class="lv ${lv[1]}">${lv[0]}</span><span class="pbar sm"><i class="${lv[1]}" style="width:${Math.round(o.shown*100)}%"></i></span><span class="dim s11 pc ${lv[1]}">성공 ${Math.round(o.shown*100)}%</span></button>`; }).join('')}</div></div>`; }
@@ -2490,7 +2499,7 @@ function mgrSubUI(outId, inId) {
   const M = G0().mm, r = Core.mgrSub(outId, inId, MV.min); if (r) M.segDirty = true; if (!r) { toast('교체할 수 없습니다 (5회 한도)'); return; }
   const i = MV.mst.findIndex(p => p.id === outId); if (i >= 0) MV.mst[i] = r.inn;
   MV.mgrDirty = true; MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 — ${esc(r.inn.name)} IN / ${esc(r.out.name)} OUT` });
-  const pb = $('#pitchbox'); if (pb) { pb.innerHTML = pitchHTML(M); MV.els = null; MV.refEl = null; } S.mpout = null; PX.ui.render();
+  pitchRedraw(M); S.mpout = null; PX.ui.render();
 }
 
 const NAV = [['home','홈'],['me','내 선수'],['ctr','이적'],['league','순위·대회'],['news','뉴스']];
