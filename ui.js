@@ -879,6 +879,7 @@ function retarget(M) {
         else { let best = null, bd = 24; foes.forEach(o => { if (taken.has(o.j)) return; const dd = Math.hypot(o.q.x - x, o.q.y - y); if (dd < bd) { bd = dd; best = o; } });          // 가까운 공격수 마크(골문 쪽에서)
           if (best) { taken.add(best.j); const mk = clampN(0.45 + (A('MAR') - 50) / 150, 0.3, 0.8); x += (best.q.x - d * 2.8 - x) * mk; y += (best.q.y + (32 - best.q.y) * 0.1 - y) * mk; } }
       }
+      if (!gk && MV.chase && MV.chase[pre + i] && hold && hold.s !== pre && !MV.pg && !MV.sp && !act) { const me1 = pos[pre][i]; if (me1 && Math.hypot(me1.x - b.x, me1.y - b.y) < 30) { x = b.x - d * 1.0; y = b.y; sprint = true; } }   // 카드가 예정된 선수: 공 가진 상대에게 달려들어 실제 반칙 장면이 나오게
       if (gk && act && act.k === 'shot' && act.s !== pre) { y = act.out === 'goal' ? act.ty + (act.ty > 32 ? -3 : 3) : act.ty; sprint = true; }   // 슛 막으러 몸을 던짐
       const rcv = act && act.k === 'pass' && act.to.s === pre && act.to.i === i, rg = rcv ? [2, 98] : (ROLE_U[sub] || [3, 97]); let uu = uOf(x, d); uu = c01(uu, rg[0], rg[1]); x = d > 0 ? uu : 100 - uu;   // 받으러 가는 선수는 범위 제한 없음
       { let nx = c01(x, 2.5, 97.5), ny = c01(y, 3, 61);
@@ -998,8 +999,11 @@ function shoot(M, out, sty) {
   MV.act = { k: 'shot', tx: t.x, ty: t.y, sp: 56, out, s, to, eh, sty: sty || 'drive' }; MV.holder = null; lbl('슛!');
   const SY = SHOT_STY[sty]; if (SY) { MV.act.h0 = SY.h; MV.act.sp = SY.sp; if (SY.dev) MV.act.dev = SY.dev * (footOf(sideOf(s)[h.i]) === 'L' ? 1 : -1) * d; if (SY.cy != null && out === 'goal') MV.act.ty = 32 + (t.y > 32 ? 1 : -1) * SY.cy; lbl(SY.t); }
   if (MV.pg && MV.pg.ng) { chanceEnd(M, s, h.i, os); return; }
-  if (out !== 'goal') { const nm = esc(sideOf(s)[h.i].name); MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${({ save: '골키퍼 선방', wide: '골대를 벗어남', block: '수비가 막아냄', post: '골대를 때림' })[out]}` }); }
+  if (out !== 'goal') { const nm = esc(sideOf(s)[h.i].name); resLater({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${({ save: '골키퍼 선방', wide: '골대를 벗어남', block: '수비가 막아냄', post: '골대를 때림' })[out]}` }); }
 }
+// 슛 결과 문구·배너는 공이 도착한 순간(슛 동작이 끝날 때)에: 차는 순간 '선방!'이 먼저 뜨던 문제
+function resLater(lg, fx) { const a = MV.act; if (!a || a.k !== 'shot' || MV.skipping) { if (lg) MV.log.unshift(lg); if (fx) fxShow(fx[0], fx[1], fx[2], false); return; } const r = a.res || (a.res = { lg: [], fx: [] }); if (lg) r.lg.push(lg); if (fx) r.fx.push(fx); MV.resA = a; }
+function resFlush(force) { const a = MV && MV.resA; if (!a || (!force && MV.act === a)) return; MV.resA = null; const r = a.res; if (!r) return; r.lg.forEach(o => { o.min = Math.max(o.min, MV.min); MV.log.unshift(o); }); r.fx.forEach(f => fxShow(f[0], f[1], f[2], false)); }
 const SHOT_STY = { header: { h: 1.0, sp: 60, t: '헤딩슛!' }, volley: { h: 2.0, sp: 68, t: '발리슛!' }, chip: { h: 3.4, sp: 36, t: '칩슛!', cy: 1.6 }, curve: { h: 1.6, sp: 54, t: '감아차기!', dev: 2.8 }, drive: { h: 1.3, sp: 82, t: '중거리 슛!' }, low: { h: 0.5, sp: 58, t: '땅볼 슛!' }, tap: { h: 0.4, sp: 34, t: '밀어 넣기!' }, overhead: { h: 2.6, sp: 56, t: '바이시클 킥!' }, first: { h: 0.7, sp: 66, t: '논스톱 슛!' }, knuckle: { h: 1.0, sp: 92, t: '무회전 슛!', dev: 0.9 } };
 // ===== 공격 전진·개인 행동 설정값(fm-detail-spec.md 출발값). 조정은 이 표의 숫자만 =====
 const PX_CFG = {
@@ -1031,6 +1035,7 @@ function pCut(x0, y0, x1, y1, os) { const C = PX_CFG.cut, L = Math.hypot(x1 - x0
     keep *= 1 - mx * C.scale; }); return 1 - keep; }
 function softPick(opts, tau) { if (!opts.length) return null; const mx = Math.max(...opts.map(o => o.S)), w = opts.map(o => Math.exp((o.S - mx) / tau)); let r = rnd2() * w.reduce((a, b) => a + b, 0); for (let k = 0; k < opts.length; k++) { r -= w[k]; if (r <= 0) return opts[k]; } return opts[opts.length - 1]; }
 function cntAdd(k, v) { if (!pstatOn()) return; const c = MV.cnt || (MV.cnt = {}); c[k] = (c[k] || 0) + (v == null ? 1 : v); }
+function cntRaw(k) { if (!MV) return; const c = MV.cnt || (MV.cnt = {}); c[k] = (c[k] || 0) + 1; }   // 연출 시작 순간(장면 중이라 cntAdd가 안 세는 경우)
 // 3-3 미리 뛰는 침투: 0.5초마다 공격 팀에서 조건을 보고 출발(최대 2명). 화면 오프사이드는 만들지 않음(공이 그 선수에게 나가기 전엔 라인을 넘지 않음)
 function runsUpdate(M) { const C = PX_CFG.run, h = MV.holder; if (MV.runsS !== MV.poss) { MV.runs = {}; MV.runsS = MV.poss; }                                 // 공격 팀이 바뀌면 침투 기록 초기화(패스가 날아가는 동안은 유지)
   if (!h || MV.pg || MV.sp || MV.pen || MV.so || MV.lead || MV.cele || MV.paused) return;
@@ -1300,6 +1305,7 @@ function frame(ts) {
     return; }
   let dt = MV.last ? Math.min(0.05, MV.rawE || 0) : 0.016; MV.last = ts; const realDt = dt; dt *= tsOf();   // 연출 시간(같은 시계, 상한 0.05초) → 경기 시간은 배속 적용
   try { if (!MV.skipping && !MV.fast && !MV.hlFast) sndMatch(M, realDt); } catch (e) {}
+  resFlush(false);
   if (MV.rp) { if (rpStep(M, realDt)) return; }
   if (MV.momentOpen && MV.settle > 0) MV.settle -= realDt; const hold = !!MV.momentOpen && !(MV.settle > 0), pdt = hold ? 0 : dt;
   if (MV.momentOpen && !MV.over) {                                                                  // 내 선택 장면: 선택하기 전에는 상대도 절대 진행하지 않는다 + 10초 제한(초과 시 무작위 선택)
@@ -1580,15 +1586,37 @@ function foulScene(M, o) {
   deadBall(M, { type, s, sx: clampN(sx, 2, 98), sy });
 }
 // 엔진 파울·카드의 실제 위치: 파울당한 팀이 공을 가졌으면 공 가진 선수 자리, 아니면 파울한 선수가 상대와 붙어 있는 자리. 없으면 null(미룸)
-function foulSpot(M, x, loose) { const r = foulSpot0(M, x, loose); if (!r) return null; const s = x.ms ? 'o' : 'm', d = s === 'm' ? dM_(M) : -dM_(M); if (uOf(r.at.x, d) > 83 && Math.abs(r.at.y - 32) < 22) return null; return r; }   // 박스 안이면 미룸(엉뚱하게 박스 밖으로 옮기지 않게)
-function foulSpot0(M, x, loose) { const s = x.ms ? 'o' : 'm', fs = x.ms ? 'm' : 'o', fi = sideOf(fs).indexOf(x.p), h = MV.holder;
+function foulSpot(M, x, loose, strict) { const r = foulSpot0(M, x, loose, strict); if (!r) return null; const s = x.ms ? 'o' : 'm', d = s === 'm' ? dM_(M) : -dM_(M); if (uOf(r.at.x, d) > 83 && Math.abs(r.at.y - 32) < 22) return null; return r; }   // 박스 안이면 미룸(엉뚱하게 박스 밖으로 옮기지 않게)
+function foulSpot0(M, x, loose, strict) { const s = x.ms ? 'o' : 'm', fs = x.ms ? 'm' : 'o', fi = sideOf(fs).indexOf(x.p), h = MV.holder;
   const near = (pre, q, R) => { let bi = -1, bd = R; (MV.pos[pre] || []).forEach((p2, j) => { if (j && p2 && !MV.red[pre + j]) { const dd = Math.hypot(p2.x - q.x, p2.y - q.y); if (dd < bd) { bd = dd; bi = j; } } }); return bi; };
-  if (h && h.s === s && !MV.act) { const q = MV.pos[s][h.i]; if (q) { const vi = fi > 0 && MV.pos[fs][fi] && Math.hypot(MV.pos[fs][fi].x - q.x, MV.pos[fs][fi].y - q.y) < 7 ? fi : near(fs, q, 7); if (vi > 0 || loose) return { at: { x: q.x, y: q.y }, vi, vs: fs }; } }
-  const fq = fi > 0 && MV.pos[fs][fi]; if (fq) { const j = near(s, fq, 5); if (j > 0) { const q = MV.pos[s][j], at = { x: (fq.x + q.x) / 2, y: (fq.y + q.y) / 2 }; if (Math.hypot(at.x - MV.ball.x, at.y - MV.ball.y) <= 8) return { at, vi: fi, vs: fs }; } }   // 공 근처에서 붙어 있을 때만(공이 순간이동하지 않게)
+  if (h && h.s === s && !MV.act) { const q = MV.pos[s][h.i]; if (q) { const vi = fi > 0 && MV.pos[fs][fi] && Math.hypot(MV.pos[fs][fi].x - q.x, MV.pos[fs][fi].y - q.y) < 7 ? fi : strict ? -1 : near(fs, q, loose ? 11 : 7); if (vi > 0 || (loose && !strict)) return { at: { x: q.x, y: q.y }, vi, vs: fs }; } }   // strict(카드): 기록된 그 선수가 붙어 있을 때만
+  const fq = fi > 0 && MV.pos[fs][fi]; if (fq) { const j = near(s, fq, 5); if (j > 0) { const q = MV.pos[s][j], at = { x: (fq.x + q.x) / 2, y: (fq.y + q.y) / 2 }; if (Math.hypot(at.x - MV.ball.x, at.y - MV.ball.y) <= 5) return { at, vi: fi, vs: fs }; } }   // 공 근처에서 붙어 있을 때만(공이 순간이동하지 않게)
   return null; }
-function engineFoul(M, x, card, loose) { if (!canStage()) return false; const sp = foulSpot(M, x, loose); if (!sp) return false; { const hh = MV.holder, c = MV.cnt || (MV.cnt = {}), k = hh && hh.s === (x.ms ? 'o' : 'm') ? 'flHolder' : 'flFouler'; c[k] = (c[k] || 0) + 1; c.flJump = (c.flJump || 0) + Math.hypot(MV.ball.x - sp.at.x, MV.ball.y - sp.at.y); }
+function engineFoul(M, x, card, loose) { if (!canStage()) return false; const sp = foulSpot(M, x, loose, !!card && !loose); if (!sp) return false; { const hh = MV.holder, c = MV.cnt || (MV.cnt = {}), k = hh && hh.s === (x.ms ? 'o' : 'm') ? 'flHolder' : 'flFouler'; c[k] = (c[k] || 0) + 1; c.flJump = (c.flJump || 0) + Math.hypot(MV.ball.x - sp.at.x, MV.ball.y - sp.at.y); }
   if (sp.vi > 0) MV.slideReq = { s: sp.vs, i: sp.vi, t: MV.t }; MV.act = null; MV.holder = null;
-  foulScene(M, { s: x.ms ? 'o' : 'm', p: x.p, card, at: sp.at }); if (!MV.sp) cntAdd('flNoSp'); return true; }
+  const vp = sp.vi > 0 ? sideOf(sp.vs)[sp.vi] : x.p;   // 화면에서 실제로 태클한 선수(중계 문구도 이 선수로)
+  foulScene(M, { s: x.ms ? 'o' : 'm', p: vp, card, at: sp.at }); if (!MV.sp) cntAdd('flNoSp'); return { p: vp }; }
+// 엔진이 교체 선수(벤치)를 득점자로 정했는데 화면 선발에 없으면: 골 몇 분 전에 같은 포지션 계열 선수와 화면 교체(기록·점수는 엔진 그대로)
+function benchSub(M) { if (!MV || !MV.pos || !MV.pos.m.length) return;
+  for (const e of M.evMine.concat(M.evOpp)) { if (e.shown || !e.sc || e.min > MV.min + 4) continue; const ms = M.evMine.includes(e), sd = ms ? 'm' : 'o', st = sideOf(sd); if (st.includes(e.sc) || e.sc.me) continue;
+    if (e.min > MV.min && (MV.pg || MV.sp || MV.act || MV.goalRes)) continue;   // 여유가 있으면 공이 멈춰 있을 때·동작이 없을 때
+    const grp = (q) => ['ST', 'W', 'AM'].includes(q) ? 0 : ['CM', 'DM'].includes(q) ? 1 : 2, g = grp(e.sc.sub || 'ST'), busy = new Set();
+    M.evMine.concat(M.evOpp).forEach(o => { if (!o.shown) { busy.add(o.sc); busy.add(o.as); } }); (M.evx || []).forEach(o => { if (!o.shown) busy.add(o.p); });
+    const ok = (j, strictG) => j > 0 && st[j] && !st[j].me && !MV.red[sd + j] && MV.pos[sd][j] && !busy.has(st[j]) && (!strictG || grp(st[j].sub) === g);
+    let c = st.map((_, j) => j).filter(j => ok(j, true)); if (!c.length) c = st.map((_, j) => j).filter(j => ok(j, false) && st[j].sub !== 'GK'); if (!c.length) continue;
+    const j = c[Math.floor(rnd2() * c.length)], outP = st[j]; st[j] = e.sc; cntAdd('vSub');
+    MV.log.unshift({ min: MV.min, ic: IC.swap, cls: '', t: `교체 — ${esc(e.sc.name)} IN / ${esc(outP.name)} OUT <span class="dim">${esc((ms ? M.mine : M.opp).name)}</span>` });
+    const pb = typeof $ === 'function' && $('#pitchbox'); if (pb) { pb.innerHTML = pitchHTML(M); MV.els = null; MV.refEl = null; } if (!MV.hlFast) lbl('선수 교체'); } }
+function dgStage(M, x) { if (!MV.pos || !MV.pos.m.length || !canStage() || MV.regWalk || MV.htWait || MV.intro || MV.rp || MV.aim || (MV.act && MV.act.k === 'out')) return false;
+  const ms = !!x.ms, sd = ms ? 'm' : 'o', st = sideOf(sd); let si = vizIdx(st, sd, x.p); if (!(si > 0) || MV.red[sd + si] || !MV.pos[sd][si]) return false;
+  const ev = { min: MV.min, side: (ms ? M.mine : M.opp).id, sc: st[si], as: null, pen: false, varOff: x.why || 'off', fake: true };   // 기록에 없는 골(점수 불변): 번복 처리에서 지울 것이 없음
+  let pid = 'solo'; try { pid = pgPlan(st[si], null, false); } catch (e) {} if (!PAT[pid] || PAT[pid].special || PAT[pid].dead || pid === 'pk') pid = 'solo';
+  MV.pg = { s: sd, ms, si, html: '', logs: [], t: 0, pen: false, ev, off: ev.varOff, ms2: ms, as: -1, pat: pid, pp: PAT[pid], sj: (rnd2() * 2 - 1) * 4 }; MV.paused = true; MV.dec = Math.min(MV.dec, 0.3); return true; }
+function cardLine(M, x, min) { const team = x.ms ? M.mine : M.opp, nmx = esc(x.p.name); return x.t === 'yc' ? { min, ic: IC.yc, cls: 'c', t: `경고 ${nmx} <span class="dim">${esc(team.name)}</span>` } : { min, ic: IC.rc, cls: 'c r', t: x.second ? `<b>경고 누적 퇴장!</b> ${nmx} <span class="dim">${esc(team.name)} · 두 번째 경고</span>` : `<b>퇴장!</b> ${nmx} <span class="dim">${esc(team.name)}${x.var ? ' · VAR 확인' : ''}</span>` }; }
+function cardFx(M, x, quiet) { const r = x.t === 'rc', nmx = esc(x.p.name); if (MV.chase) { const s0 = x.ms ? 'm' : 'o'; delete MV.chase[s0 + sideOf(s0).indexOf(x.p)]; } if (!quiet) MV.refCard = { c: r ? 'r' : 'y', p: x.p, ms: x.ms, until: MV.t + (r ? 2.8 : 2.6) };
+  if (r) { const idx = (x.ms ? MV.mst : MV.ost).indexOf(x.p); if (idx >= 0) MV.red[(x.ms ? 'm' : 'o') + idx] = true; }
+  if (!quiet) fxShow(`${(r ? IC.rc : IC.yc).replace('width="12" height="16"','width="30" height="40"')}<div class="gs">${nmx}</div>`, r ? 'card red' : 'card', r ? 1300 : 1000, false); }
+function cardWait(M, x) { return x.t === 'rc' && (M.evx || []).some(y => y !== x && y.t === 'yc' && y.p === x.p && !y.shown); }   // 경고 누적 퇴장은 첫 경고가 화면에 나온 뒤에
 function cnUndo(ce) { if (!ce || !MV) return; const k = MV.log.indexOf(ce.entry); if (k >= 0) MV.log.splice(k, 1); ce.x.shown = false; ce.x.defer = true; cntAdd('cnRetry'); }   // 코너킥 장면이 끊기면 기록 취소 → 다시 미룸
 function cnStart(M, x, entry) { MV.log.unshift(entry); startSp(M, 'cn', x.ms); if (MV.act && MV.act.k === 'out') MV.act.cnEv = { x, entry }; }
 function startSp(M, type, ms) {                                                         // 엔진 이벤트(코너킥·파울)용 진입점
@@ -1771,7 +1799,8 @@ function offsideFx(M, x) {                                                      
 // 미뤄 둔 엔진 사건(파울·오프사이드·코너킥)을 매 순간 확인해 맞는 상황이 오면 바로 연출 + 중계 기록
 function stageDeferred(M) { if (!M.evx || MV.act || MV.aim || !canStage()) return;
   for (const x of M.evx) { if (!x.defer || x.shown) continue; const team = x.ms ? M.mine : M.opp, tn = ` <span class="dim">${esc(team.name)}</span>`;
-    if (x.t === 'fl') { if (engineFoul(M, x, null, MV.min - x.min >= 4)) { x.shown = true; MV.log.unshift({ min: MV.min, ic: '📣', cls: '', t: `파울 ${esc(x.p.name)}${tn}` }); PX.ui.render(); return; } }
+    if (x.t === 'fl') { const r = engineFoul(M, x, null, MV.min - x.min >= 4); if (r) { x.shown = true; MV.log.unshift({ min: MV.min, ic: '📣', cls: '', t: `파울 ${esc(r.p.name)}${tn}` }); PX.ui.render(); return; } }
+    else if (x.t === 'yc' || x.t === 'rc') { if (cardWait(M, x)) continue; if (engineFoul(M, x, x.t === 'rc' ? 'r' : 'y', false)) { x.shown = true; cntRaw('cdStage'); cardFx(M, x); MV.log.unshift(cardLine(M, x, MV.min)); PX.ui.render(); return; } }
     else if (x.t === 'of') { const fp = offEngine(M, x, false); if (fp) { x.shown = true; cntAdd('ofStage'); MV.log.unshift({ min: MV.min, ic: '🚩', cls: '', t: `오프사이드 ${esc(fp.name)}${tn}` }); PX.ui.render(); return; } }
     else if (x.t === 'cn') { const du = x.ms ? dM_(M) : -dM_(M), ub = uOf(MV.ball.x, du), hs = MV.holder && MV.holder.s === (x.ms ? 'm' : 'o'); if (ub > 62 || (MV.min - x.min >= 3 && ub > 45 && hs)) { x.shown = true; cntAdd('cnStage'); cnStart(M, x, { min: MV.min, ic: '🚩', cls: '', t: `코너킥${tn}` }); PX.ui.render(); return; } } } }
 function offEngine(M, x, late) { if (!canStage()) return null; const s = x.ms ? 'm' : 'o', os = x.ms ? 'o' : 'm', d = s === 'm' ? dM_(M) : -dM_(M), h = MV.holder; if (MV.poss !== s) return null;
@@ -1796,9 +1825,9 @@ function chanceStart(M, x) {
   MV.paused = true; MV.dec = Math.min(MV.dec, 0.3); { const c = MV.cnt || (MV.cnt = {}); c.chance = (c.chance || 0) + 1; } return true; }
 function chanceEnd(M, s, i, os) { const pg = MV.pg; MV.pg = null; const team = s === 'm' ? M.mine : M.opp, oteam = s === 'm' ? M.opp : M.mine, nm = esc(sideOf(s)[i].name), gk = sideOf(os)[0], k = pg.ngK, act = MV.act;
   const sl = { save: '골키퍼 선방', wide: '골대를 벗어남', post: '골대를 때림' }[pg.ng] || '골대를 벗어남';
-  if (k === 'pt') { MV.log.unshift({ min: MV.min, ic: IC.post, cls: 'p', t: `${nm}의 슛, 골대를 강타!` }); fxShow(`<div class="gb">🥅</div><div class="gs">골대 강타!</div>`, 'save', 1000, false); }
-  else if (k === 'sv') { MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${sl}` }); MV.log.unshift({ min: MV.min, ic: IC.glove, cls: 's', t: `<b>슈퍼세이브!</b> ${esc(gk ? gk.name : '골키퍼')} <span class="dim">${esc(oteam.name)}</span>` }); fxShow(`<div class="gb">🧤</div><div class="gs">슈퍼세이브</div>`, 'save', 1000, false); }
-  else { MV.log.unshift({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${sl}` }); fxShow(sl === '골키퍼 선방' ? `<div class="gb">🧤</div><div class="gs">선방!</div>` : `<div class="gb">❌</div><div class="gs">${sl}</div>`, 'save', 900, false); }
+  if (k === 'pt') resLater({ min: MV.min, ic: IC.post, cls: 'p', t: `${nm}의 슛, 골대를 강타!` }, [`<div class="gb">🥅</div><div class="gs">골대 강타!</div>`, 'save', 1000]);
+  else if (k === 'sv') { resLater({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${sl}` }); resLater({ min: MV.min, ic: IC.glove, cls: 's', t: `<b>슈퍼세이브!</b> ${esc(gk ? gk.name : '골키퍼')} <span class="dim">${esc(oteam.name)}</span>` }, [`<div class="gb">🧤</div><div class="gs">슈퍼세이브</div>`, 'save', 1000]); }
+  else resLater({ min: MV.min, ic: IC.target, cls: '', t: `${nm}의 슛 — ${sl}` }, [sl === '골키퍼 선방' ? `<div class="gb">🧤</div><div class="gs">선방!</div>` : `<div class="gb">❌</div><div class="gs">${sl}</div>`, 'save', 900]);
   if (!MV.talk && !MV.momentOpen && !MV.lead && !MV.sp && !MV.pen && !MV.so && !MV.regWalk && !MV.htWait && !MV.intro) MV.paused = false; PX.ui.render(); }
 function emitAt(M, min, anim) {
   const out = []; const dM = dM_(M);
@@ -1818,25 +1847,29 @@ function emitAt(M, min, anim) {
   }
   for (const x of M.evx || []) if ((x.min === min || (x.defer && x.min <= min)) && !x.shown) {
     x.shown = true; const team = x.ms ? M.mine : M.opp, nmx = esc(x.p.name);
-    if (x.t === 'yc') { MV.refCard = { c: 'y', p: x.p, ms: x.ms, until: MV.t + 2.6 }; out.push({ min, ic: IC.yc, cls: 'c', t: `경고 ${nmx} <span class="dim">${esc(team.name)}</span>` }); if (anim) { fxShow(`${IC.yc.replace('width="12" height="16"','width="30" height="40"')}<div class="gs">${nmx}</div>`, 'card', 1000, false); (engineFoul(M, x, 'y', true) || lbl('경고')); } }
-    else if (x.t === 'dg') { const why = ({ off: '오프사이드', foul: '공격자 반칙', hand: '핸드볼' })[x.why] || '오프사이드'; out.push({ min, ic: '🚫', cls: 'c', t: `<b>골 취소</b> ${nmx} <span class="dim">${esc(team.name)} · VAR 판독 · ${why}</span>` }); if (anim) varSeq([[`<div class="gb">⚽</div><div class="gs">골인?!</div>`, 'save', 900], [`<div class="gb">📺</div><div class="gs">VAR 판독 중…</div>`, 'save', 1500], [`<div class="gb">🚫</div><div class="gs">골 취소 · ${why}</div>`, 'card', 1700]]); }
+    if (x.t === 'yc' || x.t === 'rc') { const late = min - x.min >= (x.t === 'rc' ? 5 : 15);   // 카드: 그 선수가 실제로 반칙하는 장면과 함께(맞는 상황이 올 때까지 경고 15분·퇴장 5분까지 미룸)
+      if (anim && !MV.over && !MV.skipping) { if (!late && cardWait(M, x)) { x.shown = false; x.defer = true; continue; } const r = engineFoul(M, x, x.t === 'rc' ? 'r' : 'y', false); if (r) { cardFx(M, x); MV.log.unshift(cardLine(M, x, MV.min)); cntRaw('cdStage'); } else if (!late) { x.shown = false; x.defer = true; } else { cardFx(M, x, true); out.push(cardLine(M, x, min)); cntAdd('cdLogOnly'); } }   // 끝내 장면이 없으면 기록만(큰 카드 배너 없이)
+      else { out.push(cardLine(M, x, min)); if (x.t === 'rc') cardFx(M, x, true); } }
+    else if (x.t === 'dg') { const why = ({ off: '오프사이드', foul: '공격자 반칙', hand: '핸드볼' })[x.why] || '오프사이드';   // VAR로 취소될 골: 실제 득점 장면(골망) → VAR 판독 → 취소. 장면을 못 만들면 3분까지 미루고, 그래도 안 되면 문구만
+      if (anim && !MV.over && dgStage(M, x)) cntRaw('dgStage'); else if (anim && !MV.over && min - x.min < 3) { x.shown = false; x.defer = true; } else out.push({ min, ic: '🚫', cls: 'c', t: `<b>골 취소</b> ${nmx} <span class="dim">${esc(team.name)} · VAR 판독 · ${why}</span>` }); }
+    else if (x.t === 'pk' && anim && !MV.over && (MV.pen || MV.so || MV.pg || MV.sp || MV.goalRes || MV.lead) && min - x.min < 4) { x.shown = false; x.defer = true; }   // 다른 장면 중이면 PK 장면을 직접 보여 줄 수 있을 때까지 미룸
     else if (x.t === 'pk') { const gkn = x.gk ? esc(x.gk.name) : '골키퍼'; out.push({ min, ic: '🅿️', cls: 'c', t: `<b>페널티킥 선언</b> <span class="dim">${esc(team.name)} · 박스 안 반칙(VAR 확인)</span>` }); const pkr = { min, ic: x.res === 'miss' ? '❌' : IC.glove, cls: 's', t: x.res === 'miss' ? `${nmx}의 페널티킥 — 골대 밖으로 벗어남` : `<b>페널티킥 선방!</b> ${gkn} <span class="dim">키커 ${nmx}</span>` }; if (!anim || MV.pen || MV.so || MV.pg || MV.sp) out.push(pkr); if (anim) { const sd = x.ms ? 'm' : 'o', stp = x.ms ? MV.mst : MV.ost, idx0 = stp.indexOf(x.p), res = x.res === 'miss' ? (rnd2() < 0.7 ? 'wide' : 'post') : 'save', fin = () => fxShow(res === 'save' ? `<div class="gb">🧤</div><div class="gs">선방!</div>` : `<div class="gb">❌</div><div class="gs">실축!</div>`, 'save', 1200, false);
         if (MV.pen || MV.so || MV.pg || MV.sp) varSeq([[`<div class="gb">🅿️</div><div class="gs">페널티킥! · ${nmx}</div>`, 'card', 1100], [`<div class="gb">📺</div><div class="gs">VAR 확인 · 파울 인정</div>`, 'save', 1300], [res === 'save' ? `<div class="gb">🧤</div><div class="gs">선방!</div>` : `<div class="gb">❌</div><div class="gs">실축!</div>`, 'save', 1300]]);
         else pkBuild(M, sd, idx0 >= 0 ? idx0 : -1, () => penScene(M, { s: sd, ki: idx0 >= 0 ? idx0 : bestKicker(stp), res, intro: [[`<div class="gb">🅿️</div><div class="gs">페널티킥! · ${nmx}</div>`, 'card', 1100], [`<div class="gb">📺</div><div class="gs">VAR 확인 · 파울 인정</div>`, 'save', 1200]], done: () => { fin(); pkr.min = MV.min; MV.log.unshift(pkr); PX.ui.render(); if (!MV.pg && !MV.momentOpen && !MV.lead && !MV.talk) MV.paused = false; } })); } }   // 결과 문구는 차는 순간 이후에
     else if (x.t === 'of') { const ofl = (p) => ({ min, ic: '🚩', cls: '', t: `오프사이드 ${esc(p.name)} <span class="dim">${esc(team.name)}</span>` });   // 맞는 상황(공 소유 + 라인 뒤 동료)에서만 연출, 최대 3분 미룸
       if (anim && !MV.over && !MV.skipping) { const fp = offEngine(M, x, min - x.min >= 8); if (fp) { MV.log.unshift(ofl(fp)); cntAdd('ofStage'); } else if (min - x.min < 8) { if (!x.defer) cntAdd('ofDefer'); x.shown = false; x.defer = true; } else cntAdd('ofLogOnly'); } else out.push(ofl(x.p)); }
-    else if (x.t === 'rc') { MV.refCard = { c: 'r', p: x.p, ms: x.ms, until: MV.t + 2.8 }; out.push({ min, ic: IC.rc, cls: 'c r', t: x.second ? `<b>경고 누적 퇴장!</b> ${nmx} <span class="dim">${esc(team.name)} · 두 번째 경고</span>` : `<b>퇴장!</b> ${nmx} <span class="dim">${esc(team.name)}${x.var ? ' · VAR 확인' : ''}</span>` }); const idx = (x.ms ? MV.mst : MV.ost).indexOf(x.p); if (idx >= 0) MV.red[(x.ms ? 'm' : 'o') + idx] = true; if (anim) fxShow(`${IC.rc.replace('width="12" height="16"','width="30" height="40"')}<div class="gs">${nmx}</div>`, 'card red', 1300, false); (engineFoul(M, x, 'r', true) || lbl('퇴장')); }
-    else if ((x.t === 'sv' || x.t === 'ch' || x.t === 'pt') && anim && (chanceStart(M, x) || (min - x.min < 2 && !MV.over && (x.shown = false, x.defer = true)))) { /* 공격 장면으로 연출 → 슛하는 순간 문구(다른 장면 중이면 최대 2분 미룸) */ }
+    else if ((x.t === 'sv' || x.t === 'ch' || x.t === 'pt') && anim && (chanceStart(M, x) || (min - x.min < 5 && !MV.over && (x.shown = false, x.defer = true)) || true)) { /* 공격 장면으로 연출 → 공이 도착하는 순간 문구(다른 장면 중이면 최대 5분 미룸, 그래도 없으면 장면 없는 문구는 띄우지 않음) */ }
     else if (x.t === 'sv') { out.push({ min, ic: IC.glove, cls: 's', t: `<b>슈퍼세이브!</b> ${nmx} <span class="dim">${esc(team.name)}</span>` }); if (anim) fxShow(`<div class="gb">🧤</div><div class="gs">슈퍼세이브</div>`, 'save', 1000, false); }
     else if (x.t === 'ch') { out.push({ min, ic: IC.target, cls: 's', t: `<b>결정적 기회!</b> ${nmx} <span class="dim">${esc(team.name)}</span>` }); if (anim) fxShow(`<div class="gb">🎯</div><div class="gs">결정적 기회 · ${nmx}</div>`, 'save', 900, false); }
     else if (x.t === 'cn') { const cl = { min, ic: '🚩', cls: '', t: `코너킥 <span class="dim">${esc(team.name)}</span>` }, late = min - x.min >= 6, du = x.ms ? dM_(M) : -dM_(M);   // 공이 그 팀 공격 진영 깊이 있을 때 연출, 최대 2분 미룸
       if (anim && !MV.over && !MV.skipping) { if (canStage() && !MV.act && (late || uOf(MV.ball.x, du) > 62)) { cnStart(M, x, cl); cntAdd('cnStage'); } else if (!late) { x.shown = false; x.defer = true; } else cntAdd('cnLogOnly'); } else out.push(cl); }
     else if (x.t === 'fl') { const fl = { min, ic: '📣', cls: '', t: `파울 ${nmx} <span class="dim">${esc(team.name)}</span>` };   // 파울: 맞는 상황(공 가진 선수·붙어 있는 선수)에서 장면과 함께, 없으면 최대 2분 미룸
-      if (anim && !MV.over && !MV.skipping) { if (engineFoul(M, x, null, min - x.min >= 8)) MV.log.unshift(fl); else if (min - x.min < 8) { if (!x.defer) cntAdd('flDefer'); x.shown = false; x.defer = true; } else cntAdd('flLogOnly'); } else out.push(fl); }
+      if (anim && !MV.over && !MV.skipping) { const r = engineFoul(M, x, null, min - x.min >= 8); if (r) { fl.t = `파울 ${esc(r.p.name)} <span class="dim">${esc(team.name)}</span>`; fl.min = MV.min; MV.log.unshift(fl); } else if (min - x.min < 8) { if (!x.defer) cntAdd('flDefer'); x.shown = false; x.defer = true; } else cntAdd('flLogOnly'); } else out.push(fl); }
     else if (x.t === 'ij') { out.push({ min, ic: '🩹', cls: 'c', t: `부상 치료 ${nmx} <span class="dim">${esc(team.name)}</span>` }); if (anim) { const idx = (x.ms ? MV.mst : MV.ost).indexOf(x.p); if (idx >= 0) { (MV.frz || (MV.frz = {}))[(x.ms ? 'm' : 'o') + idx] = MV.t + 4; { const pre0 = x.ms ? 'm' : 'o', op0 = x.ms ? 'o' : 'm', me0 = MV.pos[pre0][idx]; let nj = -1, nd0 = 7; (MV.pos[op0] || []).forEach((q, j) => { if (j && q && me0) { const dd = Math.hypot(q.x - me0.x, q.y - me0.y); if (dd < nd0) { nd0 = dd; nj = j; } } }); if (nj >= 0) { MV.slideReq = { s: op0, i: nj, t: MV.t }; lbl('충돌 — 쓰러졌다'); } else lbl('근육 부상으로 쓰러짐'); } } } }
     else if (x.t === 'pt') { out.push({ min, ic: IC.post, cls: 'p', t: `${nmx}의 슛, 골대를 강타!` }); if (anim) fxShow(`<div class="gb">🥅</div><div class="gs">골대 강타!</div>`, 'save', 900, false); }
   }
   for (const o of out.reverse()) MV.log.unshift(o);
+  if (anim) { const ch = {}; (M.evx || []).forEach(y => { if ((y.t === 'yc' || y.t === 'rc') && y.defer && !y.shown) { const s0 = y.ms ? 'm' : 'o', ix = sideOf(s0).indexOf(y.p); if (ix > 0) ch[s0 + ix] = 1; } }); MV.chase = ch; }
 }
 const SPD = [1, 1.5, 2], BASE_MS = 1600;
 function spdGet() { try { const v = +localStorage.getItem('bfm_spd'); if (SPD.includes(v)) return v; } catch (e) {} return 1; }
@@ -1894,7 +1927,7 @@ function scoreAt(min) {
   const M = G0().mm; const mine = M.evMine.filter(e => e.min <= min).length, opp = M.evOpp.filter(e => e.min <= min).length;
   return M.mineHome ? [mine, opp] : [opp, mine];
 }
-function finishLog(M) { const mv = Core.mvpOf(M); MV.log.unshift({ min: MV.etOn ? 120 : 90, ic: IC.crown, cls: 'mvp', t: mv ? `<b>MVP ${esc(mv.p.name)}</b>${mv.me ? ' <span class="tag">나!</span>' : ''} <span class="dim">${esc((mv.mine ? M.mine : M.opp).name)}</span>` : '경기 종료' }); }
+function finishLog(M) { try { resFlush(true); } catch (e) {} const mv = Core.mvpOf(M); MV.log.unshift({ min: MV.etOn ? 120 : 90, ic: IC.crown, cls: 'mvp', t: mv ? `<b>MVP ${esc(mv.p.name)}</b>${mv.me ? ' <span class="tag">나!</span>' : ''} <span class="dim">${esc((mv.mine ? M.mine : M.opp).name)}</span>` : '경기 종료' }); }
 function aiInGame(M) {                                                                            // AI 감독의 경기 중 판단: 뒤지면 공격적으로, 앞서면 수비적으로(전술 이해도가 높을수록 적극적·정확)
   for (const pre of ['m', 'o']) {
     if (pre === 'm' && Core.isMgr()) continue; const club = pre === 'm' ? M.mine : M.opp, tac = MV.tacR[pre], T = MV.tk[pre]; if (!T || rnd2() > clampN((tac - 30) / 70, 0.1, 0.9)) continue;
@@ -1907,6 +1940,7 @@ function tick() {
   const M = G0().mm; if (!M || !MV || MV.paused || MV.over || MV.momentOpen || MV.exitAsk || MV.setOpen) return;
   MV.min++;
   const m = Core.me();
+  try { benchSub(M); } catch (e) {}
   emitAt(M, MV.min, !MV.hlFast);
   segTick(M);
   if (M.role !== 'mgr' && [30, 60, 75].includes(MV.min)) { try { const ps = Core.mePush(MV.min); if (ps > 0) { MV.log.unshift({ min: MV.min, ic: '🔥', cls: '', t: '<b>내 활약에 팀이 살아납니다</b> <span class="dim">동료들의 움직임이 좋아졌습니다</span>' }); if (!MV.hlFast) lbl('기세 상승'); } else if (ps < 0) MV.log.unshift({ min: MV.min, ic: '😓', cls: '', t: '<b>부진이 팀 분위기에 영향을 줍니다</b> <span class="dim">상대가 기세를 올립니다</span>' }); } catch (e) {} }
